@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets — .env.example is tracked, real .env is not
+.env
+.env.local
+
+# Generated run output (digests, findings, inventories, screenshots)
+out/
+
+# Runtime state: sqlite DBs, LLM cache, upstream snapshots
+state/
+
+# Course content exports and source sheets (large, proprietary)
+data/

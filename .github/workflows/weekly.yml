@@ -1,0 +1,55 @@
+# Weekly unattended run. GitHub Actions `schedule` is the only cron precedent in the
+# house, so it is what MIW uses; a local crontab line calling `main.py run-weekly`
+# works identically.
+name: curriculum-drift-watch
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'        # Mondays 04:00 UTC = 09:30 IST
+  workflow_dispatch:
+    inputs:
+      tiers:
+        description: watch tiers to probe
+        default: critical,standard
+      limit:
+        description: max dependencies to probe (blank = all)
+        default: ''
+
+concurrency:
+  group: curriculum-drift-watch
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt tavily-python openai
+      # Gate the run on the offline suites. They need no keys and no network, so a
+      # broken extractor or a loosened trust rule fails here rather than in a digest.
+      - run: python3 -m pytest tests/ -q
+      - run: python3 eval/run_eval.py
+      # State carries week-over-week memory: without it every run reports the same
+      # standing facts and the digest becomes noise.
+      - uses: actions/cache@v4
+        with:
+          path: state
+          key: miw-state-${{ github.run_id }}
+          restore-keys: miw-state-
+      - env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 main.py run-weekly --tiers "${{ inputs.tiers || 'critical,standard' }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: digest
+          path: |
+            out/digest_*.md
+            out/findings_*.json
+            out/probe_*.json

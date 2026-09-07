@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MIW — Curriculum Drift Watch</title>
+<!-- Inline favicon: the page must make no external request, and a missing
+     /favicon.ico is a 404 in every visitor's console. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230e6a5e'/%3E%3Cpath d='M6 21l5-9 5 5 4-7 6 11' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  /* Local-only styling: no font host, no CDN, no external request of any kind.
+     The app must work on a laptop with no network, which is also when a curriculum
+     lead is most likely to be reading last week's digest. */
+  :root {
+    --ground:#f4f7f6; --surface:#fff; --sunk:#eaf0ee; --ink:#16211f; --soft:#475854;
+    --muted:#6b7c78; --rule:#d8e1df; --rule2:#b9c7c4;
+    --accent:#0e6a5e; --accent-ink:#0a4b42; --accent-wash:#dcebe7;
+    --crit:#a33019; --crit-wash:#f6e2dd; --high:#8a5b06; --high-wash:#f6ead3;
+    --med:#2f5f7a; --med-wash:#dde8ef; --low:#5c6b67; --low-wash:#e7ecea;
+    --ok:#2c6739; --ok-wash:#deebdf;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --ground:#0d1312; --surface:#141c1a; --sunk:#1b2422; --ink:#e7eeeb; --soft:#b2c2bd;
+    --muted:#869893; --rule:#253130; --rule2:#354543;
+    --accent:#4ec0ae; --accent-ink:#8ad8cb; --accent-wash:#14332e;
+    --crit:#e58873; --crit-wash:#38201b; --high:#d9ab56; --high-wash:#332714;
+    --med:#88b6d0; --med-wash:#16262e; --low:#94a5a1; --low-wash:#1d2624;
+    --ok:#7fbe8b; --ok-wash:#17301c;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font:14.5px/1.55 var(--sans)}
+  a{color:var(--accent)}
+  code,.mono{font-family:var(--mono);font-size:.86em}
+
+  header{background:var(--surface);border-bottom:1px solid var(--rule);padding:14px 22px;
+    display:flex;flex-wrap:wrap;gap:14px 26px;align-items:baseline;position:sticky;top:0;z-index:20}
+  header h1{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+  header h1 span{color:var(--accent)}
+  .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;
+    flex-wrap:wrap;gap:4px 18px}
+  .meta b{color:var(--ink);font-weight:500}
+
+  nav{display:flex;gap:2px;padding:0 22px;background:var(--surface);
+    border-bottom:1px solid var(--rule);position:sticky;top:57px;z-index:19}
+  nav button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;
+    font:inherit;font-size:13px;color:var(--muted);cursor:pointer}
+  nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+  nav button:hover{color:var(--ink)}
+
+  main{padding:20px 22px 60px;max-width:1180px}
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:1px;
+    background:var(--rule);border:1px solid var(--rule);margin-bottom:22px}
+  .tile{background:var(--surface);padding:12px 14px}
+  .tile .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--muted)}
+  .tile .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:3px}
+  .tile .s{font-size:11.5px;color:var(--muted)}
+
+  .card{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--rule2);
+    margin-bottom:14px}
+  .card.critical{border-left-color:var(--crit)} .card.high{border-left-color:var(--high)}
+  .card.medium{border-left-color:var(--med)}   .card.low{border-left-color:var(--low)}
+  .card.done{opacity:.62}
+  .chead{padding:13px 16px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;
+    border-bottom:1px solid var(--rule)}
+  .chead .name{font-weight:600;font-size:15px}
+  .cbody{padding:13px 16px;display:flex;flex-direction:column;gap:9px}
+  .row{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;font-size:13.5px}
+  .row .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);padding-top:3px}
+  blockquote{margin:5px 0 0;padding:7px 11px;background:var(--sunk);
+    border-left:2px solid var(--rule2);font-size:12.8px;color:var(--soft)}
+  .ev{margin-bottom:8px}
+  .ev:last-child{margin-bottom:0}
+  .ev a{font-family:var(--mono);font-size:11.5px;word-break:break-all}
+
+  .chip{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 7px;
+    border-radius:2px;white-space:nowrap;border:1px solid transparent}
+  .chip.critical{background:var(--crit-wash);color:var(--crit)}
+  .chip.high{background:var(--high-wash);color:var(--high)}
+  .chip.medium{background:var(--med-wash);color:var(--med)}
+  .chip.low,.chip.info{background:var(--low-wash);color:var(--low)}
+  .chip.sig{background:var(--accent-wash);color:var(--accent-ink)}
+  .chip.n{background:var(--sunk);color:var(--muted);border-color:var(--rule)}
+  .chip.ok{background:var(--ok-wash);color:var(--ok)}
+  .chip.opportunity{background:var(--accent-wash);color:var(--accent-ink)}
+
+  .triage{border-top:1px solid var(--rule);padding:11px 16px;background:var(--sunk);
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button.act{font:inherit;font-size:12.5px;padding:5px 12px;border:1px solid var(--rule2);
+    background:var(--surface);color:var(--ink);border-radius:3px;cursor:pointer}
+  button.act:hover{border-color:var(--accent);color:var(--accent)}
+  button.act.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.act.primary:hover{color:#fff;opacity:.9}
+  button.act.danger:hover{border-color:var(--crit);color:var(--crit)}
+  button.act:disabled{opacity:.45;cursor:not-allowed}
+  input.ti,textarea.ti{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--rule2);
+    background:var(--surface);color:var(--ink);border-radius:3px;width:100%}
+  .correct{display:none;flex-basis:100%;flex-direction:column;gap:6px;margin-top:6px}
+  .correct.open{display:flex}
+  .correct label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--muted)}
+  .note{font-size:12px;color:var(--muted)}
+
+  /* `separate` + zero spacing rather than `collapse`: collapsed borders are known to
+     interact badly with `position:sticky` on <th> in some engines, and this renders
+     identically. */
+  table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;
+    background:var(--surface)}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--rule);vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);background:var(--sunk);position:sticky;top:0;z-index:1}
+  /* The table gets its own vertical scroll box so the header can stick to the box's
+     top. Sticking it to a hard page offset instead (`top:96px`) breaks as soon as the
+     surrounding chrome changes height, and leaves the first row painted above it. */
+  .scroll{overflow:auto;max-height:calc(100vh - 250px);border:1px solid var(--rule)}
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+  select,input.q{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--rule2);
+    background:var(--surface);color:var(--ink);border-radius:3px}
+  input.q{min-width:220px}
+  pre.out{background:var(--surface);border:1px solid var(--rule);padding:14px;
+    overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.5;white-space:pre-wrap}
+  .empty{background:var(--surface);border:1px dashed var(--rule2);padding:26px;
+    text-align:center;color:var(--muted)}
+
+  /* run form */
+  .panel{background:var(--surface);border:1px solid var(--rule);padding:16px 18px;
+    margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:18px}
+  fieldset{border:0;padding:0;margin:0}
+  legend,.flabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:7px;display:block}
+  .checks{display:flex;flex-direction:column;gap:5px}
+  .checks label,.inline label{display:flex;gap:7px;align-items:center;font-size:13.5px;
+    cursor:pointer}
+  .inline{display:flex;flex-wrap:wrap;gap:6px 16px}
+  .checks .cnt{color:var(--muted);font-family:var(--mono);font-size:11px}
+  input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+  .preview{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:baseline;
+    border-top:1px solid var(--rule);margin-top:14px;padding-top:13px}
+  .preview .big{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+  .runbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:13px}
+  pre.log{background:#0d1312;color:#dfe9e6;border:1px solid var(--rule);padding:12px 14px;
+    font-family:var(--mono);font-size:11.8px;line-height:1.55;max-height:420px;
+    overflow:auto;white-space:pre-wrap;margin:0}
+  pre.log b{color:var(--accent-ink);font-weight:600}
+  .runrow{display:grid;grid-template-columns:80px 92px 1fr 128px;gap:10px;padding:7px 10px;
+    border-bottom:1px solid var(--rule);font-size:12.5px;align-items:center}
+  .runrow:last-child{border-bottom:0}
+  .spin{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+    animation:pulse 1.1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none;opacity:.8}}
+  h2{font-size:14px;margin:22px 0 10px;font-weight:600}
+  h2:first-child{margin-top:0}
+  .hint{font-size:12.5px;color:var(--muted);margin-bottom:14px;max-width:70ch}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>MIW <span>·</span> Curriculum Drift Watch</h1>
+  <div class="meta" id="meta">loading…</div>
+</header>
+
+<nav role="tablist">
+  <button role="tab" data-tab="run" aria-selected="true">Run audit</button>
+  <button role="tab" data-tab="findings" aria-selected="false">Findings</button>
+  <button role="tab" data-tab="inventory" aria-selected="false">Inventory</button>
+  <button role="tab" data-tab="trust" aria-selected="false">Trust &amp; feedback</button>
+  <button role="tab" data-tab="digest" aria-selected="false">Digest</button>
+</nav>
+
+<main>
+  <section id="tab-run">
+    <div class="panel">
+      <div class="grid2">
+        <fieldset>
+          <legend>Courses</legend>
+          <div class="checks" id="courses">loading…</div>
+        </fieldset>
+        <fieldset>
+          <legend>Sessions</legend>
+          <input class="ti" id="sessions" placeholder="all sessions — or 12, 3-7, 3,5,9-11">
+          <p class="note" style="margin:7px 0 0">A session filter with no course selected
+            matches that number in every course.</p>
+          <span class="flabel" style="margin-top:14px">Watch tier</span>
+          <div class="inline" id="tiers"></div>
+          <span class="flabel" style="margin-top:14px">Cap</span>
+          <input class="ti" id="limit" type="number" min="1" placeholder="no cap"
+                 style="max-width:130px">
+        </fieldset>
+        <fieldset>
+          <legend>Stages</legend>
+          <div class="checks" id="stages">
+            <label><input type="checkbox" value="ingest"> re-read course exports</label>
+            <label><input type="checkbox" value="extract"> rebuild inventory
+              <span class="cnt">(unscoped)</span></label>
+            <label><input type="checkbox" value="probe" checked> probe
+              <span class="cnt">deterministic</span></label>
+            <label><input type="checkbox" value="research"> research
+              <span class="cnt">official pages</span></label>
+            <label><input type="checkbox" value="analyse" checked> analyse</label>
+            <label><input type="checkbox" value="report" checked> report</label>
+          </div>
+          <label style="margin-top:10px;display:flex;gap:7px;align-items:center">
+            <input type="checkbox" id="refine"> refine notes with the LLM
+          </label>
+          <p class="note" style="margin:6px 0 0" id="refinenote"></p>
+        </fieldset>
+      </div>
+
+      <div class="preview">
+        <div><span class="big" id="pvdeps">—</span>
+          <span class="note">dependencies in scope</span></div>
+        <div><span class="big" id="pvurls">—</span>
+          <span class="note">referenced URLs</span></div>
+        <div><span class="note" id="pvtime"></span></div>
+        <div><span class="note" id="pvtier"></span></div>
+      </div>
+
+      <div class="runbar">
+        <button class="act primary" id="runbtn">Run audit</button>
+        <button class="act" id="cancelbtn" hidden>Cancel</button>
+        <input class="ti" id="label" placeholder="label (optional)" style="max-width:230px">
+        <span class="note" id="runstatus"></span>
+      </div>
+    </div>
+
+    <h2>Run log</h2>
+    <pre class="log" id="log">No run started in this session. Pick a scope above and press Run audit.</pre>
+
+    <h2>Recent runs</h2>
+    <div class="panel" style="padding:0" id="runs"></div>
+  </section>
+
+  <section id="tab-findings" hidden>
+    <div class="strip" id="strip"></div>
+    <p class="hint" id="coverage"></p>
+    <div id="findings"></div>
+    <div id="standing"></div>
+    <div id="held"></div>
+  </section>
+
+  <section id="tab-inventory" hidden>
+    <p class="hint">Every external dependency the curriculum references, deduplicated.
+      A row with no authority set can never produce a deprecation, pricing or version
+      finding — that is the safe direction, but it also means it is unmonitored.</p>
+    <div class="filters">
+      <input class="q" id="q" placeholder="search name, alias or domain…">
+      <select id="kind"><option value="">all kinds</option></select>
+      <select id="tier"><option value="">all watch tiers</option>
+        <option value="critical">critical</option><option value="standard">standard</option>
+        <option value="mention-only">mention-only</option></select>
+      <select id="authority"><option value="">any authority</option>
+        <option value="yes">has official authority</option>
+        <option value="no">no authority (unmonitorable)</option></select>
+      <span class="note" id="invcount"></span>
+    </div>
+    <div class="scroll"><table id="invtable"></table></div>
+  </section>
+
+  <section id="tab-trust" hidden>
+    <h2>Trust invariant audit</h2>
+    <p class="hint">Runs <code>main.py verify</code>: no finding may rest on a source
+      that is not authoritative for its claim kind.</p>
+    <pre class="out" id="verify">click to run…</pre>
+    <button class="act" id="runverify">Run audit</button>
+    <h2>Reviewer corrections the system has learned from</h2>
+    <p class="hint">Half of all triage decisions are held out from learning and used only
+      to score precision — otherwise precision decays into self-assessment.</p>
+    <pre class="out" id="feedback">loading…</pre>
+  </section>
+
+  <section id="tab-digest" hidden>
+    <h2>This week's digest</h2>
+    <pre class="out" id="digest">loading…</pre>
+  </section>
+</main>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const get = async u => (await fetch(u)).json();
+const text = async u => (await fetch(u)).text();
+let SUMMARY = {}, FINDINGS = [];
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x =>
+    x.setAttribute('aria-selected', String(x === b)));
+  ['run','findings','inventory','trust','digest'].forEach(t =>
+    $('#tab-'+t).hidden = (t !== b.dataset.tab));
+  if (b.dataset.tab === 'run') loadRuns();
+  if (b.dataset.tab === 'inventory') loadInventory();
+  if (b.dataset.tab === 'digest') text('/api/digest').then(t => $('#digest').textContent = t);
+  if (b.dataset.tab === 'trust') text('/api/feedback').then(t => $('#feedback').textContent = t);
+});
+
+/* ---------- header + tiles ---------- */
+function renderHeader() {
+  const p = SUMMARY.precision || {};
+  const prec = p.precision === null || p.precision === undefined
+    ? 'not yet measurable' : (p.precision*100).toFixed(0) + '% of ' + p.triaged;
+  $('#meta').innerHTML = [
+    ['run', SUMMARY.run_date || '—'],
+    ['dependencies', SUMMARY.dependencies],
+    ['probed', SUMMARY.probed],
+    ['precision', prec],
+    ['llm', SUMMARY.llm_provider],
+  ].map(([k,v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('');
+}
+
+function renderStrip() {
+  const sev = SUMMARY.findings_by_severity || {}, pc = SUMMARY.probe_counts || {};
+  const tiles = [
+    ['open findings', SUMMARY.findings_total ?? 0,
+      Object.entries(sev).map(([k,v]) => `${v} ${k}`).join(' · ') || 'none this week'],
+    ['probed ok', pc.ok ?? 0, 'no change detected'],
+    ['broken', pc.broken ?? 0, 'confirmed over 2 runs'],
+    ['inconclusive', pc.inconclusive ?? 0, 'blocked or robots-refused, not broken'],
+    ['unchanged, suppressed', SUMMARY.suppressed_unchanged ?? 0, 'kept out of the digest'],
+    ['unmonitorable', SUMMARY.without_authority ?? 0, 'no official domain set'],
+  ];
+  $('#strip').innerHTML = tiles.map(([k,v,s]) =>
+    `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>
+     <div class="s">${esc(s)}</div></div>`).join('');
+}
+
+/* ---------- findings ---------- */
+function locLine(f) {
+  const by = {};
+  (f.locations||[]).forEach(l => {
+    const tag = l.session_no ? 's'+l.session_no
+      : (String(l.evidence_source||'').startsWith('sheet') ? 'workbook' : 'unit');
+    (by[l.course] = by[l.course] || new Set()).add(tag);
+  });
+  return Object.entries(by).map(([c,s]) =>
+    `<b>${esc(c)}</b> (${[...s].slice(0,6).join(', ')})`).join('; ') || '—';
+}
+
+function card(f) {
+  const done = f._decision ? ' done' : '';
+  const ev = (f.claims||[]).filter(c => c.tier === 'AUTHORITATIVE').map(c =>
+    `<div class="ev"><a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.source_url)}</a>
+     <span class="chip n">${esc(c.tier.toLowerCase())} · ${esc((c.retrieved_at||'').slice(0,10))}</span>
+     <blockquote>${esc(c.quote)}</blockquote></div>`).join('');
+  const alts = (f.alternatives||[]).filter(a => (a.claims||[]).length).map(a =>
+    `<div>${esc(a.name)} — <a href="${esc(a.homepage)}" target="_blank" rel="noopener">${esc(a.homepage)}</a>
+     ${a.free_student_path ? '<span class="chip ok">free path</span>' : ''}
+     ${a.signup_required ? '<span class="chip n">signup required</span>' : ''}</div>`).join('');
+  const fallout = f.questions_executing
+    ? `${f.questions_executing} graded item(s) execute this and will break`
+    : '';
+
+  const rows = [
+    ['affects', `${locLine(f)} <span class="chip n">blast ${f.blast_radius}</span>`],
+    ['what to do', esc(f.what_to_act || f.recommendation)],
+    ['why', esc(f.why_to_act)],
+    ['when', esc(f.when_to_act)],
+    fallout ? ['assessments', esc(fallout)] : null,
+    f.probe_signals?.length ? ['observed', `<span class="mono">${esc([...new Set(f.probe_signals)].join(', '))}</span>`] : null,
+    ev ? ['evidence', ev] : null,
+    alts ? ['alternatives', alts] : null,
+  ].filter(Boolean);
+
+  return `<article class="card ${esc(f.severity)}${done}" id="c-${esc(f.finding_id)}">
+    <div class="chead">
+      <span class="chip ${esc(f.severity)}">${esc(f.severity)}</span>
+      <span class="chip sig">${esc(f.signal)}</span>
+      <span class="name">${esc(f.canonical_name)}</span>
+      <span class="note">${esc(f.signal_label)}</span>
+      <span class="chip ${f.kind_of_signal === 'opportunity' ? 'opportunity' : 'n'}">${esc(f.kind_of_signal)}</span>
+      ${f.note_source === 'llm' ? '<span class="chip n">note refined</span>' : ''}
+      ${f._decision ? `<span class="chip ${f._decision === 'accepted' ? 'ok' : 'critical'}">${esc(f._decision)}</span>` : ''}
+    </div>
+    <div class="cbody">
+      <div>${esc(f.summary)}</div>
+      ${rows.map(([l,v]) => `<div class="row"><div class="lab">${esc(l)}</div><div>${v}</div></div>`).join('')}
+    </div>
+    <div class="triage" data-id="${esc(f.finding_id)}">
+      <button class="act primary" data-do="accept">Accept</button>
+      <button class="act danger" data-do="reject">Reject…</button>
+      <button class="act" data-do="toggle">Correct wording…</button>
+      <span class="note" data-role="status">${f._decision
+        ? esc(f._decision + (f._decision_reason ? ' — ' + f._decision_reason : ''))
+        : (f._split === 'learn' ? 'this one will teach the next run' : 'held out for scoring')}</span>
+      <div class="correct">
+        <label>reason (required to reject)</label>
+        <input class="ti" data-f="reason" placeholder="e.g. we cite that blog, it is not a taught step">
+        <label>correct “what to do”</label><input class="ti" data-f="what">
+        <label>correct “why it matters”</label><input class="ti" data-f="why">
+        <label>correct “when”</label><input class="ti" data-f="when">
+      </div>
+    </div>
+  </article>`;
+}
+
+function renderFindings(data) {
+  FINDINGS = data.findings || [];
+  $('#findings').innerHTML = FINDINGS.length
+    ? FINDINGS.map(card).join('')
+    : `<div class="empty">No new or worsened findings this week.<br>
+       <span class="note">${esc(SUMMARY.suppressed_unchanged||0)} unchanged finding(s) suppressed.</span></div>`;
+
+  /* Findings that are still open but unchanged are held in the store and kept out of
+     the report. Saying so is the point: hiding them silently is the same dishonesty as
+     the artifact-clobbering bug this replaced. */
+  const standing = data.standing || [];
+  $('#standing').innerHTML = standing.length
+    ? `<h2>Still open, unchanged since the last run (${standing.length})</h2>
+       <p class="hint">Not repeated above because nothing about them changed. They are
+       still on file and still unresolved.</p>
+       <div class="panel" style="padding:0">` + standing.map(s =>
+        `<div class="runrow" style="grid-template-columns:80px 60px 1fr">
+           <span class="chip ${esc(s.severity)}">${esc(s.severity)}</span>
+           <span class="chip sig">${esc(s.signal)}</span>
+           <span><b>${esc(s.canonical_name)}</b>
+             <span class="note"> · ${esc(s.summary)}</span></span></div>`).join('')
+       + '</div>'
+    : '';
+
+  const cov = data.coverage || {};
+  const stamps = Object.values(cov).filter(Boolean).sort();
+  $('#coverage').textContent = stamps.length
+    ? `Coverage: ${Object.keys(cov).length} dependencies tracked, oldest check `
+      + `${stamps[0].slice(0,16).replace('T',' ')} UTC. A scoped run refreshes only its `
+      + `own slice — the rest is carried forward.`
+    : '';
+
+  const held = data.suppressed_by_reviewer || [];
+  $('#held').innerHTML = held.length ? `<h2>Held back by earlier reviewer decisions</h2>
+    <p class="hint">These recur but a reviewer marked them not actionable. They return
+    automatically if the evidence changes.</p>` + held.map(h =>
+      `<div class="card low"><div class="cbody"><div><span class="chip sig">${esc(h.signal)}</span>
+       <b>${esc(h.canonical_name)}</b></div><div class="note">${esc(h.reason)}</div></div></div>`).join('') : '';
+  wireTriage();
+}
+
+function wireTriage() {
+  document.querySelectorAll('.triage').forEach(box => {
+    const id = box.dataset.id, status = box.querySelector('[data-role=status]');
+    const panel = box.querySelector('.correct');
+    const val = f => (box.querySelector(`[data-f=${f}]`) || {}).value || '';
+    box.querySelector('[data-do=toggle]').onclick = () => panel.classList.toggle('open');
+    const send = async verdict => {
+      if (verdict === 'rejected' && !val('reason').trim()) {
+        panel.classList.add('open');
+        status.textContent = 'a rejection needs a reason — that is what the system learns from';
+        return;
+      }
+      box.querySelectorAll('button').forEach(b => b.disabled = true);
+      status.textContent = 'saving…';
+      const r = await fetch('/api/triage', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({finding_id:id, verdict, reason:val('reason'),
+          corrected_what:val('what'), corrected_why:val('why'), corrected_when:val('when')})});
+      const d = await r.json();
+      if (!r.ok) { status.textContent = 'error: ' + (d.detail || r.status);
+        box.querySelectorAll('button').forEach(b => b.disabled = false); return; }
+      const p = d.precision || {};
+      status.textContent = `${d.verdict}${d.suppresses_recurrence ? ' · will be held back while evidence is unchanged' : ''}`
+        + ` · precision ${p.precision === null ? 'n/a' : (p.precision*100).toFixed(0)+'%'} of ${p.triaged}`
+        + (d.learning ? ' · teaching the next run' : ' · held out for scoring');
+      $('#c-'+id).classList.add('done');
+      panel.classList.remove('open');
+      SUMMARY.precision = p; renderHeader();
+    };
+    box.querySelector('[data-do=accept]').onclick = () => send('accepted');
+    box.querySelector('[data-do=reject]').onclick = () => send('rejected');
+  });
+}
+
+/* ---------- inventory ---------- */
+let invTimer;
+async function loadInventory() {
+  const p = new URLSearchParams({q:$('#q').value, kind:$('#kind').value,
+    tier:$('#tier').value, authority:$('#authority').value, limit:200});
+  const d = await get('/api/inventory?' + p);
+  $('#invcount').textContent = `${d.rows.length} of ${d.total} shown`;
+  $('#invtable').innerHTML = `<thead><tr>
+      <th>name</th><th>kind</th><th>tier</th><th>taught ver.</th>
+      <th>authority</th><th>courses</th><th>refs</th></tr></thead><tbody>` +
+    d.rows.map(r => {
+      const auth = r.official_domains.length ? r.official_domains.slice(0,2).join(', ')
+        : (r.registry ? r.registry + ' registry' : '<span class="chip n">none</span>');
+      return `<tr><td><b>${esc(r.canonical_name)}</b></td>
+        <td><span class="chip n">${esc(r.kind)}</span></td>
+        <td>${esc(r.watch_tier)}</td>
+        <td class="mono">${esc(r.taught_version || '—')}</td>
+        <td class="mono">${auth}</td>
+        <td>${esc(r.courses.join(', ') || '—')}</td>
+        <td>${esc(r.locations)}</td></tr>`;
+    }).join('') + '</tbody>';
+}
+['q','kind','tier','authority'].forEach(id => {
+  const el = $('#'+id);
+  el.addEventListener(id === 'q' ? 'input' : 'change', () => {
+    clearTimeout(invTimer); invTimer = setTimeout(loadInventory, 220);
+  });
+});
+$('#runverify').onclick = async () => {
+  $('#verify').textContent = 'running…';
+  $('#verify').textContent = await text('/api/verify');
+};
+
+/* ---------- run audit ---------- */
+let COURSES = [], POLL = null, CURRENT_RUN = null;
+const showTab = name => document.querySelector(`nav button[data-tab=${name}]`).click();
+
+async function loadCourses() {
+  const d = await get('/api/courses');
+  COURSES = d.courses;
+  $('#courses').innerHTML = COURSES.map(c => {
+    const s = c.sessions;
+    const range = s.length ? `${s[0]}–${s[s.length-1]}` : 'no numbered sessions';
+    return `<label><input type="checkbox" class="course" value="${esc(c.title)}">
+      ${esc(c.title)} <span class="cnt">${esc(range)}</span></label>`;
+  }).join('');
+  $('#tiers').innerHTML = d.tiers.map(t =>
+    `<label><input type="checkbox" class="tier" value="${esc(t)}"
+      ${t !== 'mention-only' ? 'checked' : ''}> ${esc(t)}</label>`).join('');
+  document.querySelectorAll('.course,.tier').forEach(el => el.onchange = preview);
+  $('#refinenote').textContent = SUMMARY.llm_provider === 'none'
+    ? 'No LLM provider found — notes stay template-composed.'
+    : `Uses ${SUMMARY.llm_provider}; cached prompts are free, new ones cost ~$0.01 each.`;
+  preview();
+}
+
+const picked = sel => [...document.querySelectorAll(sel)].filter(x => x.checked)
+  .map(x => x.value);
+
+let pvTimer;
+function preview() {
+  clearTimeout(pvTimer);
+  pvTimer = setTimeout(async () => {
+    const p = new URLSearchParams({count_only:'true',
+      course: picked('.course').join('|'),
+      sessions: $('#sessions').value.trim(),
+      tiers: picked('.tier').join(',')});
+    let d;
+    try { d = await get('/api/inventory?' + p); }
+    catch { $('#pvtime').textContent = 'check the session spec'; return; }
+    if (d.detail) { $('#pvtime').textContent = d.detail; return; }
+    $('#pvdeps').textContent = d.total;
+    $('#pvurls').textContent = d.referenced_urls;
+    $('#pvtier').textContent = Object.entries(d.by_tier||{})
+      .map(([k,v]) => `${v} ${k}`).join(' · ');
+    /* ~10s per dependency, measured against real vendor hosts with the 1.5s
+       per-domain courtesy gap. Rough on purpose. */
+    const secs = d.total * 10;
+    $('#pvtime').textContent = d.total
+      ? `probe ≈ ${secs < 90 ? secs + 's' : Math.round(secs/60) + ' min'} (rough)`
+      : 'nothing in scope';
+    $('#runbtn').disabled = !d.total;
+  }, 250);
+}
+$('#sessions').addEventListener('input', preview);
+$('#limit').addEventListener('input', preview);
+
+function renderLog(events, reset) {
+  const el = $('#log');
+  if (reset) el.textContent = '';
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+  events.forEach(e => {
+    const tag = e.stage ? e.stage.padEnd(8) : '        ';
+    el.insertAdjacentHTML('beforeend',
+      `<b>${esc(tag)}</b>${esc(e.line)}\n`);
+  });
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+async function startRun() {
+  const body = {
+    courses: picked('.course'),
+    sessions: $('#sessions').value.trim(),
+    tiers: picked('.tier'),
+    stages: picked('#stages input'),
+    refine: $('#refine').checked,
+    label: $('#label').value.trim(),
+    limit: $('#limit').value ? Number($('#limit').value) : null,
+  };
+  if (!body.stages.length) { $('#runstatus').textContent = 'pick at least one stage'; return; }
+  $('#runbtn').disabled = true;
+  $('#runstatus').innerHTML = '<span class="spin"></span> starting…';
+  const r = await fetch('/api/runs', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) { $('#runstatus').textContent = 'error: ' + (d.detail || r.status);
+    $('#runbtn').disabled = false; return; }
+  CURRENT_RUN = d.run_id;
+  $('#cancelbtn').hidden = false;
+  renderLog([], true);
+  poll(d.run_id, 0);
+}
+
+async function poll(runId, after) {
+  clearTimeout(POLL);
+  const d = await get(`/api/runs/${runId}?after=${after}`);
+  renderLog(d.events, false);
+  const st = d.run.status;
+  const stage = d.run.stage_now ? ` · ${d.run.stage_now}` : '';
+  $('#runstatus').innerHTML = (st === 'running' || st === 'queued')
+    ? `<span class="spin"></span> ${esc(st)}${esc(stage)}`
+    : esc(st) + (d.run.exit_code !== null ? ` (exit ${d.run.exit_code})` : '');
+  if (st === 'running' || st === 'queued') {
+    POLL = setTimeout(() => poll(runId, d.last_event_id), 1500);
+    return;
+  }
+  $('#runbtn').disabled = false; $('#cancelbtn').hidden = true; CURRENT_RUN = null;
+  loadRuns();
+  if (st === 'done') {
+    SUMMARY = await get('/api/summary');
+    renderHeader(); renderStrip();
+    renderFindings(await get('/api/findings'));
+    $('#runstatus').innerHTML = `done — <a href="#" id="gofind">see findings</a>`;
+    $('#gofind').onclick = e => { e.preventDefault(); showTab('findings'); };
+  }
+}
+
+$('#runbtn').onclick = startRun;
+$('#cancelbtn').onclick = async () => {
+  if (!CURRENT_RUN) return;
+  await fetch(`/api/runs/${CURRENT_RUN}/cancel`, {method:'POST'});
+};
+
+async function loadRuns() {
+  const d = await get('/api/runs?limit=12');
+  $('#runs').innerHTML = d.runs.length ? d.runs.map(r => {
+    const sc = JSON.parse(r.scope || '{}');
+    const where = [(sc.courses||[]).join(', ') || 'all courses',
+      (sc.sessions||[]).length ? 's' + sc.sessions.join(',') : null].filter(Boolean).join(' · ');
+    const cls = {done:'ok', failed:'critical', interrupted:'high',
+      cancelled:'n', running:'sig', queued:'n'}[r.status] || 'n';
+    return `<div class="runrow">
+      <span class="chip ${cls}">${esc(r.status)}</span>
+      <span class="mono">${esc(r.run_id)}</span>
+      <span>${esc(r.label || where)}<span class="note"> · ${esc(JSON.parse(r.stages||'[]').join(', '))}</span></span>
+      <a href="#" class="mono" data-open="${esc(r.run_id)}">view log</a></div>`;
+  }).join('') : '<div class="runrow"><span class="note">no runs yet</span></div>';
+  document.querySelectorAll('[data-open]').forEach(a => a.onclick = e => {
+    e.preventDefault(); renderLog([], true); poll(a.dataset.open, 0);
+  });
+}
+
+/* ---------- boot ---------- */
+(async () => {
+  SUMMARY = await get('/api/summary');
+  renderHeader(); renderStrip();
+  Object.keys(SUMMARY.by_kind || {}).forEach(k =>
+    $('#kind').insertAdjacentHTML('beforeend', `<option value="${esc(k)}">${esc(k)}</option>`));
+  renderFindings(await get('/api/findings'));
+  await loadCourses();
+  loadRuns();
+})();
+</script>
+</body>
+</html>

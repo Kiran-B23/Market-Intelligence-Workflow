@@ -1,0 +1,1672 @@
+# Question tags MIW could not resolve to a registry entry.
+# These are NOT in the inventory and are not monitored. Promote a real tool by
+# adding it to registry/tools.yaml with its official_domains; leave lesson
+# topics alone. Unreviewed guesses are deliberately kept out of the inventory.
+# 2113 candidates.
+
+candidates:
+- name: UNDERSTAND
+  occurrences: 122
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+  - PSE
+- name: REMEMBER
+  occurrences: 115
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+  - PSE
+- name: UNDERSTANDING
+  occurrences: 86
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+  - PSE
+- name: APPLY
+  occurrences: 57
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+  - PSE
+- name: ANALYZE
+  occurrences: 45
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+  - PSE
+- name: APPLICATION
+  occurrences: 42
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+- name: Icebreaker Question
+  occurrences: 24
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+  - PSE
+- name: Learner Engagement
+  occurrences: 24
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+  - PSE
+- name: Session Warm-up
+  occurrences: 24
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+  - PSE
+- name: ANALYZING
+  occurrences: 20
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Node Identification
+  occurrences: 19
+  courses:
+  - Intro to Gen AI
+- name: Workflow Building Blocks
+  occurrences: 18
+  courses:
+  - Intro to Gen AI
+- name: KNOWLEDGE
+  occurrences: 16
+  courses:
+  - Intro to Gen AI
+- name: APPLYING
+  occurrences: 13
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: ANALYSIS
+  occurrences: 12
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+- name: COMPREHENSION
+  occurrences: 12
+  courses:
+  - Intro to Gen AI
+- name: AI Automation and Workflows
+  occurrences: 12
+  courses:
+  - Intro to Gen AI
+- name: N8N Projects
+  occurrences: 12
+  courses:
+  - Intro to Gen AI
+- name: Webhook Integrations
+  occurrences: 10
+  courses:
+  - Intro to Gen AI
+- name: REMEMBERING
+  occurrences: 8
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Coding Agents
+  occurrences: 7
+  courses:
+  - AI for Finance
+  - PSE
+- name: Definition
+  occurrences: 6
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: LLM Limitations
+  occurrences: 6
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Building College Help Desk Agent
+  occurrences: 6
+  courses:
+  - PSE
+- name: Open Source Models
+  occurrences: 5
+  courses:
+  - Intro to Gen AI
+- name: Understand
+  occurrences: 5
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+- name: Prompt Engineering
+  occurrences: 5
+  courses:
+  - Intro to Gen AI
+- name: AI Workflows
+  occurrences: 5
+  courses:
+  - Intro to Gen AI
+- name: Workflow Design
+  occurrences: 5
+  courses:
+  - Intro to Gen AI
+- name: Workflow Automation
+  occurrences: 5
+  courses:
+  - Intro to Gen AI
+- name: AI Image Generation
+  occurrences: 5
+  courses:
+  - Intro to Gen AI
+- name: AI Agents
+  occurrences: 5
+  courses:
+  - Intro to Gen AI
+- name: Model Context Protocol
+  occurrences: 5
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: MCP Advantages
+  occurrences: 5
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Building AI Guardrails
+  occurrences: 5
+  courses:
+  - AI for Finance
+- name: Fine-Tuning LLMs
+  occurrences: 4
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Voice Interaction
+  occurrences: 4
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+- name: Applications
+  occurrences: 4
+  courses:
+  - Intro to Gen AI
+- name: n8n Platform
+  occurrences: 4
+  courses:
+  - Intro to Gen AI
+- name: AI News Summarizer
+  occurrences: 4
+  courses:
+  - Intro to Gen AI
+- name: Data Processing
+  occurrences: 4
+  courses:
+  - Intro to Gen AI
+- name: AI Audio Generation
+  occurrences: 4
+  courses:
+  - Intro to Gen AI
+- name: AI Shopping Assistant on Telegram
+  occurrences: 4
+  courses:
+  - Intro to Gen AI
+- name: Model Selection
+  occurrences: 4
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: RAG Indexing
+  occurrences: 4
+  courses:
+  - Building LLM Applications
+  - PSE
+- name: Agent Creation
+  occurrences: 4
+  courses:
+  - Building LLM Applications
+- name: Agent Execution
+  occurrences: 4
+  courses:
+  - Building LLM Applications
+- name: Environment Configuration
+  occurrences: 4
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Running Models Locally
+  occurrences: 4
+  courses:
+  - Building LLM Applications
+  - PSE
+- name: Autonomous Agents
+  occurrences: 4
+  courses:
+  - AI for Finance
+  - PSE
+- name: Setting Up LangSmith
+  occurrences: 4
+  courses:
+  - AI for Finance
+- name: SDLC Phases
+  occurrences: 4
+  courses:
+  - PSE
+- name: Software Development Models
+  occurrences: 4
+  courses:
+  - PSE
+- name: Open vs Closed Source Models
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Model Categories
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: AI Tools
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Agent Mode
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Code2Tutorial
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: EVALUATION
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Workflow Triggers
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Node Functions
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Prompt Engineering Fundamentals
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Overview
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: API Interaction
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Perplexity AI
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Node Application
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Diffusion Models
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Building No-Code Applications with AI
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: F5-TTS Features
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Core Components
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Introduction to AI Agents
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: ReAct Framework
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: AI Agent Configuration
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: AI Agents with Memory
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Short-Term Memory
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Types of Memory
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Memory Types
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: Application
+  occurrences: 3
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+- name: Long-Term Memory
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: MCP Components
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: MCP Host
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: MCP Server
+  occurrences: 3
+  courses:
+  - Intro to Gen AI
+- name: MCP Server Providers
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: MCP Definition
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Python Integration
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+- name: Installation
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+- name: Agent Decision Making
+  occurrences: 3
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Tool Creation
+  occurrences: 3
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Multi-Agent Systems
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+- name: Ollama Commands
+  occurrences: 3
+  courses:
+  - Building LLM Applications
+  - PSE
+- name: Introduction to AI in Finance
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Major Sectors in Finance
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Real-World AI Impact
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: LLM vs RAG Evaluation
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Configuring the Evaluator LLM
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Claude Code Features
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: IDE-Native Agents
+  occurrences: 3
+  courses:
+  - AI for Finance
+  - PSE
+- name: Finance Productivity Tools
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: The Goal of Trading
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Agent Architecture
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Introduction to LLM Observability
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: LangSmith Platform
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Observability Definition
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Observability vs Evaluation
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Understanding Traces
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Advantages of Observability
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Apply
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Building a Financial Fraud Detection Model
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Classification Outcomes
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Introduction to AI Ethics
+  occurrences: 3
+  courses:
+  - AI for Finance
+- name: Development
+  occurrences: 3
+  courses:
+  - PSE
+- name: Waterfall Model
+  occurrences: 3
+  courses:
+  - PSE
+- name: Agile Frameworks
+  occurrences: 3
+  courses:
+  - PSE
+- name: Agile Model
+  occurrences: 3
+  courses:
+  - PSE
+- name: Kanban
+  occurrences: 3
+  courses:
+  - PSE
+- name: Scrum
+  occurrences: 3
+  courses:
+  - PSE
+- name: V-Model
+  occurrences: 3
+  courses:
+  - PSE
+- name: Building College Help Desk Agent Part 3
+  occurrences: 3
+  courses:
+  - PSE
+- name: Integrating Ollama Models with AI Coding Agents
+  occurrences: 3
+  courses:
+  - PSE
+- name: Testing a Real-World Project
+  occurrences: 3
+  courses:
+  - PSE
+- name: Traditional Testing
+  occurrences: 3
+  courses:
+  - PSE
+- name: Deploying a Frontend Application
+  occurrences: 3
+  courses:
+  - PSE
+- name: Deploying a Backend Application
+  occurrences: 3
+  courses:
+  - PSE
+- name: Setting up CI/CD
+  occurrences: 3
+  courses:
+  - PSE
+- name: Fullstack App Development using Lovable
+  occurrences: 3
+  courses:
+  - PSE
+- name: Closed Source Models
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Large Language Models (LLMs)
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Deep Research
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Real-Time Information Access
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Search (Web Browsing)
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Flash Models
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Voice Input and Output
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Task Optimization
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Capabilities
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Fine-Tuning
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Custom GPTs
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: RCAFT Framework
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Characteristics
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Node Types
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Nodes Concept
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Platform Integrations
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Workflow Tools
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Prompting Techniques
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Chain-of-Thought Prompting
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Few-shot Prompting
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Knowledge Cutoff
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Passive Nature
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Email Delivery
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: RSS Feed Basics
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: AI Summarization
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Aggregate Node
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Gmail Node
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Schedule Trigger Node
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: n8n Nodes
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: SERP API Parameters
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Using SERP API
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Workflow Automation Basics
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: HTTP Request Node
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: AI Tools for Productivity
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: API Purpose
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: EVALUATING
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Error Detection
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Node Purpose Matching
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Workflow Decision Points
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Cross-Industry Applications
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Definition and Concept
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Diffusion Models Phases
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Input Methods
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Mastering Image Generation with Stable Diffusion
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Stable Diffusion Versions
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: AI Audio Generation Types
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: AI-Powered Audio Generation
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Examples in Daily Life
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Introduction to AI Audio Generation
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Mastering AI Audio Generation
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: examples
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Real World Use Cases
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: From Workflows to Applications
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Modern Application Building
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: No-Code Application Building
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Webhooks
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Webhook Integration
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Workflow Response Configuration
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: F5-TTS Advantages
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Online Platform Challenges
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Multi Speech Applications
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Voice Chat Benefits
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Voice Sample Importance
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Core Components of AI Agents
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: How Agents Work
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Learning Path Generator
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: SerpAPI Purpose
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Product Search Implementation
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Code Node Functionality
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Message Type Check
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Telegram Get File Node
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Workflow Components
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Context Window
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Building an Agent with Memory
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Episodic Memory
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Procedural Memory
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Semantic Memory
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Simple Memory Node
+  occurrences: 2
+  courses:
+  - Intro to Gen AI
+- name: Building LLM Applications
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Client Initialization
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Connector (Libraries)
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Importing Modules
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Installing Gemini Package
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LLM Fundamentals
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LLM Integration
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LLM Libraries
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Request Flow
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Response Handling
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Running LLMs Locally vs API
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Setting Up Google Colab
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Switching Libraries
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Understanding LLMs
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Using n8n and Using Code
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Max Tokens
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Rate Limits
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Study Assistant
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Temperature Control
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Building Study Assistant's UI
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: 'Hands-On: Your First Gradio App'
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Why Transformers Were Needed
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Purpose
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Transformer Architecture
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Enhancing Productivity with AI
+  occurrences: 2
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Tool Definition Structure
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Tool Use & Function Calling in LLMs
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Effective Prompting Techniques
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Meta Prompting
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Prompt Chaining
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Structured Prompting
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Introduction to LangChain
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LangChain Core Components
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Messages
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Model Initialization
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Models
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: The Provider Problem
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: What is LangChain
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Vector Store
+  occurrences: 2
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Retrieval-Augmented Generation
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+  - PSE
+- name: Agent Invocation
+  occurrences: 2
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Custom Tool Creation
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Response Extraction
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Tool Execution
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Building Memory Agent
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: AI In The Real World
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: AI Agent Architecture
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Agent Creation Syntax
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: CORS Configuration
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Murf Falcon Features
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: AI-Powered Conversational Interview Assistant
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Context Engineering
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Introduction to Context Engineering
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: MCP Core Components
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: MCP Server Sources
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: CrewAI Core Components
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Key Characteristics
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Multi-Agent System Definition
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: BERTScore Metric
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: BLEU Metric
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Evaluation Approaches
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Why AI Apps Fail
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: DeepEval Built-in Metrics
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LLM-as-a-Judge Limitations
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LLM-as-a-Judge Use Cases
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Faithfulness Metric
+  occurrences: 2
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Benefits of Running Models Locally
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LM Studio
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Requirements for Running Models Locally
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Dataset Splits
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Full Fine-Tuning vs PEFT
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: LoRA Configuration
+  occurrences: 2
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Methods of Fine-Tuning
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Prompt Engineering vs RAG vs Fine-Tuning
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: Unsloth Framework
+  occurrences: 2
+  courses:
+  - Building LLM Applications
+- name: What is Finance
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Credit Risk Assessment & Lending
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Fraud Detection & Prevention
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Personalized Banking & Customer Service
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: The Opportunity
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: LLM Limitations in Finance
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Building the UI
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Introduction to RAG Evaluation
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: RAGAS Metrics
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Collecting RAG Outputs
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Understanding Our Results
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Debugging with Metrics
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Agent Configuration
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Agent Types
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Integration Tools
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Claude Code Skills
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Current Price
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Introduction to Stock Trading
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Price History & Indicators
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Ticker and Trader
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Understanding the Price API
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Understanding the Time Series API
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: What is Stock Trading?
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: RSI Tool Implementation
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Market Events Impact
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: News Tool Implementation
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Finnhub News API
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Introduction
+  occurrences: 2
+  courses:
+  - AI for Finance
+  - PSE
+- name: Portfolio Checking
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Practice Trading
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: LLM Debugging Challenges
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Making Traced Requests
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: LangSmith Features
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Traces and Runs
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Custom Function Tracing
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Debugging and Prompt Playground
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Prompt Playground
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: The Monitoring Dashboard
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Tracing Custom Functions
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Tracing Every Step with LangSmith
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Viewing Traces in the Dashboard
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Integrating LangSmith with Trading Agent
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Configuring LoRA Adapters
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Fine-Tuning LLMs for Fraud Detection
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Fine-Tuning Language Models
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: LoRA Adapters
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Testing the Fine-Tuned Model from Hub
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Analysis
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Classification Metrics
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Evaluating the Financial Fraud Detection Model
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Model Evaluation
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Understanding
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Understanding Classification Outcomes
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Calculating and Interpreting Metrics
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Loading Models
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Loading Models for Comparison
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Loading and Preparing Test Data
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Building a Financial Fraud Detection Agent
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Using the Tool Decorator
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Wrapping the Model as a Tool
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: AI Ethics
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Fairness
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Human Oversight
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Privacy
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: What is AI Ethics
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Belmont Report Principles
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Introduction to Responsible AI
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Responsible AI
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Deterministic Guardrails
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Ethics vs Responsible AI vs Guardrails
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Model-Based Guardrails
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Types of Guardrails
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: What Could Go Wrong
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: PII Middleware
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: PII Middleware Configuration
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Prompt Injection
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Checkpointer Role
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: HITL Decision Types
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Human-in-the-Loop Middleware
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Middleware Hooks
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Software Development Life Cycle
+  occurrences: 2
+  courses:
+  - PSE
+- name: Benefits of AI in SDLC
+  occurrences: 2
+  courses:
+  - PSE
+- name: Design
+  occurrences: 2
+  courses:
+  - PSE
+- name: Maintenance
+  occurrences: 2
+  courses:
+  - PSE
+- name: Planning
+  occurrences: 2
+  courses:
+  - PSE
+- name: AI Across Industries
+  occurrences: 2
+  courses:
+  - PSE
+- name: How It Starts in the Real World
+  occurrences: 2
+  courses:
+  - PSE
+- name: Phase 01 — Requirement Gathering & Analysis
+  occurrences: 2
+  courses:
+  - PSE
+- name: The Reality Check
+  occurrences: 2
+  courses:
+  - PSE
+- name: The Shift — AI in Software Development
+  occurrences: 2
+  courses:
+  - PSE
+- name: AI-Assisted Design
+  occurrences: 2
+  courses:
+  - PSE
+- name: Phase 02 — Planning
+  occurrences: 2
+  courses:
+  - PSE
+- name: RAG Packages
+  occurrences: 2
+  courses:
+  - PSE
+- name: Setting Up the RAG Service
+  occurrences: 2
+  courses:
+  - PSE
+- name: Storing Embeddings
+  occurrences: 2
+  courses:
+  - PSE
+- name: Vector Search Index
+  occurrences: 2
+  courses:
+  - PSE
+- name: Building College Help Desk Agent Part 4
+  occurrences: 2
+  courses:
+  - PSE
+- name: CLI-First Agents
+  occurrences: 2
+  courses:
+  - PSE
+- name: Folder Structure
+  occurrences: 2
+  courses:
+  - PSE
+- name: Clean Code
+  occurrences: 2
+  courses:
+  - PSE
+- name: The Real Problem — Cloud Limits
+  occurrences: 2
+  courses:
+  - PSE
+- name: Tools for Running Models Locally
+  occurrences: 2
+  courses:
+  - PSE
+- name: What You Need to Run Models Locally
+  occurrences: 2
+  courses:
+  - PSE
+- name: What is Ollama
+  occurrences: 2
+  courses:
+  - PSE
+- name: Launch Claude Code with Ollama
+  occurrences: 2
+  courses:
+  - PSE
+- name: Why Claude Code
+  occurrences: 2
+  courses:
+  - PSE
+- name: SDLC vs STLC
+  occurrences: 2
+  courses:
+  - PSE
+- name: Software Testing Life Cycle (STLC)
+  occurrences: 2
+  courses:
+  - PSE
+- name: What Is Software Testing
+  occurrences: 2
+  courses:
+  - PSE
+- name: Why Testing Matters
+  occurrences: 2
+  courses:
+  - PSE
+- name: AI-Assisted Testing with TestSprite
+  occurrences: 2
+  courses:
+  - PSE
+- name: Functional Testing Sub-Types
+  occurrences: 2
+  courses:
+  - PSE
+- name: Content Delivery Network (CDN)
+  occurrences: 2
+  courses:
+  - PSE
+- name: Domain Name System (DNS)
+  occurrences: 2
+  courses:
+  - PSE
+- name: File Storage
+  occurrences: 2
+  courses:
+  - PSE
+- name: What Is Cloud Computing
+  occurrences: 2
+  courses:
+  - PSE
+- name: What Is Deployment
+  occurrences: 2
+  courses:
+  - PSE
+- name: What Is a Server
+  occurrences: 2
+  courses:
+  - PSE
+- name: Amazon CloudFront
+  occurrences: 2
+  courses:
+  - PSE
+- name: Amazon S3
+  occurrences: 2
+  courses:
+  - PSE
+- name: Cloud Providers
+  occurrences: 2
+  courses:
+  - PSE
+- name: What Is AWS
+  occurrences: 2
+  courses:
+  - PSE

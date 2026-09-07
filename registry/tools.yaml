@@ -1,0 +1,3407 @@
+# MIW tool registry - human-owned.
+#
+# `official_domains` is the authority set: the ONLY domains that may
+# substantiate a deprecation, pricing, version or implementation claim about
+# this dependency (see miw/trust.py). Widen it only to hosts the vendor
+# actually publishes on.
+#
+# review_status: derived = inferred from the curriculum's own links;
+#                approved = a human has checked it.
+# 457 entries.
+
+tools:
+- canonical_name: all-minilm-l6-v2
+  kind: model
+  homepage: https://huggingface.co/sentence-transformers
+  docs_url: https://huggingface.co/sentence-transformers
+  official_domains:
+  - huggingface.co
+  vendor: Hugging Face
+  review_status: derived
+- canonical_name: all-mpnet-base-v2
+  kind: model
+  homepage: https://huggingface.co/sentence-transformers
+  docs_url: https://huggingface.co/sentence-transformers
+  official_domains:
+  - huggingface.co
+  vendor: Hugging Face
+  review_status: derived
+- canonical_name: claude-opus-4.5
+  kind: model
+  homepage: https://docs.anthropic.com/en/docs/about-claude/models
+  docs_url: https://docs.anthropic.com/en/docs/about-claude/models
+  official_domains:
+  - anthropic.com
+  - claude.ai
+  - docs.anthropic.com
+  vendor: Anthropic
+  review_status: derived
+- canonical_name: deberta-v3-base-prompt-injection-v2
+  kind: model
+  homepage: https://huggingface.co/protectai
+  docs_url: https://huggingface.co/protectai
+  official_domains:
+  - huggingface.co
+  vendor: Hugging Face
+  review_status: derived
+- canonical_name: deepseek-r1
+  kind: model
+  homepage: https://api-docs.deepseek.com/quick_start/pricing
+  docs_url: https://api-docs.deepseek.com/quick_start/pricing
+  official_domains:
+  - api-docs.deepseek.com
+  - deepseek.com
+  vendor: DeepSeek
+  review_status: derived
+- canonical_name: deepseek-v4
+  kind: model
+  homepage: https://api-docs.deepseek.com/quick_start/pricing
+  docs_url: https://api-docs.deepseek.com/quick_start/pricing
+  official_domains:
+  - api-docs.deepseek.com
+  - deepseek.com
+  vendor: DeepSeek
+  review_status: derived
+- canonical_name: embed-english-v3.0
+  kind: model
+  homepage: https://docs.cohere.com/docs/models
+  docs_url: https://docs.cohere.com/docs/models
+  official_domains:
+  - cohere.com
+  - docs.cohere.com
+  vendor: Cohere
+  review_status: derived
+- canonical_name: gemini-2-5-flash
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-2-5-flash-image-generation-for-the-best-results
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-2.0-flash
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-2.0-flash-001
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-2.0-flash-exp
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-2.5-flash
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-2.5-pro
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-3-pro-preview
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-3.1-flash-lite
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gemini-embedding-001
+  kind: model
+  homepage: https://ai.google.dev/gemini-api/docs/models
+  docs_url: https://ai.google.dev/gemini-api/docs/models
+  official_domains:
+  - ai.google.dev
+  - cloud.google.com
+  - deepmind.google
+  - google.dev
+  vendor: Google
+  review_status: derived
+- canonical_name: gpt-3.5
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: gpt-4
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: gpt-4.1
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: gpt-4o
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: gpt-5
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: gpt-5.4
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: gpt-5.5
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: llama-3
+  kind: model
+  homepage: https://www.llama.com/
+  docs_url: https://www.llama.com/
+  official_domains:
+  - ai.meta.com
+  - huggingface.co
+  - llama.com
+  vendor: Meta
+  review_status: derived
+- canonical_name: llama-3.1-8b-instant
+  kind: model
+  homepage: https://www.llama.com/
+  docs_url: https://www.llama.com/
+  official_domains:
+  - ai.meta.com
+  - huggingface.co
+  - llama.com
+  vendor: Meta
+  review_status: derived
+- canonical_name: llama-3.1-8b-instruct
+  kind: model
+  homepage: https://www.llama.com/
+  docs_url: https://www.llama.com/
+  official_domains:
+  - ai.meta.com
+  - huggingface.co
+  - llama.com
+  vendor: Meta
+  review_status: derived
+- canonical_name: llama-3.2-1b
+  kind: model
+  homepage: https://www.llama.com/
+  docs_url: https://www.llama.com/
+  official_domains:
+  - ai.meta.com
+  - huggingface.co
+  - llama.com
+  vendor: Meta
+  review_status: derived
+- canonical_name: llama-3.2-1b-instruct
+  kind: model
+  homepage: https://www.llama.com/
+  docs_url: https://www.llama.com/
+  official_domains:
+  - ai.meta.com
+  - huggingface.co
+  - llama.com
+  vendor: Meta
+  review_status: derived
+- canonical_name: llama-3.3-70b-versatile
+  kind: model
+  homepage: https://www.llama.com/
+  docs_url: https://www.llama.com/
+  official_domains:
+  - ai.meta.com
+  - huggingface.co
+  - llama.com
+  vendor: Meta
+  review_status: derived
+- canonical_name: llama3
+  kind: model
+  homepage: https://www.llama.com/
+  docs_url: https://www.llama.com/
+  official_domains:
+  - ai.meta.com
+  - huggingface.co
+  - llama.com
+  vendor: Meta
+  review_status: derived
+- canonical_name: qwen/qwen2.5-0.5b-instruct
+  kind: model
+  homepage: https://huggingface.co/Qwen
+  docs_url: https://huggingface.co/Qwen
+  official_domains:
+  - huggingface.co
+  - qwen.ai
+  vendor: Alibaba
+  review_status: derived
+- canonical_name: qwen/qwen2.5-1.5b-instruct
+  kind: model
+  homepage: https://huggingface.co/Qwen
+  docs_url: https://huggingface.co/Qwen
+  official_domains:
+  - huggingface.co
+  - qwen.ai
+  vendor: Alibaba
+  review_status: derived
+- canonical_name: qwen2.5-0.5b
+  kind: model
+  homepage: https://huggingface.co/Qwen
+  docs_url: https://huggingface.co/Qwen
+  official_domains:
+  - huggingface.co
+  - qwen.ai
+  vendor: Alibaba
+  review_status: derived
+- canonical_name: qwen2.5-1.5b
+  kind: model
+  homepage: https://huggingface.co/Qwen
+  docs_url: https://huggingface.co/Qwen
+  official_domains:
+  - huggingface.co
+  - qwen.ai
+  vendor: Alibaba
+  review_status: derived
+- canonical_name: qwen3-vl
+  kind: model
+  homepage: https://huggingface.co/Qwen
+  docs_url: https://huggingface.co/Qwen
+  official_domains:
+  - huggingface.co
+  - qwen.ai
+  vendor: Alibaba
+  review_status: derived
+- canonical_name: qwen3.5
+  kind: model
+  homepage: https://huggingface.co/Qwen
+  docs_url: https://huggingface.co/Qwen
+  official_domains:
+  - huggingface.co
+  - qwen.ai
+  vendor: Alibaba
+  review_status: derived
+- canonical_name: text-embedding-3-small
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: text-embedding-ada-002
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: voyage-2
+  kind: model
+  homepage: https://docs.voyageai.com/docs/embeddings
+  docs_url: https://docs.voyageai.com/docs/embeddings
+  official_domains:
+  - docs.voyageai.com
+  - voyageai.com
+  vendor: Voyage AI
+  review_status: derived
+- canonical_name: whisper-large-v3
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: whisper-large-v3-turbo
+  kind: model
+  homepage: https://platform.openai.com/docs/models
+  docs_url: https://platform.openai.com/docs/models
+  official_domains:
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.agent'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.chainLlm'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.chatTrigger'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.lmChatAnthropic'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.lmChatGroq'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.lmChatMistralCloud'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.lmChatOpenAi'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.lmChatOpenRouter'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.lmOpenAi'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.mcpClientTool'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.memoryBufferWindow'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.memoryRedisChat'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.outputParserStructured'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.toolCalculator'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.toolCode'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.toolSerpApi'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.toolWikipedia'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.toolWorkflow'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@n8n/n8n-nodes-langchain.vectorStoreInMemory'
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: '@n8n/n8n-nodes-langchain'
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.aggregate
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.code
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.gmail
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.googleCalendarTool
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.googleDocsTool
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.googleSheets
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.googleSheetsTrigger
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.httpRequest
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.httpRequestTool
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.if
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.linkedIn
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.merge
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.respondToWebhook
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.rssFeedRead
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.scheduleTrigger
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.set
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.someNode
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.switch
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.telegram
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.telegramTrigger
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.wait
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: n8n-nodes-base.webhook
+  kind: n8n_node
+  homepage: https://n8n.io
+  docs_url: https://docs.n8n.io/integrations/
+  changelog_url: https://docs.n8n.io/release-notes/
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  registry: n8n
+  registry_id: n8n-nodes-base
+  vendor: n8n
+  review_status: derived
+- canonical_name: '@github/copilot'
+  kind: package
+  registry: npm
+  registry_id: '@github/copilot'
+  review_status: derived
+- canonical_name: '@google/gemini-cli'
+  kind: package
+  registry: npm
+  registry_id: '@google/gemini-cli'
+  review_status: derived
+- canonical_name: '@langchain/classic'
+  kind: package
+  registry: npm
+  registry_id: '@langchain/classic'
+  review_status: derived
+- canonical_name: '@langchain/mongodb'
+  kind: package
+  registry: npm
+  registry_id: '@langchain/mongodb'
+  review_status: derived
+- canonical_name: '@langchain/textsplitters'
+  kind: package
+  registry: npm
+  registry_id: '@langchain/textsplitters'
+  review_status: derived
+- canonical_name: '@openai/codex'
+  kind: package
+  registry: npm
+  registry_id: '@openai/codex'
+  review_status: derived
+- canonical_name: accelerate
+  kind: package
+  registry: pypi
+  registry_id: accelerate
+  review_status: derived
+- canonical_name: assemblyai
+  kind: package
+  registry: pypi
+  registry_id: assemblyai
+  review_status: derived
+- canonical_name: bert_score
+  kind: package
+  registry: pypi
+  registry_id: bert_score
+  review_status: derived
+- canonical_name: bitsandbytes
+  kind: package
+  registry: pypi
+  registry_id: bitsandbytes
+  review_status: derived
+- canonical_name: cors
+  kind: package
+  registry: npm
+  registry_id: cors
+  review_status: derived
+- canonical_name: crew-ai
+  kind: package
+  registry: pypi
+  registry_id: crew-ai
+  review_status: derived
+- canonical_name: crewai
+  kind: package
+  registry: pypi
+  registry_id: crewai
+  review_status: derived
+- canonical_name: crewai-framework
+  kind: package
+  registry: pypi
+  registry_id: crewai-framework
+  review_status: derived
+- canonical_name: crewai-genai
+  kind: package
+  registry: pypi
+  registry_id: crewai-genai
+  review_status: derived
+- canonical_name: crewai-google-gemini
+  kind: package
+  registry: pypi
+  registry_id: crewai-google-gemini
+  review_status: derived
+- canonical_name: crewai-google-genai
+  kind: package
+  registry: npm
+  registry_id: crewai-google-genai
+  review_status: derived
+- canonical_name: crewai_tools
+  kind: package
+  registry: pypi
+  registry_id: crewai_tools
+  review_status: derived
+- canonical_name: datasets
+  kind: package
+  registry: pypi
+  registry_id: datasets
+  review_status: derived
+- canonical_name: deepeval
+  kind: package
+  registry: pypi
+  registry_id: deepeval
+  review_status: derived
+- canonical_name: evaluate
+  kind: package
+  registry: pypi
+  registry_id: evaluate
+  review_status: derived
+- canonical_name: express
+  kind: package
+  registry: npm
+  registry_id: express
+  review_status: derived
+- canonical_name: finnhub
+  kind: package
+  registry: pypi
+  registry_id: finnhub
+  review_status: derived
+- canonical_name: finnhub-python
+  kind: package
+  registry: pypi
+  registry_id: finnhub-python
+  review_status: derived
+- canonical_name: flask-cors
+  kind: package
+  registry: pypi
+  registry_id: flask-cors
+  review_status: derived
+- canonical_name: google-genai
+  kind: package
+  registry: pypi
+  registry_id: google-genai
+  review_status: derived
+- canonical_name: google-search-results
+  kind: package
+  registry: pypi
+  registry_id: google-search-results
+  review_status: derived
+- canonical_name: gradio
+  kind: package
+  registry: pypi
+  registry_id: gradio
+  review_status: derived
+- canonical_name: groq
+  kind: package
+  registry: pypi
+  registry_id: groq
+  review_status: derived
+- canonical_name: jsonref
+  kind: package
+  registry: pypi
+  registry_id: jsonref
+  review_status: derived
+- canonical_name: langchain
+  kind: package
+  registry: pypi
+  registry_id: langchain
+  review_status: derived
+- canonical_name: langchain-adapters
+  kind: package
+  registry: pypi
+  registry_id: langchain-adapters
+  review_status: derived
+- canonical_name: langchain-chroma
+  kind: package
+  registry: pypi
+  registry_id: langchain-chroma
+  review_status: derived
+- canonical_name: langchain-community
+  kind: package
+  registry: pypi
+  registry_id: langchain-community
+  review_status: derived
+- canonical_name: langchain-core
+  kind: package
+  registry: pypi
+  registry_id: langchain-core
+  review_status: derived
+- canonical_name: langchain-google-genai
+  kind: package
+  registry: pypi
+  registry_id: langchain-google-genai
+  review_status: derived
+- canonical_name: langchain-groq
+  kind: package
+  registry: pypi
+  registry_id: langchain-groq
+  review_status: derived
+- canonical_name: langchain-huggingface
+  kind: package
+  registry: pypi
+  registry_id: langchain-huggingface
+  review_status: derived
+- canonical_name: langchain-mcp
+  kind: package
+  registry: pypi
+  registry_id: langchain-mcp
+  review_status: derived
+- canonical_name: langchain-mcp-adapters
+  kind: package
+  registry: pypi
+  registry_id: langchain-mcp-adapters
+  review_status: derived
+- canonical_name: langchain-openai
+  kind: package
+  registry: pypi
+  registry_id: langchain-openai
+  review_status: derived
+- canonical_name: langchain-tavily
+  kind: package
+  registry: pypi
+  registry_id: langchain-tavily
+  review_status: derived
+- canonical_name: langchain-text-splitters
+  kind: package
+  registry: pypi
+  registry_id: langchain-text-splitters
+  review_status: derived
+- canonical_name: langchain_mcp_adapters
+  kind: package
+  registry: pypi
+  registry_id: langchain_mcp_adapters
+  review_status: derived
+- canonical_name: langchain_openai
+  kind: package
+  registry: pypi
+  registry_id: langchain_openai
+  review_status: derived
+- canonical_name: langchain_tavily
+  kind: package
+  registry: pypi
+  registry_id: langchain_tavily
+  review_status: derived
+- canonical_name: langgraph
+  kind: package
+  registry: pypi
+  registry_id: langgraph
+  review_status: derived
+- canonical_name: langsmith
+  kind: package
+  registry: pypi
+  registry_id: langsmith
+  review_status: derived
+- canonical_name: mcp-adapters
+  kind: package
+  registry: pypi
+  registry_id: mcp-adapters
+  review_status: derived
+- canonical_name: mongodb
+  kind: package
+  registry: npm
+  registry_id: mongodb
+  review_status: derived
+- canonical_name: openai-langchain
+  kind: package
+  registry: pypi
+  registry_id: openai-langchain
+  review_status: derived
+- canonical_name: pandas
+  kind: package
+  registry: pypi
+  registry_id: pandas
+  review_status: derived
+- canonical_name: peft
+  kind: package
+  registry: pypi
+  registry_id: peft
+  review_status: derived
+- canonical_name: playwright
+  kind: package
+  registry: npm
+  registry_id: playwright
+  review_status: derived
+- canonical_name: playwright-web
+  kind: package
+  registry: pypi
+  registry_id: playwright-web
+  review_status: derived
+- canonical_name: pypdf
+  kind: package
+  registry: pypi
+  registry_id: pypdf
+  review_status: derived
+- canonical_name: python-dotenv
+  kind: package
+  registry: pypi
+  registry_id: python-dotenv
+  review_status: derived
+- canonical_name: ragas
+  kind: package
+  registry: pypi
+  registry_id: ragas
+  review_status: derived
+- canonical_name: requests
+  kind: package
+  registry: pypi
+  registry_id: requests
+  review_status: derived
+- canonical_name: requirements.txt
+  kind: package
+  registry: pypi
+  registry_id: requirements.txt
+  review_status: derived
+- canonical_name: scikit-learn
+  kind: package
+  registry: pypi
+  registry_id: scikit-learn
+  review_status: derived
+- canonical_name: sentence_transformers
+  kind: package
+  registry: pypi
+  registry_id: sentence_transformers
+  review_status: derived
+- canonical_name: serverless-http
+  kind: package
+  registry: npm
+  registry_id: serverless-http
+  review_status: derived
+- canonical_name: torch
+  kind: package
+  registry: pypi
+  registry_id: torch
+  review_status: derived
+- canonical_name: torchao
+  kind: package
+  registry: pypi
+  registry_id: torchao
+  review_status: derived
+- canonical_name: transformers
+  kind: package
+  registry: pypi
+  registry_id: transformers
+  review_status: derived
+- canonical_name: trl
+  kind: package
+  registry: pypi
+  registry_id: trl
+  review_status: derived
+- canonical_name: unsloth
+  kind: package
+  registry: pypi
+  registry_id: unsloth
+  review_status: derived
+- canonical_name: unsloth_zoo
+  kind: package
+  registry: pypi
+  registry_id: unsloth_zoo
+  review_status: derived
+- canonical_name: xformers
+  kind: package
+  registry: pypi
+  registry_id: xformers
+  review_status: derived
+- canonical_name: yfinance
+  kind: package
+  registry: pypi
+  registry_id: yfinance
+  review_status: derived
+- canonical_name: Alpaca
+  kind: service
+  aliases:
+  - Alpaca
+  - alpaca.markets
+  homepage: https://alpaca.markets
+  official_domains:
+  - alpaca.markets
+  - api.alpaca.markets
+  - docs.alpaca.markets
+  - paper-api.alpaca.markets
+  - sandbox.alpaca.markets
+  - trading.alpaca.markets
+  review_status: derived
+- canonical_name: Amazon
+  kind: service
+  aliases:
+  - Amazon
+  - amazon.com
+  homepage: https://amazon.com
+  official_domains:
+  - amazon.com
+  - amazon.in
+  - aws.amazon.com
+  - console.aws.amazon.com
+  - docs.aws.amazon.com
+  review_status: derived
+- canonical_name: Antigravity
+  kind: service
+  aliases:
+  - Antigravity
+  - antigravity.google
+  homepage: https://antigravity.google
+  official_domains:
+  - antigravity.google
+  review_status: derived
+- canonical_name: AssemblyAI
+  kind: service
+  aliases:
+  - AssemblyAI
+  - assemblyai.com
+  homepage: https://assemblyai.com
+  official_domains:
+  - assemblyai.com
+  review_status: derived
+- canonical_name: Bertscore
+  kind: service
+  aliases:
+  - Bertscore
+  - bertscore.com
+  homepage: https://bertscore.com
+  official_domains:
+  - bertscore.com
+  review_status: derived
+- canonical_name: Chatgpt
+  kind: service
+  aliases:
+  - Chatgpt
+  - chatgpt.com
+  homepage: https://chatgpt.com
+  official_domains:
+  - chatgpt.com
+  review_status: derived
+- canonical_name: Chroma
+  kind: service
+  aliases:
+  - Chroma
+  - trychroma.com
+  homepage: https://trychroma.com
+  official_domains:
+  - research.trychroma.com
+  - trychroma.com
+  review_status: derived
+- canonical_name: Claude
+  kind: service
+  aliases:
+  - Claude
+  - claude.ai
+  homepage: https://claude.ai
+  official_domains:
+  - claude.ai
+  - claude.com
+  - code.claude.com
+  review_status: derived
+- canonical_name: Coingecko
+  kind: service
+  aliases:
+  - Coingecko
+  - coingecko.com
+  homepage: https://coingecko.com
+  official_domains:
+  - coingecko.com
+  - docs.coingecko.com
+  review_status: derived
+- canonical_name: Composio
+  kind: service
+  aliases:
+  - Composio
+  - composio.dev
+  homepage: https://composio.dev
+  official_domains:
+  - app.composio.dev
+  - composio.dev
+  - docs.composio.dev
+  - mcp.composio.dev
+  - platform.composio.dev
+  review_status: derived
+- canonical_name: Crewai
+  kind: service
+  aliases:
+  - Crewai
+  - crewai.com
+  homepage: https://crewai.com
+  official_domains:
+  - crewai.com
+  - docs.crewai.com
+  review_status: derived
+- canonical_name: Cursor
+  kind: service
+  aliases:
+  - Cursor
+  - cursor.com
+  homepage: https://cursor.com
+  official_domains:
+  - cursor.com
+  review_status: derived
+- canonical_name: Deepeval
+  kind: service
+  aliases:
+  - Deepeval
+  - deepeval.com
+  homepage: https://deepeval.com
+  official_domains:
+  - deepeval.ai
+  - deepeval.com
+  - docs.deepeval.ai
+  review_status: derived
+- canonical_name: Deepmind
+  kind: service
+  aliases:
+  - Deepmind
+  - deepmind.google
+  homepage: https://deepmind.google
+  official_domains:
+  - deepmind.google
+  review_status: derived
+- canonical_name: DeepWiki
+  kind: service
+  aliases:
+  - DeepWiki
+  - deepwiki.com
+  homepage: https://deepwiki.com
+  official_domains:
+  - deepwiki.com
+  review_status: derived
+- canonical_name: Discord
+  kind: service
+  aliases:
+  - Discord
+  - discord.gg
+  homepage: https://discord.gg
+  official_domains:
+  - discord.gg
+  review_status: derived
+- canonical_name: Earth Ai
+  kind: service
+  aliases:
+  - Earth Ai
+  - earth-ai.com
+  homepage: https://earth-ai.com
+  official_domains:
+  - earth-ai.com
+  review_status: derived
+- canonical_name: ElevenLabs
+  kind: service
+  aliases:
+  - ElevenLabs
+  - elevenlabs.io
+  homepage: https://elevenlabs.io
+  official_domains:
+  - elevenlabs.io
+  review_status: derived
+- canonical_name: Er Api
+  kind: service
+  aliases:
+  - Er Api
+  - er-api.com
+  homepage: https://er-api.com
+  official_domains:
+  - er-api.com
+  - open.er-api.com
+  review_status: derived
+- canonical_name: Fetchrss
+  kind: service
+  aliases:
+  - Fetchrss
+  - fetchrss.com
+  homepage: https://fetchrss.com
+  official_domains:
+  - fetchrss.com
+  review_status: derived
+- canonical_name: Finnhub
+  kind: service
+  aliases:
+  - Finnhub
+  - finnhub.io
+  homepage: https://finnhub.io
+  official_domains:
+  - finnhub.io
+  review_status: derived
+- canonical_name: Firecrawl
+  kind: service
+  aliases:
+  - Firecrawl
+  - firecrawl.dev
+  homepage: https://firecrawl.dev
+  official_domains:
+  - firecrawl.dev
+  review_status: derived
+- canonical_name: Gamma
+  kind: service
+  aliases:
+  - Gamma
+  - gamma.app
+  homepage: https://gamma.app
+  official_domains:
+  - gamma.app
+  review_status: derived
+- canonical_name: Genspark
+  kind: service
+  aliases:
+  - Genspark
+  - genspark.ai
+  homepage: https://genspark.ai
+  official_domains:
+  - genspark.ai
+  review_status: derived
+- canonical_name: Git Scm
+  kind: service
+  aliases:
+  - Git Scm
+  - git-scm.com
+  homepage: https://git-scm.com
+  official_domains:
+  - git-scm.com
+  review_status: derived
+- canonical_name: GitHub
+  kind: service
+  aliases:
+  - GitHub
+  - github.com
+  homepage: https://github.com
+  official_domains:
+  - docs.github.com
+  - education.github.com
+  - github.com
+  review_status: derived
+- canonical_name: Gold-API
+  kind: service
+  aliases:
+  - Gold-API
+  - gold-api.com
+  homepage: https://gold-api.com
+  official_domains:
+  - api.gold-api.com
+  - gold-api.com
+  review_status: derived
+- canonical_name: Google
+  kind: service
+  aliases:
+  - Google
+  - google.com
+  homepage: https://google.com
+  official_domains:
+  - aistudio.google.com
+  - cloud.google.com
+  - colab.research.google.com
+  - console.cloud.google.com
+  - developers.google.com
+  - docs.cloud.google.com
+  - gemini.google.com
+  - google.com
+  - makersuite.google.com
+  review_status: derived
+- canonical_name: Google AI for Developers
+  kind: service
+  aliases:
+  - Google AI for Developers
+  - google.dev
+  homepage: https://google.dev
+  official_domains:
+  - ai.google.dev
+  - google.dev
+  review_status: derived
+- canonical_name: Gradio
+  kind: service
+  aliases:
+  - Gradio
+  - gradio.app
+  homepage: https://gradio.app
+  official_domains:
+  - gradio.app
+  - gradio.live
+  - xxxxx.gradio.live
+  review_status: derived
+- canonical_name: Groq
+  kind: service
+  aliases:
+  - Groq
+  - groq.com
+  homepage: https://groq.com
+  official_domains:
+  - console.groq.com
+  - groq.com
+  review_status: derived
+- canonical_name: Hugging Face
+  kind: service
+  aliases:
+  - Hugging Face
+  - huggingface.co
+  homepage: https://huggingface.co
+  official_domains:
+  - huggingface.co
+  review_status: derived
+- canonical_name: Ibm
+  kind: service
+  aliases:
+  - Ibm
+  - ibm.com
+  homepage: https://ibm.com
+  official_domains:
+  - ibm.com
+  review_status: derived
+- canonical_name: Julius
+  kind: service
+  aliases:
+  - Julius
+  - julius.ai
+  homepage: https://julius.ai
+  official_domains:
+  - julius.ai
+  review_status: derived
+- canonical_name: Kaggle
+  kind: service
+  aliases:
+  - Kaggle
+  - kaggle.com
+  homepage: https://kaggle.com
+  official_domains:
+  - kaggle.com
+  review_status: derived
+- canonical_name: LangChain
+  kind: service
+  aliases:
+  - LangChain
+  - langchain.com
+  homepage: https://langchain.com
+  official_domains:
+  - docs.langchain.com
+  - docs.smith.langchain.com
+  - langchain.com
+  - python.langchain.com
+  - reference.langchain.com
+  - smith.langchain.com
+  review_status: derived
+- canonical_name: Llama
+  kind: service
+  aliases:
+  - Llama
+  - llama.com
+  homepage: https://llama.com
+  official_domains:
+  - llama.com
+  review_status: derived
+- canonical_name: Lmstudio
+  kind: service
+  aliases:
+  - Lmstudio
+  - lmstudio.ai
+  homepage: https://lmstudio.ai
+  official_domains:
+  - lmstudio.ai
+  review_status: derived
+- canonical_name: Lovable
+  kind: service
+  aliases:
+  - Lovable
+  - lovable.dev
+  homepage: https://lovable.dev
+  official_domains:
+  - lovable.dev
+  review_status: derived
+- canonical_name: Mcp
+  kind: service
+  aliases:
+  - Mcp
+  - mcp.so
+  homepage: https://mcp.so
+  official_domains:
+  - mcp.so
+  review_status: derived
+- canonical_name: Microsoft
+  kind: service
+  aliases:
+  - Microsoft
+  - microsoft.com
+  homepage: https://microsoft.com
+  official_domains:
+  - learn.microsoft.com
+  - microsoft.com
+  review_status: derived
+- canonical_name: Mistral AI
+  kind: service
+  aliases:
+  - Mistral AI
+  - mistral.ai
+  homepage: https://mistral.ai
+  official_domains:
+  - admin.mistral.ai
+  - docs.mistral.ai
+  - mistral.ai
+  review_status: derived
+- canonical_name: Mongodb
+  kind: service
+  aliases:
+  - Mongodb
+  - mongodb.com
+  homepage: https://mongodb.com
+  official_domains:
+  - mongodb.com
+  review_status: derived
+- canonical_name: Murf.AI
+  kind: service
+  aliases:
+  - Murf.AI
+  - murf.ai
+  homepage: https://murf.ai
+  official_domains:
+  - global.api.murf.ai
+  - murf.ai
+  review_status: derived
+- canonical_name: n8n
+  kind: service
+  aliases:
+  - n8n
+  - n8n.io
+  homepage: https://n8n.io
+  official_domains:
+  - docs.n8n.io
+  - n8n.io
+  review_status: derived
+- canonical_name: Napkin AI
+  kind: service
+  aliases:
+  - Napkin AI
+  - napkin.ai
+  homepage: https://napkin.ai
+  official_domains:
+  - napkin.ai
+  review_status: derived
+- canonical_name: Ngrok
+  kind: service
+  aliases:
+  - Ngrok
+  - ngrok.com
+  homepage: https://ngrok.com
+  official_domains:
+  - abc123.ngrok.io
+  - ngrok.com
+  - ngrok.io
+  review_status: derived
+- canonical_name: Nvidia
+  kind: service
+  aliases:
+  - Nvidia
+  - nvidia.com
+  homepage: https://nvidia.com
+  official_domains:
+  - developer.nvidia.com
+  - nvidia.com
+  review_status: derived
+- canonical_name: Ollama
+  kind: service
+  aliases:
+  - Ollama
+  - ollama.com
+  homepage: https://ollama.com
+  official_domains:
+  - ollama.com
+  review_status: derived
+- canonical_name: OpenAI
+  kind: service
+  aliases:
+  - OpenAI
+  - openai.com
+  homepage: https://openai.com
+  official_domains:
+  - cookbook.openai.com
+  - openai.com
+  - platform.openai.com
+  review_status: derived
+- canonical_name: OpenRouter
+  kind: service
+  aliases:
+  - OpenRouter
+  - openrouter.ai
+  homepage: https://openrouter.ai
+  official_domains:
+  - openrouter.ai
+  review_status: derived
+- canonical_name: Openrss
+  kind: service
+  aliases:
+  - Openrss
+  - openrss.org
+  homepage: https://openrss.org
+  official_domains:
+  - openrss.org
+  review_status: derived
+- canonical_name: Openweathermap
+  kind: service
+  aliases:
+  - Openweathermap
+  - openweathermap.org
+  homepage: https://openweathermap.org
+  official_domains:
+  - api.openweathermap.org
+  - home.openweathermap.org
+  - openweathermap.org
+  review_status: derived
+- canonical_name: Otter
+  kind: service
+  aliases:
+  - Otter
+  - otter.ai
+  homepage: https://otter.ai
+  official_domains:
+  - otter.ai
+  review_status: derived
+- canonical_name: Paytm
+  kind: service
+  aliases:
+  - Paytm
+  - paytm.com
+  homepage: https://paytm.com
+  official_domains:
+  - paytm.com
+  review_status: derived
+- canonical_name: Perplexity
+  kind: service
+  aliases:
+  - Perplexity
+  - perplexity.ai
+  homepage: https://perplexity.ai
+  official_domains:
+  - perplexity.ai
+  review_status: derived
+- canonical_name: Pipedream
+  kind: service
+  aliases:
+  - Pipedream
+  - pipedream.com
+  homepage: https://pipedream.com
+  official_domains:
+  - pipedream.com
+  review_status: derived
+- canonical_name: Promptbase
+  kind: service
+  aliases:
+  - Promptbase
+  - promptbase.com
+  homepage: https://promptbase.com
+  official_domains:
+  - promptbase.com
+  review_status: derived
+- canonical_name: PyPI
+  kind: service
+  aliases:
+  - PyPI
+  - pypi.org
+  homepage: https://pypi.org
+  official_domains:
+  - pypi.org
+  review_status: derived
+- canonical_name: Python
+  kind: service
+  aliases:
+  - Python
+  - python.org
+  homepage: https://python.org
+  official_domains:
+  - docs.python.org
+  - python.org
+  review_status: derived
+- canonical_name: Quizgecko
+  kind: service
+  aliases:
+  - Quizgecko
+  - quizgecko.com
+  homepage: https://quizgecko.com
+  official_domains:
+  - quizgecko.com
+  review_status: derived
+- canonical_name: Ragas
+  kind: service
+  aliases:
+  - Ragas
+  - ragas.io
+  homepage: https://ragas.io
+  official_domains:
+  - docs.ragas.io
+  - ragas.io
+  review_status: derived
+- canonical_name: Rapidapi
+  kind: service
+  aliases:
+  - Rapidapi
+  - rapidapi.com
+  homepage: https://rapidapi.com
+  official_domains:
+  - rapidapi.com
+  review_status: derived
+- canonical_name: Redis
+  kind: service
+  aliases:
+  - Redis
+  - redis.io
+  homepage: https://redis.io
+  official_domains:
+  - redis.io
+  review_status: derived
+- canonical_name: Render
+  kind: service
+  aliases:
+  - Render
+  - render.com
+  homepage: https://render.com
+  official_domains:
+  - render.com
+  review_status: derived
+- canonical_name: Scraperapi
+  kind: service
+  aliases:
+  - Scraperapi
+  - scraperapi.com
+  homepage: https://scraperapi.com
+  official_domains:
+  - dashboard.scraperapi.com
+  - docs.scraperapi.com
+  - scraperapi.com
+  review_status: derived
+- canonical_name: SerpAPI
+  kind: service
+  aliases:
+  - SerpAPI
+  - serpapi.com
+  homepage: https://serpapi.com
+  official_domains:
+  - serpapi.com
+  review_status: derived
+- canonical_name: Serper
+  kind: service
+  aliases:
+  - Serper
+  - serper.dev
+  homepage: https://serper.dev
+  official_domains:
+  - serper.dev
+  review_status: derived
+- canonical_name: Smithery
+  kind: service
+  aliases:
+  - Smithery
+  - smithery.ai
+  homepage: https://smithery.ai
+  official_domains:
+  - smithery.ai
+  review_status: derived
+- canonical_name: Stability AI
+  kind: service
+  aliases:
+  - Stability AI
+  - stability.ai
+  homepage: https://stability.ai
+  official_domains:
+  - api.stability.ai
+  - platform.stability.ai
+  - stability.ai
+  review_status: derived
+- canonical_name: Sunoapi
+  kind: service
+  aliases:
+  - Sunoapi
+  - sunoapi.org
+  homepage: https://sunoapi.org
+  official_domains:
+  - old-docs.sunoapi.org
+  - sunoapi.org
+  review_status: derived
+- canonical_name: Supabase
+  kind: service
+  aliases:
+  - Supabase
+  - supabase.com
+  homepage: https://supabase.com
+  official_domains:
+  - supabase.com
+  review_status: derived
+- canonical_name: Supermemory
+  kind: service
+  aliases:
+  - Supermemory
+  - supermemory.ai
+  homepage: https://supermemory.ai
+  official_domains:
+  - supermemory.ai
+  review_status: derived
+- canonical_name: Tavily
+  kind: service
+  aliases:
+  - Tavily
+  - tavily.com
+  homepage: https://tavily.com
+  official_domains:
+  - app.tavily.com
+  - docs.tavily.com
+  - tavily.com
+  review_status: derived
+- canonical_name: Tensorflow
+  kind: service
+  aliases:
+  - Tensorflow
+  - tensorflow.org
+  homepage: https://tensorflow.org
+  official_domains:
+  - projector.tensorflow.org
+  - tensorflow.org
+  review_status: derived
+- canonical_name: Testsprite
+  kind: service
+  aliases:
+  - Testsprite
+  - testsprite.com
+  homepage: https://testsprite.com
+  official_domains:
+  - docs.testsprite.com
+  - testsprite.com
+  review_status: derived
+- canonical_name: Thita
+  kind: service
+  aliases:
+  - Thita
+  - thita.ai
+  homepage: https://thita.ai
+  official_domains:
+  - thita.ai
+  review_status: derived
+- canonical_name: Twelve Data
+  kind: service
+  aliases:
+  - Twelve Data
+  - twelvedata.com
+  homepage: https://twelvedata.com
+  official_domains:
+  - api.twelvedata.com
+  - twelvedata.com
+  review_status: derived
+- canonical_name: Vercel
+  kind: service
+  aliases:
+  - Vercel
+  - vercel.com
+  homepage: https://vercel.com
+  official_domains:
+  - vercel.com
+  review_status: derived
+- canonical_name: Vespa
+  kind: service
+  aliases:
+  - Vespa
+  - vespa.ai
+  homepage: https://vespa.ai
+  official_domains:
+  - vespa.ai
+  review_status: derived
+- canonical_name: Visualstudio
+  kind: service
+  aliases:
+  - Visualstudio
+  - visualstudio.com
+  homepage: https://visualstudio.com
+  official_domains:
+  - code.visualstudio.com
+  - visualstudio.com
+  review_status: derived
+- canonical_name: Vite
+  kind: service
+  aliases:
+  - Vite
+  - vite.dev
+  homepage: https://vite.dev
+  official_domains:
+  - vite.dev
+  review_status: derived
+- canonical_name: Withgoogle
+  kind: service
+  aliases:
+  - Withgoogle
+  - withgoogle.com
+  homepage: https://withgoogle.com
+  official_domains:
+  - pair.withgoogle.com
+  - stitch.withgoogle.com
+  - withgoogle.com
+  review_status: derived
+- canonical_name: Yahoo
+  kind: service
+  aliases:
+  - Yahoo
+  - yahoo.com
+  homepage: https://yahoo.com
+  official_domains:
+  - finance.yahoo.com
+  - yahoo.com
+  review_status: derived
+- canonical_name: AIVA
+  kind: tool
+  aliases:
+  - AIVA
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Alpha Vantage
+  kind: tool
+  aliases:
+  - Alpha Vantage
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Anki
+  kind: tool
+  aliases:
+  - Anki
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: anthropic
+  kind: tool
+  aliases:
+  - anthropic
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Anthropic Claude Opus 4.8
+  kind: tool
+  aliases:
+  - Anthropic Claude Opus 4.8
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Astra DB
+  kind: tool
+  aliases:
+  - Astra DB
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Automatic1111
+  kind: tool
+  aliases:
+  - Automatic1111
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: BandLab
+  kind: tool
+  aliases:
+  - BandLab
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Bark
+  kind: tool
+  aliases:
+  - Bark
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Base44
+  kind: tool
+  aliases:
+  - Base44
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Beautiful.ai
+  kind: tool
+  aliases:
+  - Beautiful.ai
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Bloomberg
+  kind: tool
+  aliases:
+  - Bloomberg
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Bolt
+  kind: tool
+  aliases:
+  - Bolt
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Canva
+  kind: tool
+  aliases:
+  - Canva
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Canvas
+  kind: tool
+  aliases:
+  - Canvas
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Cerebras
+  kind: tool
+  aliases:
+  - Cerebras
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Chart.js
+  kind: tool
+  aliases:
+  - Chart.js
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Chirp
+  kind: tool
+  aliases:
+  - Chirp
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: ChromaDB
+  kind: tool
+  aliases:
+  - ChromaDB
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Cifer Fraud Detection Dataset
+  kind: tool
+  aliases:
+  - Cifer Fraud Detection Dataset
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: CivitAI
+  kind: tool
+  aliases:
+  - CivitAI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Claude Artifacts
+  kind: tool
+  aliases:
+  - Claude Artifacts
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Claude Code
+  kind: tool
+  aliases:
+  - Claude Code
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Claude Haiku 4.5
+  kind: tool
+  aliases:
+  - Claude Haiku 4.5
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Claude Opus 4.8
+  kind: tool
+  aliases:
+  - Claude Opus 4.8
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Claude Opus 4.8 Vision
+  kind: tool
+  aliases:
+  - Claude Opus 4.8 Vision
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Claude Skills
+  kind: tool
+  aliases:
+  - Claude Skills
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Claude Sonnet 4.6
+  kind: tool
+  aliases:
+  - Claude Sonnet 4.6
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: claude-sonnet-4-5
+  kind: tool
+  aliases:
+  - claude-sonnet-4-5
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Cloudflare Workers AI
+  kind: tool
+  aliases:
+  - Cloudflare Workers AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Codex CLI
+  kind: tool
+  aliases:
+  - Codex CLI
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Cohere
+  kind: tool
+  aliases:
+  - Cohere
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Comet Browser
+  kind: tool
+  aliases:
+  - Comet Browser
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: ComfyUI
+  kind: tool
+  aliases:
+  - ComfyUI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Context API
+  kind: tool
+  aliases:
+  - Context API
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Copilot CLI
+  kind: tool
+  aliases:
+  - Copilot CLI
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Cursor IDE
+  kind: tool
+  aliases:
+  - Cursor IDE
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: DALL-E
+  kind: tool
+  aliases:
+  - DALL-E
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Deepgram
+  kind: tool
+  aliases:
+  - Deepgram
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: DeepSeek
+  kind: tool
+  aliases:
+  - DeepSeek
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: deepseek-ai
+  kind: tool
+  aliases:
+  - deepseek-ai
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: DeepSeek-V4 Flash
+  kind: tool
+  aliases:
+  - DeepSeek-V4 Flash
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: DreamStudio
+  kind: tool
+  aliases:
+  - DreamStudio
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Email
+  kind: tool
+  aliases:
+  - Email
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: EmbedChain
+  kind: tool
+  aliases:
+  - EmbedChain
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: ESLint
+  kind: tool
+  aliases:
+  - ESLint
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Excel
+  kind: tool
+  aliases:
+  - Excel
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: F5-TTS
+  kind: tool
+  aliases:
+  - F5-TTS
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: FAISS
+  kind: tool
+  aliases:
+  - FAISS
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: FastSpeech2
+  kind: tool
+  aliases:
+  - FastSpeech2
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Fathom
+  kind: tool
+  aliases:
+  - Fathom
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Fetch
+  kind: tool
+  aliases:
+  - Fetch
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Fireflies AI
+  kind: tool
+  aliases:
+  - Fireflies AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Flowise AI
+  kind: tool
+  aliases:
+  - Flowise AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: FLUX.2
+  kind: tool
+  aliases:
+  - FLUX.2
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Fooocus
+  kind: tool
+  aliases:
+  - Fooocus
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gamma AI
+  kind: tool
+  aliases:
+  - Gamma AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: gemini
+  kind: tool
+  aliases:
+  - gemini
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini 2.5
+  kind: tool
+  aliases:
+  - Gemini 2.5
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini 3
+  kind: tool
+  aliases:
+  - Gemini 3
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini 3 Pro Image
+  kind: tool
+  aliases:
+  - Gemini 3 Pro Image
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini 3 Pro Vision
+  kind: tool
+  aliases:
+  - Gemini 3 Pro Vision
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini 3.1 Pro
+  kind: tool
+  aliases:
+  - Gemini 3.1 Pro
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini 3.5 Flash
+  kind: tool
+  aliases:
+  - Gemini 3.5 Flash
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini CLI
+  kind: tool
+  aliases:
+  - Gemini CLI
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini Guided Learning
+  kind: tool
+  aliases:
+  - Gemini Guided Learning
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini Nano Banana
+  kind: tool
+  aliases:
+  - Gemini Nano Banana
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: gemini-api
+  kind: tool
+  aliases:
+  - gemini-api
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini-TTS
+  kind: tool
+  aliases:
+  - Gemini-TTS
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemma 4
+  kind: tool
+  aliases:
+  - Gemma 4
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: GitHub Models
+  kind: tool
+  aliases:
+  - GitHub Models
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gmail
+  kind: tool
+  aliases:
+  - Gmail
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google AI Studio
+  kind: tool
+  aliases:
+  - Google AI Studio
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Antigravity
+  kind: tool
+  aliases:
+  - Google Antigravity
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Calendar
+  kind: tool
+  aliases:
+  - Google Calendar
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Chrome
+  kind: tool
+  aliases:
+  - Google Chrome
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Colab
+  kind: tool
+  aliases:
+  - Google Colab
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Docs
+  kind: tool
+  aliases:
+  - Google Docs
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Drive
+  kind: tool
+  aliases:
+  - Google Drive
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Gemini 3.1 Pro
+  kind: tool
+  aliases:
+  - Google Gemini 3.1 Pro
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Sheets
+  kind: tool
+  aliases:
+  - Google Sheets
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Speech-to-Text
+  kind: tool
+  aliases:
+  - Google Speech-to-Text
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Vertex
+  kind: tool
+  aliases:
+  - Google Vertex
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: GPT
+  kind: tool
+  aliases:
+  - GPT
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: GPT Image 2
+  kind: tool
+  aliases:
+  - GPT Image 2
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: GPT-5.4 mini
+  kind: tool
+  aliases:
+  - GPT-5.4 mini
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: GPT-5.5 Vision
+  kind: tool
+  aliases:
+  - GPT-5.5 Vision
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Grok
+  kind: tool
+  aliases:
+  - Grok
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: groq-api
+  kind: tool
+  aliases:
+  - groq-api
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: GST Ready Reckoner
+  kind: tool
+  aliases:
+  - GST Ready Reckoner
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Haystack
+  kind: tool
+  aliases:
+  - Haystack
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: http-request
+  kind: tool
+  aliases:
+  - http-request
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: http://huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell
+  kind: tool
+  aliases:
+  - http://huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Hugging Face Diffusers
+  kind: tool
+  aliases:
+  - Hugging Face Diffusers
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Hugging Face Spaces
+  kind: tool
+  aliases:
+  - Hugging Face Spaces
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: HuggingFace
+  kind: tool
+  aliases:
+  - HuggingFace
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: HuggingFace Hub
+  kind: tool
+  aliases:
+  - HuggingFace Hub
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell
+  kind: tool
+  aliases:
+  - huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: HuggingFaceEmbeddings
+  kind: tool
+  aliases:
+  - HuggingFaceEmbeddings
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: HumanInTheLoopMiddleware
+  kind: tool
+  aliases:
+  - HumanInTheLoopMiddleware
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: if-node
+  kind: tool
+  aliases:
+  - if-node
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Imagen 4 Ultra
+  kind: tool
+  aliases:
+  - Imagen 4 Ultra
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: InMemorySaver
+  kind: tool
+  aliases:
+  - InMemorySaver
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Interactive Brokers
+  kind: tool
+  aliases:
+  - Interactive Brokers
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: InternVL3
+  kind: tool
+  aliases:
+  - InternVL3
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: JS Cookie
+  kind: tool
+  aliases:
+  - JS Cookie
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: JSON
+  kind: tool
+  aliases:
+  - JSON
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Julius AI
+  kind: tool
+  aliases:
+  - Julius AI
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Kokoro-82M
+  kind: tool
+  aliases:
+  - Kokoro-82M
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Lambda Labs
+  kind: tool
+  aliases:
+  - Lambda Labs
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Langflow
+  kind: tool
+  aliases:
+  - Langflow
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: LinkedIn
+  kind: tool
+  aliases:
+  - LinkedIn
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Llama 4
+  kind: tool
+  aliases:
+  - Llama 4
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: LlamaIndex
+  kind: tool
+  aliases:
+  - LlamaIndex
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Local Storage
+  kind: tool
+  aliases:
+  - Local Storage
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: LoRA
+  kind: tool
+  aliases:
+  - LoRA
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Marketaux
+  kind: tool
+  aliases:
+  - Marketaux
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: mcp-client
+  kind: tool
+  aliases:
+  - mcp-client
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: MeloTTS
+  kind: tool
+  aliases:
+  - MeloTTS
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Meta Llama
+  kind: tool
+  aliases:
+  - Meta Llama
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Meta Llama 3
+  kind: tool
+  aliases:
+  - Meta Llama 3
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: meta-llama/Llama-3.2-1B-Instruct
+  kind: tool
+  aliases:
+  - meta-llama/Llama-3.2-1B-Instruct
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Mid Journey
+  kind: tool
+  aliases:
+  - Mid Journey
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Midjourney v8.1
+  kind: tool
+  aliases:
+  - Midjourney v8.1
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Milvus
+  kind: tool
+  aliases:
+  - Milvus
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Miro AI
+  kind: tool
+  aliases:
+  - Miro AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Mistral
+  kind: tool
+  aliases:
+  - Mistral
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Mistral Large 3
+  kind: tool
+  aliases:
+  - Mistral Large 3
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: mistral-cloud
+  kind: tool
+  aliases:
+  - mistral-cloud
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: ModelScope
+  kind: tool
+  aliases:
+  - ModelScope
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Molmo
+  kind: tool
+  aliases:
+  - Molmo
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Murf AI
+  kind: tool
+  aliases:
+  - Murf AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: MusicGen
+  kind: tool
+  aliases:
+  - MusicGen
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: MyLens AI
+  kind: tool
+  aliases:
+  - MyLens AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: NeMo Guardrails
+  kind: tool
+  aliases:
+  - NeMo Guardrails
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: NewsAPI
+  kind: tool
+  aliases:
+  - NewsAPI
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: NightCafe
+  kind: tool
+  aliases:
+  - NightCafe
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: NTTS
+  kind: tool
+  aliases:
+  - NTTS
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: NVIDIA NIM
+  kind: tool
+  aliases:
+  - NVIDIA NIM
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: OpenAI GPT-5.5
+  kind: tool
+  aliases:
+  - OpenAI GPT-5.5
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: OpenAI Whisper
+  kind: tool
+  aliases:
+  - OpenAI Whisper
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: OpenVoice V2
+  kind: tool
+  aliases:
+  - OpenVoice V2
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: OpenWeather API
+  kind: tool
+  aliases:
+  - OpenWeather API
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Opus 4
+  kind: tool
+  aliases:
+  - Opus 4
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Otter AI
+  kind: tool
+  aliases:
+  - Otter AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Paperspace
+  kind: tool
+  aliases:
+  - Paperspace
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: PaySim
+  kind: tool
+  aliases:
+  - PaySim
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: PIIMiddleware
+  kind: tool
+  aliases:
+  - PIIMiddleware
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Pinecone
+  kind: tool
+  aliases:
+  - Pinecone
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Polygon.io
+  kind: tool
+  aliases:
+  - Polygon.io
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: PowerPoint
+  kind: tool
+  aliases:
+  - PowerPoint
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Prettier
+  kind: tool
+  aliases:
+  - Prettier
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Prompt Base
+  kind: tool
+  aliases:
+  - Prompt Base
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: ProtectAI
+  kind: tool
+  aliases:
+  - ProtectAI
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: protectai/deberta-v3-base-prompt-injection-v2
+  kind: tool
+  aliases:
+  - protectai/deberta-v3-base-prompt-injection-v2
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Qdrant
+  kind: tool
+  aliases:
+  - Qdrant
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: QLoRA
+  kind: tool
+  aliases:
+  - QLoRA
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Quadratic
+  kind: tool
+  aliases:
+  - Quadratic
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Quizlet
+  kind: tool
+  aliases:
+  - Quizlet
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Qwen
+  kind: tool
+  aliases:
+  - Qwen
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Qwen-Image
+  kind: tool
+  aliases:
+  - Qwen-Image
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: R1
+  kind: tool
+  aliases:
+  - R1
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: RAGatouille
+  kind: tool
+  aliases:
+  - RAGatouille
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: React Icons
+  kind: tool
+  aliases:
+  - React Icons
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: React Router
+  kind: tool
+  aliases:
+  - React Router
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: React Spinners
+  kind: tool
+  aliases:
+  - React Spinners
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Relevance AI
+  kind: tool
+  aliases:
+  - Relevance AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Replicate
+  kind: tool
+  aliases:
+  - Replicate
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Replit
+  kind: tool
+  aliases:
+  - Replit
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Reuters
+  kind: tool
+  aliases:
+  - Reuters
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Rev
+  kind: tool
+  aliases:
+  - Rev
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Robinhood
+  kind: tool
+  aliases:
+  - Robinhood
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: RunPod
+  kind: tool
+  aliases:
+  - RunPod
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Scheduler Methods
+  kind: tool
+  aliases:
+  - Scheduler Methods
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Scholar AI
+  kind: tool
+  aliases:
+  - Scholar AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Scraper API
+  kind: tool
+  aliases:
+  - Scraper API
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: SEBI Financial Education Booklet
+  kind: tool
+  aliases:
+  - SEBI Financial Education Booklet
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Semantic Kernel
+  kind: tool
+  aliases:
+  - Semantic Kernel
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Sendsteps.ai
+  kind: tool
+  aliases:
+  - Sendsteps.ai
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: sentence-transformers
+  kind: tool
+  aliases:
+  - sentence-transformers
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Serp API
+  kind: tool
+  aliases:
+  - Serp API
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: SFTTrainer
+  kind: tool
+  aliases:
+  - SFTTrainer
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Slack
+  kind: tool
+  aliases:
+  - Slack
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Sonnet 4.5
+  kind: tool
+  aliases:
+  - Sonnet 4.5
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Soundful
+  kind: tool
+  aliases:
+  - Soundful
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Speechify
+  kind: tool
+  aliases:
+  - Speechify
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: SpeechT5
+  kind: tool
+  aliases:
+  - SpeechT5
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Stable Diffusion 3.5
+  kind: tool
+  aliases:
+  - Stable Diffusion 3.5
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Stable Diffusion 4
+  kind: tool
+  aliases:
+  - Stable Diffusion 4
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Stable Diffusion v1.5
+  kind: tool
+  aliases:
+  - Stable Diffusion v1.5
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Stable Diffusion XL
+  kind: tool
+  aliases:
+  - Stable Diffusion XL
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Streamlit
+  kind: tool
+  aliases:
+  - Streamlit
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: StudyFetch
+  kind: tool
+  aliases:
+  - StudyFetch
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Suno
+  kind: tool
+  aliases:
+  - Suno
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: suno-api
+  kind: tool
+  aliases:
+  - suno-api
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Tacotron 2
+  kind: tool
+  aliases:
+  - Tacotron 2
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Telegram
+  kind: tool
+  aliases:
+  - Telegram
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Tensor.Art
+  kind: tool
+  aliases:
+  - Tensor.Art
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: tl;dv
+  kind: tool
+  aliases:
+  - tl;dv
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Together AI
+  kind: tool
+  aliases:
+  - Together AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: TOON
+  kind: tool
+  aliases:
+  - TOON
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: TwelveData
+  kind: tool
+  aliases:
+  - TwelveData
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Udio
+  kind: tool
+  aliases:
+  - Udio
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: V0 by Vercel
+  kind: tool
+  aliases:
+  - V0 by Vercel
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: V3
+  kind: tool
+  aliases:
+  - V3
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: VALL-E 2
+  kind: tool
+  aliases:
+  - VALL-E 2
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Vast AI
+  kind: tool
+  aliases:
+  - Vast AI
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Voyage AI
+  kind: tool
+  aliases:
+  - Voyage AI
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: WaveNet
+  kind: tool
+  aliases:
+  - WaveNet
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Weaviate
+  kind: tool
+  aliases:
+  - Weaviate
+  review_status: from_sheet
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: webhook
+  kind: tool
+  aliases:
+  - webhook
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Webull
+  kind: tool
+  aliases:
+  - Webull
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Whimsical
+  kind: tool
+  aliases:
+  - Whimsical
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Whisper
+  kind: tool
+  aliases:
+  - Whisper
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: wikipedia
+  kind: tool
+  aliases:
+  - wikipedia
+  review_status: from_sheet
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Windsurf
+  kind: tool
+  aliases:
+  - Windsurf
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Yahoo Finance
+  kind: tool
+  aliases:
+  - Yahoo Finance
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Zerodha
+  kind: tool
+  aliases:
+  - Zerodha
+  review_status: from_sheet
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U

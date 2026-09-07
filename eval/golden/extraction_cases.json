@@ -1,0 +1,43 @@
+[
+  {"name": "an <a href> tool link is inventoried, with authority derived from the link",
+   "records": [{"body_text": "Get a key from <a href=\"https://console.groq.com/keys\" target=\"_blank\">Groq</a>.", "evidence_source": "markdown", "object_type": "LEARNING_RESOURCE"}],
+   "expect": {"must_contain": [{"kind": "service", "canonical_name": "Groq", "has_domain": "groq.com"}]}},
+
+  {"name": "a news citation is NOT a curriculum dependency",
+   "records": [{"body_text": "Background reading: <a href=\"https://www.reuters.com/technology/ai-story\">Reuters</a>.", "evidence_source": "markdown", "object_type": "LEARNING_RESOURCE"}],
+   "expect": {"max_dependencies": 0}},
+
+  {"name": "an academic citation is NOT a dependency",
+   "records": [{"body_text": "See <a href=\"https://stanford.edu/~jurafsky/slp3/\">the textbook</a>.", "evidence_source": "markdown", "object_type": "LEARNING_RESOURCE"}],
+   "expect": {"max_dependencies": 0}},
+
+  {"name": "imports in reference solution code become package dependencies",
+   "records": [{"body_text": "import gradio as gr\nfrom langchain_chroma import Chroma\nimport os, json", "evidence_source": "solution_code", "object_type": "CODING_QUESTIONS"}],
+   "expect": {"must_contain": [{"kind": "package", "canonical_name": "gradio"}, {"kind": "package", "canonical_name": "langchain-chroma"}],
+              "must_not_contain": ["os", "json"]}},
+
+  {"name": "pip install inside prose does not yield the sentence as packages",
+   "records": [{"body_text": "Later you can pip install the application yourself before the session starts.", "evidence_source": "markdown", "object_type": "LEARNING_RESOURCE"}],
+   "expect": {"must_not_contain": ["application", "yourself", "the"]}},
+
+  {"name": "a fenced pip install does yield its packages",
+   "records": [{"body_text": "```\n!pip install -qU gradio langchain-community\n```", "evidence_source": "markdown", "object_type": "LEARNING_RESOURCE"}],
+   "expect": {"must_contain": [{"kind": "package", "canonical_name": "gradio"}, {"kind": "package", "canonical_name": "langchain-community"}]}},
+
+  {"name": "n8n workflow nodes are captured with their taught typeVersion",
+   "records": [{"body_text": "{\"nodes\":[{\"type\":\"@n8n/n8n-nodes-langchain.agent\",\"typeVersion\":2.2},{\"type\":\"n8n-nodes-base.gmail\",\"typeVersion\":2.1}]}", "evidence_source": "solution_code", "object_type": "OBJECTIVE_QUESTIONS"}],
+   "expect": {"must_contain": [{"kind": "n8n_node", "canonical_name": "@n8n/n8n-nodes-langchain.agent", "taught_version": "2.2"}]}},
+
+  {"name": "model ids are captured but doc-URL fragments are not",
+   "records": [{"body_text": "We call gemini-2.5-flash; see the gemini-api quickstart.", "evidence_source": "markdown", "object_type": "LEARNING_RESOURCE"}],
+   "expect": {"must_contain": [{"kind": "model", "canonical_name": "gemini-2.5-flash"}],
+              "must_not_contain": ["gemini-api"]}},
+
+  {"name": "internal asset hosts are never dependencies",
+   "records": [{"body_text": "![diagram](https://nkb-backend-ccbp-media-static.s3.amazonaws.com/x/y.png) and <a href=\"https://learning.ccbp.in/course?c_id=1\">the portal</a>", "evidence_source": "markdown", "object_type": "LEARNING_RESOURCE"}],
+   "expect": {"max_dependencies": 0}},
+
+  {"name": "a machine-generated question tag is not a tool",
+   "records": [{"body_text": "hugging_face_role_q7_tf_true", "evidence_source": "question_tag", "object_type": "UNIT_TAG"}],
+   "expect": {"max_dependencies": 0}}
+]
