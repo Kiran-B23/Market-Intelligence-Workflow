@@ -30,8 +30,12 @@ WHY = {
           "reads to them as the course being wrong.",
     "S6": "Code written against the taught version may no longer run on what students "
           "install today.",
-    "S7": "A retired model id fails at call time, so every example in the session stops "
-          "working.",
+    # S7 is a callable because the flat sentence was wrong three times out of four.
+    # "fails at call time" is only true of an id the curriculum actually CALLS; of the
+    # four live S7 findings, one executes the id and three merely name it. A resolver
+    # keeps the claim tied to `questions_executing`, which `compose()` already trusts
+    # enough to build the impact list from two lines further down.
+    "S7": lambda f: _why_s7(f),
     "S8": "Screenshots and click-paths drift out of date, eroding trust in the material "
           "even where the tool still works.",
     "S10": "A better-suited tool exists; students are learning the second-best option.",
@@ -42,6 +46,13 @@ WHY = {
 # does not make every MCQ that mentions the tool wrong.
 MENTION_RELEVANT_SIGNALS = {"S4", "S7"}
 
+# Days from today by severity, taken verbatim from the prior Curriculum Gap Analyzer's
+# `when_to_act.py`. It becomes a DATE on the finding, not a second source of prose:
+# `WHEN_BY_SEVERITY` below stays the only wording, or the digest and the field can
+# disagree about the same deadline. A date is what a planning tool can sort on;
+# "next curriculum cycle" is what a person reads.
+SEVERITY_OFFSETS = {"critical": 7, "high": 30, "medium": 90, "low": 180, "info": 365}
+
 WHEN_BY_SEVERITY = {
     "critical": "This sprint — before any live cohort reaches the affected session.",
     "high": "Within two weeks.",
@@ -51,11 +62,55 @@ WHEN_BY_SEVERITY = {
 }
 
 
+def _why_s7(f: Finding) -> str:
+    """Why a taught model id being retired matters — which depends on two things.
+
+    First, whether the curriculum CALLS the id or merely names it: only the former
+    fails at run time. Second, whether the provider actually stopped serving it or just
+    moved it off the developer plan — a student on a free key is blocked either way, but
+    telling a reviewer a model is "gone" when the vendor still lists it is how the
+    digest loses its authority.
+    """
+    left_dev_plan = "model_tier_restricted" in f.probe_signals
+    if f.questions_executing:
+        return (f"The id is still served, but no longer on the provider's developer "
+                f"plan, so the {f.questions_executing} graded item(s) that run it fail "
+                f"on a student's free key." if left_dev_plan else
+                f"A retired model id fails at call time, so the "
+                f"{f.questions_executing} graded item(s) that run it stop working.")
+    if f.graded_locations:
+        reach = ("students can no longer call on a free key" if left_dev_plan
+                 else "its provider no longer serves")
+        return (f"{f.graded_locations} graded question(s) ask students about a model id "
+                f"{reach}, so the answer keyed as correct is now wrong.")
+    reach = ("that is no longer reachable on a free key" if left_dev_plan
+             else "its provider no longer serves")
+    return (f"The material names a model id {reach}, so a student following it cannot "
+            f"reproduce what the session describes.")
+
+
+def _why_for(f: Finding) -> str:
+    """The "why it matters" sentence, which may depend on the finding.
+
+    Most drift classes have one honest sentence. A few do not: whether a retired model
+    id breaks anything turns on whether the curriculum executes it, so those entries are
+    callables. Anything unresolvable falls back to the generic line rather than raising -
+    the deterministic note is the product and must always render.
+    """
+    entry = WHY.get(f.signal)
+    if callable(entry):
+        try:
+            return entry(f)
+        except Exception:       # a bad resolver must not lose the whole digest
+            entry = None
+    return entry or "This affects material students are working through."
+
+
 def compose(dep: Dependency, f: Finding) -> None:
     """Fill the triad deterministically. Always runs; never needs a model."""
     f.what_to_act = f.recommendation or f"Review {dep.canonical_name}."
 
-    why = WHY.get(f.signal, "This affects material students are working through.")
+    why = _why_for(f)
     impact = []
     if f.questions_executing:
         impact.append(f"{f.questions_executing} graded item(s) execute it")
@@ -70,12 +125,23 @@ def compose(dep: Dependency, f: Finding) -> None:
     # sessions[0] from two independently sorted lists named a course that the earliest
     # session does not belong to.
     dated = [l for l in f.locations if l.session_no]
-    if f.severity in ("critical", "high") and dated:
+    if dated:
+        # Name the earliest affected session at any severity - it is the single most
+        # useful fact for scheduling the work. But the URGENCY has to stay the one
+        # `WHEN_BY_SEVERITY` gives: prefixing every dated finding with "This sprint"
+        # told a reviewer to drop everything for a model id that nothing executes.
         first = min(dated, key=lambda l: (l.session_no, l.course))
-        when = (f"This sprint — the earliest affected session is {first.course} "
+        when = (f"{when} The earliest affected session is {first.course} "
                 f"session {first.session_no}.")
     f.when_to_act = when
+    # A sortable deadline alongside the prose. Derived from severity, so it moves with
+    # it - and it is the same mapping the prose uses, not an independent guess.
+    from datetime import date, timedelta
+    offset = SEVERITY_OFFSETS.get(f.severity)
+    f.due_by = ((date.today() + timedelta(days=offset)).isoformat()
+                if offset is not None else "")
     f.note_source = "template"
+    f.note_provider = f.note_model = ""
 
 
 # Sequences a hostile page could use to escape the untrusted block or impersonate the
@@ -123,14 +189,14 @@ def _fmt_locations(f: Finding) -> str:
     return "\n".join(out) or "- unknown"
 
 
-def refine(dep: Dependency, f: Finding, feedback: str = "") -> bool:
-    """Ask the model to rewrite the triad. Returns True only if it was accepted.
+def build_refine_prompt(dep: Dependency, f: Finding, feedback: str = "") -> str:
+    """Render the refinement prompt. Pure: no I/O, no model, no provider.
 
-    Rejected outright if the model drops a part, or if it introduces a URL that is not
-    already in the finding's evidence — the cheapest possible check that it invented a
-    source. On any rejection the deterministic triad stays exactly as composed.
+    Extracted from `refine()` so the prompt can be rendered and compared without
+    spending anything - which is what lets `eval/parity.py` prove that every provider
+    receives identical bytes.
     """
-    prompt = load_prompt(
+    return load_prompt(
         "recommendation_v1",
         signal=f.signal, signal_label=f.signal_label,
         dependency=dep.canonical_name, kind=dep.kind,
@@ -153,25 +219,50 @@ def refine(dep: Dependency, f: Finding, feedback: str = "") -> bool:
         alternatives=_fmt_alternatives(f),
         feedback=feedback or "none recorded yet",
     )
-    res = complete(prompt)
-    if not res.ok:
-        return False
-    data = res.json()
+
+
+def judge_rewrite(dep: Dependency, f: Finding,
+                  data: object) -> tuple[Optional[tuple[str, str, str]], str]:
+    """Accept or reject a model's rewrite. Returns (triad, reason).
+
+    The triad is None on rejection and `reason` always says why, so a comparison
+    harness can report *how* providers differ rather than only that they do. This is
+    the single arbiter of whether refined prose is ever used, and it is deliberately
+    ignorant of which provider produced the text.
+    """
     if not isinstance(data, dict):
-        return False
+        return None, "reply was not a JSON object"
     what, why, when = (str(data.get(k) or "").strip()
                        for k in ("what_to_act", "why_to_act", "when_to_act"))
-    if not (what and why and when):
-        return False
+    missing = [k for k, v in (("what_to_act", what), ("why_to_act", why),
+                              ("when_to_act", when)) if not v]
+    if missing:
+        return None, f"missing or empty: {', '.join(missing)}"
 
     allowed = " ".join([*f.affected_urls, *(c.source_url for c in f.claims),
                         *(a.homepage for a in f.alternatives), dep.homepage or "",
                         dep.docs_url or ""])
-    import re
     for url in re.findall(r"https?://[^\s,)\]]+", f"{what} {why} {when}"):
         if url.rstrip("/.,);") not in allowed:
-            return False           # invented a source: reject the whole rewrite
+            # Invented a source: reject the whole rewrite, not just the sentence.
+            return None, f"invented a source: {url}"
+    return (what, why, when), "accepted"
 
-    f.what_to_act, f.why_to_act, f.when_to_act = what, why, when
+
+def refine(dep: Dependency, f: Finding, feedback: str = "") -> bool:
+    """Ask the model to rewrite the triad. Returns True only if it was accepted.
+
+    Rejected outright if the model drops a part, or if it introduces a URL that is not
+    already in the finding's evidence — the cheapest possible check that it invented a
+    source. On any rejection the deterministic triad stays exactly as composed.
+    """
+    res = complete(build_refine_prompt(dep, f, feedback))
+    if not res.ok:
+        return False
+    triad, _reason = judge_rewrite(dep, f, res.json())
+    if triad is None:
+        return False
+    f.what_to_act, f.why_to_act, f.when_to_act = triad
     f.note_source = "llm"
+    f.note_provider, f.note_model = res.provider, res.model
     return True

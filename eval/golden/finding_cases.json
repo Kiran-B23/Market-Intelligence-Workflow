@@ -709,5 +709,204 @@
       ],
       "min_findings": 1
     }
+  },
+  {
+    "name": "a model whose provider shutdown date has passed fires S7 at critical",
+    "dependency": {
+      "kind": "model",
+      "canonical_name": "llama-3.3-70b-versatile",
+      "vendor": "Meta",
+      "official_domains": [
+        "ai.meta.com",
+        "llama.com"
+      ],
+      "watch_tier": "critical",
+      "locations": [
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q0"
+        },
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q1"
+        }
+      ]
+    },
+    "probe": {
+      "status": "broken",
+      "signals": [
+        "model_shutdown_passed",
+        "vendor_named_replacement"
+      ],
+      "provider": "Groq",
+      "provider_domains": [
+        "groq.com",
+        "console.groq.com"
+      ],
+      "evidence_url": "https://console.groq.com/docs/deprecations",
+      "declared_changes": [
+        {
+          "rule_id": "groq:llama-3.3-70b-versatile",
+          "n8n_version": "",
+          "title": "llama-3.3-70b-versatile is deprecated on Groq",
+          "description": "llama-3.3-70b-versatile | 08/16/26 | openai/gpt-oss-120b or qwen/qwen3.6-27b",
+          "severity": "critical",
+          "doc_url": "https://console.groq.com/docs/deprecations",
+          "node_types": [
+            "llama-3.3-70b-versatile"
+          ],
+          "actions": [],
+          "replacement_ids": [
+            "openai/gpt-oss-120b"
+          ],
+          "shutdown_date": "08/16/26"
+        }
+      ],
+      "alternatives_verified": [
+        {
+          "name": "openai/gpt-oss-120b",
+          "homepage": "https://console.groq.com/docs/models",
+          "quote": "GPT OSS 120B openai/gpt-oss-120b | 1000 | ...",
+          "status": "available"
+        }
+      ],
+      "detail": "Groq lists llama-3.3-70b-versatile as deprecated with shutdown 08/16/26 - 24 days ago"
+    },
+    "expect": {
+      "must_fire": [
+        "S7"
+      ],
+      "must_not_fire": [
+        "S1",
+        "S4"
+      ],
+      "severity_range": [
+        "critical"
+      ],
+      "min_findings": 1,
+      "must_mention": [
+        "08/16/26",
+        "openai/gpt-oss-120b"
+      ],
+      "min_questions_executing": 2
+    }
+  },
+  {
+    "name": "a provider page we could not read is never a retirement",
+    "dependency": {
+      "kind": "model",
+      "canonical_name": "llama-3.3-70b-versatile",
+      "vendor": "Meta",
+      "official_domains": [
+        "ai.meta.com",
+        "llama.com"
+      ],
+      "watch_tier": "critical",
+      "locations": [
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q0"
+        },
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q1"
+        }
+      ]
+    },
+    "probe": {
+      "status": "inconclusive",
+      "signals": [
+        "model_catalogue_unreadable"
+      ],
+      "detail": "groq: http 503"
+    },
+    "expect": {
+      "max_findings": 0
+    }
+  },
+  {
+    "name": "a model its provider still lists fires nothing",
+    "dependency": {
+      "kind": "model",
+      "canonical_name": "gemini-2.5-flash",
+      "vendor": "Meta",
+      "official_domains": [
+        "ai.meta.com",
+        "llama.com"
+      ],
+      "watch_tier": "critical",
+      "locations": [
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q0"
+        },
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q1"
+        }
+      ]
+    },
+    "probe": {
+      "status": "ok",
+      "signals": [
+        "model_listed_available"
+      ],
+      "provider": "Google",
+      "provider_domains": [
+        "ai.google.dev"
+      ]
+    },
+    "expect": {
+      "max_findings": 0
+    }
+  },
+  {
+    "name": "a model no configured provider serves asserts nothing",
+    "dependency": {
+      "kind": "model",
+      "canonical_name": "qwen3.5",
+      "vendor": "Meta",
+      "official_domains": [
+        "ai.meta.com",
+        "llama.com"
+      ],
+      "watch_tier": "critical",
+      "locations": [
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q0"
+        },
+        {
+          "evidence_source": "model_id",
+          "object_type": "CODING_QUESTIONS",
+          "session_no": 6,
+          "content_id": "q1"
+        }
+      ]
+    },
+    "probe": {
+      "status": "ok",
+      "signals": [
+        "model_provider_unknown"
+      ],
+      "detail": "no configured provider lists this id"
+    },
+    "expect": {
+      "max_findings": 0
+    }
   }
 ]

@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 GOLDEN = ROOT / "eval" / "golden"
 
+from eval import cases                                               # noqa: E402
 from miw.analyse.score import SEVERITY_ORDER, findings_for            # noqa: E402
 from miw.extract.inventory import InventoryBuilder                    # noqa: E402
 from miw.registry import Registry                                     # noqa: E402
@@ -48,7 +49,7 @@ from miw.trust import ClaimKind, Subject, Tier, classify, substantiates  # noqa:
 # Minimum share of cases that must pass for the suite to pass. Deterministic suites
 # are held to 100%: every case encodes a rule the code is supposed to enforce, so a
 # single failure is a regression, not noise.
-THRESHOLDS = {"trust": 1.0, "extraction": 1.0, "findings": 1.0}
+THRESHOLDS = {"trust": 1.0, "extraction": 1.0, "findings": 1.0, "discovery": 1.0}
 PRECISION_TARGET = 0.70          # PRD supporting metric, by week 4
 
 
@@ -105,14 +106,11 @@ def suite_trust(verbose: bool) -> Suite:
 
 # ---------------------------------------------------------------- extraction
 
+# Both of these delegate to `eval/cases.py` so the suites and `eval/parity.py` build
+# identical fixtures. Two copies drifting apart would leave a parity number that looks
+# healthy while comparing different things.
 def _record(spec: dict) -> ContentRecord:
-    return ContentRecord(
-        course="EvalCourse", topic_name="t", unit_id="u1", unit_name="Unit",
-        unit_type="LEARNING_SET", content_id=spec.get("content_id", "c1"),
-        object_type=spec.get("object_type", "LEARNING_RESOURCE"),
-        content_type="MARKDOWN", title="Eval", body_text=spec["body_text"],
-        field_path="[0].eval", evidence_source=spec.get("evidence_source", "markdown"),
-        source_file="eval", session_no=spec.get("session_no", 1))
+    return cases.record(spec)
 
 
 def suite_extraction(verbose: bool) -> Suite:
@@ -154,14 +152,7 @@ def suite_extraction(verbose: bool) -> Suite:
 # ------------------------------------------------------------------ findings
 
 def _dependency(spec: dict) -> Dependency:
-    locs = [Location(course=l.get("course", "EvalCourse"), topic_name="t",
-                     unit_id="u1", unit_name=f"Session {l.get('session_no', 1)}",
-                     content_id=l.get("content_id", ""), field_path="[0].eval",
-                     evidence_source=l["evidence_source"],
-                     object_type=l.get("object_type", "LEARNING_RESOURCE"),
-                     session_no=l.get("session_no"))
-            for l in spec.pop("locations", [])]
-    return Dependency(locations=locs, **spec)
+    return cases.dependency(spec)
 
 
 def suite_findings(verbose: bool) -> Suite:
@@ -252,8 +243,150 @@ def suite_precision(verbose: bool) -> tuple[Suite, dict]:
     return s, stats
 
 
+
+
+
+# ----------------------------------------------------------------- discovery
+
+def suite_discovery(verbose: bool) -> Suite:
+    """Claim-level audit of the nomination ladder. Offline: DNS is a set, HTTP a dict.
+
+    The 2026 measurements are the brief - 3-13% of URLs cited by research agents are
+    fabricated, and citation-support metrics overstate reliability because they never
+    check the URL resolves. So every case here asks one of two questions: did a
+    fabricated thing die deterministically, and did a real thing survive with a
+    citation we fetched ourselves. Half are must-not-fire, matching the convention of
+    the other suites.
+    """
+    from miw.research.nominate import adjudicate, from_search_hit, from_vendor_name
+    from miw.schema import AlternativeNomination, Dependency
+    from miw.trust import Tier
+
+    s = Suite("discovery")
+    dep = Dependency(kind="service", canonical_name="CodeToTutorial",
+                     official_domains=["codetotutorial.com"],
+                     homepage="https://codetotutorial.com")
+
+    PRICING = ("<html><body><p>DeepWiki has a generous free tier for public "
+               "repositories and needs no credit card to start.</p></body></html>")
+    BLANK = "<html><body><p>Welcome. Home About Contact Careers</p></body></html>"
+
+    def resolver(known):
+        from miw.net import domain
+        return lambda url: "ok" if domain(url) in known else "unresolvable"
+
+    def fetcher(pages, status=200):
+        class F:
+            def __init__(self, url):
+                from miw.net import domain
+                self.url, self.status = url, status
+                self.body = pages.get(domain(url), "") if status == 200 else ""
+                self.final_url, self.error, self.redirects = url, "", []
+            reachable = property(lambda s2: s2.status is not None)
+            ok = property(lambda s2: 200 <= (s2.status or 0) < 300)
+            gone = property(lambda s2: s2.status in (404, 410))
+            blocked = property(lambda s2: s2.status in (401, 403, 429))
+        return lambda url, **k: F(url)
+
+    # --- must fire ------------------------------------------------------
+    nom, alt = adjudicate(from_search_hit("https://deepwiki.com/p", "DeepWiki"), dep,
+                          fetcher=fetcher({"deepwiki.com": PRICING}),
+                          resolver=resolver({"deepwiki.com"}))
+    s.case("a live candidate whose own site says something is verified",
+           nom.verdict == "verified" and alt is not None and alt.verified,
+           f"verdict={nom.verdict}")
+    s.case("every claim on a verified candidate cites the candidate's own domain",
+           bool(alt) and all("deepwiki.com" in c.source_url for c in alt.claims)
+           and all(c.tier is Tier.AUTHORITATIVE for c in alt.claims),
+           "a claim escaped the candidate's authority set")
+
+    nom, alt = adjudicate(from_vendor_name("DeepWiki", "https://codetotutorial.com/docs"),
+                          dep, fetcher=fetcher({}), resolver=resolver(set()))
+    s.case("a vendor-named successor is usable with no key and no domain",
+           nom.verdict == "vendor_named" and alt is not None, f"verdict={nom.verdict}")
+    s.case("a vendor-named successor claims nothing about itself",
+           bool(alt) and alt.homepage == "" and alt.free_student_path is None,
+           "claimed something its nominating page cannot settle")
+
+    # --- must NOT fire --------------------------------------------------
+    touched = []
+    nom, alt = adjudicate(
+        AlternativeNomination(name="GhostTool", candidate_domain="ghosttool.invalid",
+                              source="model"), dep,
+        fetcher=lambda u, **k: touched.append(u), resolver=resolver(set()))
+    s.case("a fabricated domain is refuted at DNS",
+           nom.verdict == "refuted_no_such_domain" and alt is None,
+           f"verdict={nom.verdict}")
+    s.case("a fabricated domain is never fetched", touched == [], f"fetched {touched}")
+
+    touched = []
+    nom, alt = adjudicate(
+        AlternativeNomination(name="GhostTool", candidate_domain="", source="model"),
+        dep, fetcher=lambda u, **k: touched.append(u), resolver=lambda u: "ok")
+    s.case("a bare name is never turned into a guessed URL",
+           nom.verdict == "unresolved_name_only" and alt is None and touched == [],
+           f"verdict={nom.verdict} fetched={touched}")
+
+    nom, alt = adjudicate(from_search_hit("https://deepwiki.com/p", "DeepWiki"), dep,
+                          fetcher=fetcher({}, status=404),
+                          resolver=resolver({"deepwiki.com"}))
+    s.case("a dead candidate is refuted", nom.verdict == "refuted_dead" and alt is None,
+           f"verdict={nom.verdict}")
+
+    nom, alt = adjudicate(from_search_hit("https://deepwiki.com/p", "DeepWiki"), dep,
+                          fetcher=fetcher({}, status=403),
+                          resolver=resolver({"deepwiki.com"}))
+    s.case("an anti-bot 403 is NOT reported as refuted",
+           nom.verdict == "unverifiable_blocked" and not nom.refuted and alt is None,
+           f"verdict={nom.verdict} refuted={nom.refuted}")
+
+    nom, alt = adjudicate(from_search_hit("https://deepwiki.com/p", "DeepWiki"), dep,
+                          fetcher=fetcher({"deepwiki.com": BLANK}),
+                          resolver=resolver({"deepwiki.com"}))
+    s.case("a candidate whose site says nothing checkable is refuted",
+           nom.verdict == "refuted_no_evidence" and alt is None,
+           f"verdict={nom.verdict}")
+
+    for bad in ("https://deepwiki.com", "deepwiki.com/docs", "deep wiki.com"):
+        nom, alt = adjudicate(
+            AlternativeNomination(name="DeepWiki", candidate_domain=bad,
+                                  source="model"), dep,
+            fetcher=fetcher({}), resolver=resolver({"deepwiki.com"}))
+        s.case(f"a model-supplied URL is rejected, not repaired ({bad[:22]})",
+               nom.verdict == "rejected_malformed_domain" and alt is None,
+               f"verdict={nom.verdict}")
+
+    nom, alt = adjudicate(from_vendor_name("HTTPS", "https://codetotutorial.com/docs"),
+                          dep, fetcher=fetcher({}), resolver=resolver(set()))
+    s.case("a generic protocol is never nominated",
+           nom.verdict == "rejected_generic_token" and alt is None,
+           f"verdict={nom.verdict}")
+
+    touched = []
+    nom, alt = adjudicate(
+        AlternativeNomination(name="Top AI Tools", candidate_domain="geeksforgeeks.org",
+                              source="search"), dep,
+        fetcher=lambda u, **k: touched.append(u), resolver=lambda u: "ok")
+    s.case("an excluded source is never fetched or nominated",
+           nom.verdict == "rejected_excluded" and alt is None and touched == [],
+           f"verdict={nom.verdict} fetched={touched}")
+
+    nom, alt = adjudicate(
+        AlternativeNomination(name="CodeToTutorial Docs",
+                              candidate_domain="codetotutorial.com", source="search"),
+        dep, fetcher=fetcher({}), resolver=resolver({"codetotutorial.com"}))
+    s.case("a tool is never its own replacement",
+           nom.verdict == "rejected_same_vendor" and alt is None,
+           f"verdict={nom.verdict}")
+
+    # --- the audit trail exists -----------------------------------------
+    s.case("a refutation records why, so it can be reported not dropped",
+           bool(nom.verdict_detail) and bool(nom.checked_at), "no detail recorded")
+    return s
+
+
 SUITES = {"trust": suite_trust, "extraction": suite_extraction,
-          "findings": suite_findings}
+          "findings": suite_findings, "discovery": suite_discovery}
 
 
 def main() -> int:

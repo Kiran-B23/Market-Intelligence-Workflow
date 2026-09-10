@@ -16,9 +16,10 @@ Consequences worth stating plainly:
 from __future__ import annotations
 
 import re
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
-from miw.net import fetch, main_text
+from miw.extract.links import registrable
+from miw.net import domain, fetch, main_text
 from miw.probe.http_probe import (PAID_PHRASES, SUNSET_PHRASES_STRONG, WALL_PHRASES)
 from miw.schema import Alternative, Claim, Dependency, ResearchResult, UncitedClaim
 from miw.trust import ClaimKind, Subject, official_targets
@@ -42,11 +43,39 @@ _WORD = re.compile(r"[A-Za-z][a-z']+")
 
 # Fragments of embedded JSON, JS or template data. Even with chrome stripped, some
 # pages inline data payloads; a quote containing one is not human-verifiable evidence.
-_MACHINE = re.compile(r'\{"|"\s*:\s*[\[{"\d]|\\u00|\\/|=>|\bfunction\s*\(|;\s*\}')
+# Smart quotes are included because a forum post pasting a workflow renders `"id":` as
+# `“id”:`, which walked straight past the straight-quote patterns and got quoted as
+# deprecation evidence: `“position”: [ -700, 760 ], “name”: “Chat Memory Manager”`.
+_MACHINE = re.compile(
+    r'[\{\[]\s*["\u201c\u201d]'                # { "  or  [ "  (either quote style)
+    r'|["\u201c\u201d]\s*:\s*[\[{"\u201c\d]'    # "key":  value
+    r'|\\u00|\\/|=>|\bfunction\s*\(|;\s*\}'
+    r'|^\s*[-\d]+,\s*$'                        # a bare coordinate on its own line
+)
+
+
+# Page titles and breadcrumbs. `Pricing | Zite - The AI builder that means business`
+# passed every prose test - 0.40 caps ratio, 10 words, a lowercase bigram - and matched
+# the PRICING keyword using the word "Pricing" from its own title. So a "verified"
+# alternative rested on a page title that says nothing about pricing at all. Evidence
+# has to be a statement, and a pipe-delimited fragment with no terminal punctuation is
+# a title: real prose essentially never contains a pipe.
+_TITLEISH = re.compile(r"[|•»›]|\s[–—]\s")
 
 
 def _is_prose(s: str) -> bool:
     if _MACHINE.search(s):
+        return False
+    if _TITLEISH.search(s):
+        return False
+    # A fragment with no terminal punctuation is a heading, not a claim. Long text is
+    # exempt because a genuine sentence can be truncated by the quote cap.
+    if len(s) < 90 and not re.search(r"[.!?][\"')\]]?$", s.strip()):
+        return False
+    # A question is not an assertion. FAQ headings match the topic keywords perfectly
+    # - "How do text characters and credits work?" was quoted as pricing evidence -
+    # and they state nothing at all.
+    if s.strip().endswith("?"):
         return False
     words = _WORD.findall(s)
     if len(words) < 5:
@@ -71,9 +100,32 @@ KIND_KEYWORDS: dict[ClaimKind, tuple[str, ...]] = {
 
 # A successor named by the vendor itself. The highest-quality alternative signal there
 # is: the people shutting a tool down usually say what to use instead.
+#
+# The CUE is case-insensitive because a vendor writes it at the start of a sentence -
+# "Superseded by DeepWiki", "Migrate to X" - and a case-sensitive pattern missed every
+# one of those. The NAME stays case-sensitive: making the whole pattern `re.I` lets the
+# second group swallow ordinary lowercase words ("migrate to DeepWiki now" captured
+# "DeepWiki now"), so the flags are scoped rather than global.
 SUCCESSOR = re.compile(
-    r"(?:migrate to|move to|use|replaced by|superseded by|successor is|"
-    r"please use|switch to)\s+([A-Z][\w.+-]{2,30}(?:\s[A-Z][\w.+-]{2,20})?)")
+    r"(?i:migrate to|move to|switch to|replaced by|superseded by|successor is|"
+    r"please use|we recommend|we suggest|use)\s+"
+    # An outer CAPTURING group around the scoped-flag group: `(?-i:...)` does not
+    # capture, so without this `findall` returns the whole match, cue included.
+    r"((?-i:[A-Z][\w.+-]{2,30}(?:\s[A-Z][\w.+-]{2,20})?))")
+
+# Words that match the successor pattern but are not products. Without this, "the
+# legacy endpoint is retired, please use HTTPS for all requests" nominates `HTTPS` -
+# and now that a nomination carries a citation from the vendor's own page, that false
+# positive arrives AUTHORITATIVE and reaches the digest looking verified.
+GENERIC_TOKENS = frozenset({
+    "http", "https", "api", "apis", "sdk", "cli", "gui", "ui", "url", "uri", "json",
+    "yaml", "xml", "csv", "html", "css", "rest", "graphql", "grpc", "websocket",
+    "oauth", "oauth2", "saml", "sso", "jwt", "ssl", "tls", "dns", "ip", "tcp", "udp",
+    "version", "versions", "beta", "alpha", "ga", "stable", "latest", "preview",
+    "python", "javascript", "typescript", "java", "go", "rust", "node", "nodejs",
+    "docker", "kubernetes", "linux", "windows", "macos", "git", "github", "gitlab",
+    "documentation", "docs", "support", "console", "dashboard", "settings", "account",
+})
 
 
 def _sentences(text: str) -> list[str]:
@@ -81,24 +133,121 @@ def _sentences(text: str) -> list[str]:
             if MIN_QUOTE <= len(s.strip()) and _is_prose(s.strip())]
 
 
+def _successor_leads(text: str, quotes: list[str],
+                     terms: tuple[str, ...] = ()) -> list[tuple[str, str]]:
+    """(successor name, quote) pairs from a deprecation notice. Nominations, not proof.
+
+    Vendors write the successor in a SEPARATE sentence that does not repeat the subject:
+    "CodeToTutorial is deprecated. Please migrate to DeepWiki." `_relevant` keeps only
+    sentences that name the subject, so the second sentence never reached the regex and
+    every vendor-named successor was lost before it could be considered.
+
+    The neighbour is read from the RAW sentence split rather than the prose-filtered
+    list, because `_is_prose` rejects "Please migrate to DeepWiki." outright - 2 of its
+    4 tokens are capitalised, over the 0.45 cap - which is the shortest and commonest
+    form of the notice. That cap exists to stop nav chrome being quoted as *evidence*;
+    a lead is not evidence, and the quote handed to `Claim.build` is the pair, whose
+    first half already passed `_is_prose`. `_MACHINE` still applies to the neighbour, so
+    a JSON payload cannot arrive this way.
+
+    Proximity is used here and nowhere else, deliberately. Elsewhere nearby text is
+    banned as evidence, because a status sitting near an identifier says nothing about
+    it. Here the output is a *nomination*, the quote carries both sentences so a
+    reviewer sees what produced it, and a name still has to survive verification
+    against its own domain before anything is claimed about the tool itself.
+    """
+    raw = [s.strip() for s in _SENT.split(text or "") if s.strip()]
+    low_terms = {t.casefold() for t in terms if t}
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for i, sent in enumerate(raw):
+        # Anchor on a sentence already accepted as a deprecation quote about the
+        # subject, then look at it and its immediate neighbour only.
+        if not any(sent[:60] == q[:60] for q in quotes):
+            continue
+        neighbour = raw[i + 1] if i + 1 < len(raw) else ""
+        if neighbour and (_MACHINE.search(neighbour) or len(neighbour) < MIN_QUOTE):
+            neighbour = ""
+        for cand, is_self in ((sent, True), (neighbour, False)):
+            for name in SUCCESSOR.findall(cand or ""):
+                # `[\w.+-]` legitimately admits dots for names like `Node.js`, so it
+                # also swallows the sentence-ending period. Strip trailing punctuation
+                # rather than narrowing the class.
+                name = name.strip().rstrip(".,;:!?)")
+                key = name.casefold()
+                if not name or key in seen:
+                    continue
+                if key in GENERIC_TOKENS or key.replace(" ", "") in GENERIC_TOKENS:
+                    continue                      # a protocol is not a replacement
+                if key in low_terms or any(key in t or t in key for t in low_terms):
+                    continue                      # a tool cannot replace itself
+                seen.add(key)
+                out.append((name, (sent if is_self else f"{sent} {cand}")[:MAX_QUOTE]))
+    return out
+
+
+# Claim kinds whose pages are inherently about MANY subjects: a changelog lists every
+# release, a deprecations index lists every retired node. On those a sentence has to
+# name its subject, or you attribute one product's retirement to another - which is how
+# seven n8n nodes that are not deprecated acquired critical findings.
+MULTI_SUBJECT_KINDS = frozenset({
+    ClaimKind.DEPRECATION, ClaimKind.VERSION, ClaimKind.IMPLEMENTATION,
+})
+
+
+def _site_is_the_product(dep: Dependency, url: str) -> bool:
+    """Is this whole site about this one thing?
+
+    `elevenlabs.io/pricing` is ElevenLabs' pricing; every sentence on it is about
+    ElevenLabs whether or not it repeats the name, and requiring the name destroyed
+    recall completely - 21 keyword-matching sentences on that page, zero survivors.
+
+    But `ai.google.dev/pricing` and `huggingface.co/pricing` are PLATFORM pages listing
+    many products, and relaxing the check there immediately attributed "5,000 free
+    search requests (shared across all Gemini 3.x models)" to `gemini-2.0-flash`, and
+    HuggingFace's per-TB storage pricing to a Meta model served by Groq.
+
+    The discriminator is not the claim kind, it is whether the subject IS the site: a
+    name that matches the domain stem owns everything on it. A product hosted on
+    somebody's platform does not.
+    """
+    stem = registrable(domain(url)).split(".")[0].replace("-", "")
+    if not stem:
+        return False
+    for name in {dep.canonical_name, *dep.aliases}:
+        flat = re.sub(r"[^a-z0-9]", "", (name or "").lower())
+        if flat and (flat == stem or flat.startswith(stem) or stem.startswith(flat)):
+            return True
+    return False
+
+
 def _relevant(sentences: Iterable[str], keywords: tuple[str, ...],
-              terms: tuple[str, ...]) -> list[str]:
-    """Sentences that mention the claim's subject *and* the claim's topic."""
+              terms: tuple[str, ...], require_subject: bool = True) -> list[str]:
+    """Sentences on the claim's topic, and — when the page could be about several
+    things — on the claim's subject too."""
     out = []
     low_terms = [t.lower() for t in terms if t and len(t) > 2]
     for s in sentences:
         low = s.lower()
         if not any(k in low for k in keywords):
             continue
-        if low_terms and not any(t in low for t in low_terms):
+        if require_subject and low_terms and not any(t in low for t in low_terms):
             continue
         out.append(s[:MAX_QUOTE])
     return out
 
 
 def gather(dep: Dependency, kinds: Optional[Iterable[ClaimKind]] = None,
-           result: Optional[ResearchResult] = None) -> ResearchResult:
-    """Fetch the dependency's own pages and lift verbatim evidence from them."""
+           result: Optional[ResearchResult] = None,
+           fetcher: Optional[Callable] = None) -> ResearchResult:
+    """Fetch the dependency's own pages and lift verbatim evidence from them.
+
+    `fetcher` is injectable so the evidence path can be exercised offline against saved
+    vendor HTML - the same seam `probe/models.probe_model_dependency(adapters=...)`
+    already uses. Without it, testing a nomination end to end needs the network, which
+    means it does not get tested.
+    """
+    _fetch = fetcher or fetch
     subject: Subject = dep.subject()
     res = result or ResearchResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name)
 
@@ -127,19 +276,27 @@ def gather(dep: Dependency, kinds: Optional[Iterable[ClaimKind]] = None,
                 # One request per page. `observe()` keeps only a hash of the prose, and
                 # quoting needs the prose itself, so fetch directly rather than
                 # probing and then re-reading.
-                f = fetch(url)
+                f = _fetch(url)
                 text = main_text(f.body) if (f.ok and f.body) else ""
                 cache[url] = text
                 if text and url not in res.official_pages_seen:
                     res.official_pages_seen.append(url)
                 elif not f.ok:
-                    res.dropped.append(
+                    res.unreadable.append(
                         f"{url}: not readable (http {f.status or f.error})")
             if not text:
                 continue
             read += 1
 
-            quotes = _relevant(_sentences(text), KIND_KEYWORDS.get(kind, ()), terms)
+            sents = _sentences(text)
+            # The subject term is only required where the page could be about
+            # something else. `official_targets` reached this URL from the subject's
+            # OWN authority set, so for a pricing or access page the page is the
+            # subject by construction.
+            quotes = _relevant(
+                sents, KIND_KEYWORDS.get(kind, ()), terms,
+                require_subject=(kind in MULTI_SUBJECT_KINDS
+                                 or not _site_is_the_product(dep, url)))
             for q in quotes[:2]:
                 try:
                     res.claims.append(Claim.build(
@@ -150,11 +307,74 @@ def gather(dep: Dependency, kinds: Optional[Iterable[ClaimKind]] = None,
                     res.dropped.append(str(exc))
 
             if kind is ClaimKind.DEPRECATION:
-                for q in quotes[:2]:
-                    for name in SUCCESSOR.findall(q):
-                        res.alternatives.append(Alternative(
-                            name=name.strip(), nominated_by=url,
-                            maturity_note="named as the successor by the vendor itself"))
+                for name, q in _successor_leads(text, quotes, terms)[:3]:
+                    alt = Alternative(
+                        name=name, nominated_by=url,
+                        maturity_note="named as the successor by the vendor itself")
+                    # Attach the citation, or this alternative is unusable: with an
+                    # empty `claims` list `Alternative.verified` is False and
+                    # `score.findings_for` filters it out - so the one producer that
+                    # needs no API key was silently discarding every result it found.
+                    #
+                    # The quote is on the OLD vendor's own authoritative page, so it is
+                    # legitimately citable for exactly what that page can settle: that
+                    # this vendor names this successor. NOT that the successor does the
+                    # taught job, which only its own pages can establish (see
+                    # agent._verify_candidate).
+                    try:
+                        alt.claims.append(Claim.build(
+                            kind=ClaimKind.ALTERNATIVE,
+                            statement=(f"{dep.canonical_name}'s own documentation "
+                                       f"names {name} as the successor"),
+                            source_url=url, quote=q, subject=subject))
+                    except UncitedClaim as exc:
+                        res.dropped.append(str(exc))
+                    # `gather` walks several well-known paths per kind, and a vendor
+                    # repeats its migration notice on all of them, so dedupe across the
+                    # whole result rather than per page.
+                    if not any(a.name.casefold() == name.casefold()
+                               for a in res.alternatives):
+                        res.alternatives.append(alt)
+    return res
+
+
+def gather_url(dep: Dependency, url: str, kind: ClaimKind,
+               result: Optional[ResearchResult] = None,
+               fetcher: Optional[Callable] = None) -> ResearchResult:
+    """Lift evidence for one claim kind from ONE url, under the ordinary rules.
+
+    Exists so a search hit can only ever point at a page: we fetch it and read it
+    ourselves, rather than quoting the search engine's snippet. Quoting the snippet
+    bypassed `_is_prose` and the subject-term check entirely, and a domain-restricted
+    search made the result AUTHORITATIVE - so a vendor's generic "Deprecated nodes"
+    index page became a critical deprecation finding against seven nodes that are not
+    deprecated.
+    """
+    _fetch = fetcher or fetch
+    res = result or ResearchResult(dep_id=dep.dep_id,
+                                   canonical_name=dep.canonical_name)
+    subject = dep.subject()
+    terms = tuple({dep.canonical_name, dep.canonical_name.rsplit(".", 1)[-1],
+                   dep.registry_id, *dep.aliases} - {""})
+    f = _fetch(url)
+    text = main_text(f.body) if (f.ok and f.body) else ""
+    if not text:
+        res.unreadable.append(f"{url}: not readable (http {f.status or f.error})")
+        return res
+    if url not in res.official_pages_seen:
+        res.official_pages_seen.append(url)
+    # A search hit can point anywhere on the domain, including a shared page, so the
+    # subject check stays on for the multi-subject kinds here too.
+    for q in _relevant(
+            _sentences(text), KIND_KEYWORDS.get(kind, ()), terms,
+            require_subject=(kind in MULTI_SUBJECT_KINDS
+                             or not _site_is_the_product(dep, url)))[:2]:
+        try:
+            res.claims.append(Claim.build(
+                kind=kind, statement=_statement_for(kind, dep.canonical_name, q),
+                source_url=url, quote=q, subject=subject))
+        except UncitedClaim as exc:
+            res.dropped.append(str(exc))
     return res
 
 

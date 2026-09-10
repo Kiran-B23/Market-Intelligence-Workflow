@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Build the embedded @font-face CSS for the local UI.
+
+The UI's hard constraint is that it makes **no external request of any kind** — it has
+to work on a laptop with no network, which is also when a curriculum lead is most likely
+to be reading last week's digest. A font *host* is therefore out. An embedded font is
+not: a `@font-face` whose `src` is a `data:` URI issues no request at runtime, so the
+guarantee holds and `tests/test_ui_contract.py` still passes.
+
+This script is the build step, kept in the repo so the base64 in `index.html` is
+reproducible rather than a blob nobody can regenerate. It runs at BUILD time and needs
+the network; the page it produces does not.
+
+    python3 tools/build_font.py            # writes tools/fonts.generated.css
+
+Why IBM Plex: the UI is a dense monitoring tool, so it wants a neutral grotesque that
+holds up at 12-13px, and Plex ships a matching mono for the ids, paths and excerpts that
+make up much of the page. Inter and Space Grotesk are deliberately avoided.
+
+Two size decisions, both measured:
+  * Google serves Plex Sans as a variable font, one file covering 400/500/600 — so the
+    sans costs one download rather than three.
+  * That axis spans 100-700; clamping it to 400-600 (the only weights the page uses)
+    takes it from 45,712 to 35,368 bytes, 22% smaller.
+
+Requires `fonttools` and `brotli`, which are BUILD-only and deliberately absent from
+requirements.txt — nothing at runtime needs them.
+"""
+from __future__ import annotations
+
+import base64
+import re
+import sys
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "tools" / "fonts.generated.css"
+
+# A browser UA is required: with anything else Google serves unsubsetted TTF instead of
+# the `latin` woff2 slice, which is 3x the bytes for the same glyphs.
+UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+      "Chrome/131.0.0.0 Safari/537.36")
+CSS_URL = ("https://fonts.googleapis.com/css2"
+           "?family=IBM+Plex+Sans:wght@400;500;600"
+           "&family=IBM+Plex+Mono:wght@400;500&display=swap")
+
+# family -> (css font-family name, weight or range, clamp axis?)
+WANT = {
+    "IBM Plex Sans": ("MIWSans", "400 600", True),
+    "IBM Plex Mono": ("MIWMono", None, False),      # per-weight files
+}
+
+
+def _get(url: str) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.read()
+
+
+def _latin_faces(css: str) -> list[tuple[str, str, str]]:
+    """(family, weight, url) for the `latin` slice only."""
+    out = []
+    for m in re.finditer(r"/\*\s*([a-z0-9\-\[\]]+)\s*\*/\s*@font-face\s*\{(.*?)\}",
+                         css, re.S):
+        sub, body = m.group(1), m.group(2)
+        if sub != "latin":
+            continue
+        fam = re.search(r"font-family:\s*'([^']+)'", body)
+        wt = re.search(r"font-weight:\s*(\d+)", body)
+        url = re.search(r"url\(([^)]+)\)", body)
+        if fam and wt and url:
+            out.append((fam.group(1), wt.group(1), url.group(1)))
+    return out
+
+
+def _clamp(raw: bytes, lo: int = 400, hi: int = 600) -> bytes:
+    """Narrow a variable font's weight axis to the range the page actually uses."""
+    import io
+
+    from fontTools.ttLib import TTFont
+    from fontTools.varLib import instancer
+
+    f = TTFont(io.BytesIO(raw))
+    if "fvar" not in f:
+        return raw
+    instancer.instantiateVariableFont(f, {"wght": (lo, hi)}, inplace=True)
+    f.flavor = "woff2"
+    buf = io.BytesIO()
+    f.save(buf)
+    return buf.getvalue()
+
+
+def main() -> int:
+    css = _get(CSS_URL).decode()
+    faces = _latin_faces(css)
+    if not faces:
+        print("no latin faces in the stylesheet — Google changed its response shape",
+              file=sys.stderr)
+        return 1
+
+    blocks, seen, total = [], set(), 0
+    for fam, wt, url in faces:
+        if fam not in WANT:
+            continue
+        name, weight_range, clamp = WANT[fam]
+        # A variable font serves every weight from one file; skip the duplicates.
+        if url in seen:
+            continue
+        seen.add(url)
+        raw = _get(url)
+        before = len(raw)
+        if clamp:
+            raw = _clamp(raw)
+        total += len(raw)
+        b64 = base64.b64encode(raw).decode()
+        weight = weight_range or wt
+        blocks.append(
+            f"  /* {fam} {weight} · {before:,}B"
+            + (f" -> {len(raw):,}B axis-clamped" if clamp else "")
+            + f" · from {url.rsplit('/', 1)[-1]} */\n"
+            f"  @font-face{{font-family:{name};font-style:normal;"
+            f"font-weight:{weight};font-display:swap;\n"
+            f"    src:url(data:font/woff2;base64,{b64}) format('woff2')}}")
+        print(f"  {fam:16} {weight:8} {len(raw):>7,}B raw  "
+              f"{len(b64):>7,}B base64", file=sys.stderr)
+
+    header = ("  /* GENERATED by tools/build_font.py - do not hand-edit.\n"
+              "     Embedded, not hosted: a data: URI issues no network request, so the\n"
+              "     page still works with no network and the UI contract test passes. */\n")
+    OUT.write_text(header + "\n".join(blocks) + "\n")
+    print(f"\n  {len(blocks)} face(s), {total:,}B raw -> {OUT.relative_to(ROOT)} "
+          f"({OUT.stat().st_size:,}B of CSS)", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

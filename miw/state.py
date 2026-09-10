@@ -60,6 +60,28 @@ CREATE TABLE IF NOT EXISTS pricing_state (
     free_signals TEXT,      -- JSON list of the free-tier phrases last seen
     checked_at   TEXT
 );
+-- The event path's memory. Without a watermark, a daily poll re-reports every
+-- historical deprecation every day.
+CREATE TABLE IF NOT EXISTS watch_state (
+    source_key   TEXT PRIMARY KEY,
+    kind         TEXT,
+    value        TEXT,
+    evidence_url TEXT,
+    observed_at  TEXT,
+    first_seen   TEXT
+);
+CREATE TABLE IF NOT EXISTS watch_signal (
+    signal_id    TEXT PRIMARY KEY,
+    vendor_key   TEXT,
+    source_key   TEXT,
+    trigger      TEXT,
+    from_value   TEXT,
+    to_value     TEXT,
+    evidence_url TEXT,
+    refs         TEXT,
+    status       TEXT,      -- baseline | open | investigated
+    observed_at  TEXT
+);
 CREATE TABLE IF NOT EXISTS runs (
     run_id  TEXT,
     stage   TEXT,
@@ -222,6 +244,52 @@ class State:
             " VALUES (?,?,?) ON CONFLICT(dep_id) DO UPDATE SET"
             " last_researched_at=excluded.last_researched_at",
             [(d, now, now) for d in dep_ids])
+        self.conn.commit()
+
+    # --- watch: watermarks and the signal ledger ----------------------------
+
+    def watermark(self, source_key: str):
+        return self.conn.execute(
+            "SELECT * FROM watch_state WHERE source_key = ?", (source_key,)).fetchone()
+
+    def watermark_save(self, *, source_key: str, kind: str, value: str,
+                       evidence_url: str, now: str) -> None:
+        prev = self.watermark(source_key)
+        first = prev["first_seen"] if prev else now
+        self.conn.execute(
+            "INSERT INTO watch_state (source_key, kind, value, evidence_url,"
+            " observed_at, first_seen) VALUES (?,?,?,?,?,?)"
+            " ON CONFLICT(source_key) DO UPDATE SET kind=excluded.kind,"
+            " value=excluded.value, evidence_url=excluded.evidence_url,"
+            " observed_at=excluded.observed_at",
+            (source_key, kind, value, evidence_url, now, first))
+        self.conn.commit()
+
+    def signal_save(self, sig, status: str, now: str) -> bool:
+        """Record a signal. Returns True if it is new to the ledger."""
+        import json as _json
+        existing = self.conn.execute(
+            "SELECT signal_id FROM watch_signal WHERE signal_id = ?",
+            (sig.signal_id,)).fetchone()
+        self.conn.execute(
+            "INSERT INTO watch_signal (signal_id, vendor_key, source_key, trigger,"
+            " from_value, to_value, evidence_url, refs, status, observed_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(signal_id) DO UPDATE SET"
+            " status=excluded.status, observed_at=excluded.observed_at",
+            (sig.signal_id, sig.vendor_key, sig.source_key, sig.trigger,
+             sig.from_value, sig.to_value, sig.evidence_url,
+             _json.dumps(sig.refs), status, now))
+        self.conn.commit()
+        return existing is None
+
+    def open_signals(self, limit: int = 50):
+        return self.conn.execute(
+            "SELECT * FROM watch_signal WHERE status = 'open'"
+            " ORDER BY observed_at DESC LIMIT ?", (limit,)).fetchall()
+
+    def signal_mark(self, signal_id: str, status: str) -> None:
+        self.conn.execute("UPDATE watch_signal SET status=? WHERE signal_id=?",
+                          (status, signal_id))
         self.conn.commit()
 
     # --- pricing snapshots --------------------------------------------------

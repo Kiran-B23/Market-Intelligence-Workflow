@@ -1,7 +1,11 @@
-.PHONY: install test eval triage ui serve spot-check ingest extract probe research analyse report weekly clean fresh
+.PHONY: install install-optional test eval triage ui serve spot-check ingest extract probe research analyse report weekly clean fresh
 
 install:
 	pip install -r requirements.txt
+
+# Search discovery and LLM note refinement. Needed before any API key does anything.
+install-optional:
+	pip install -r requirements.txt -r requirements-optional.txt
 
 test:
 	python3 -m pytest tests/ -q

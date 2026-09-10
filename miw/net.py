@@ -7,8 +7,10 @@ stage needs to tell "changed" apart from "unreachable".
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import ipaddress
+import os
 import re
 import socket
 import threading
@@ -82,20 +84,38 @@ def domain(url: str) -> str:
     return net[4:] if net.startswith("www.") else net
 
 
-def is_safe_public_url(url: str) -> bool:
-    """SSRF guard: http(s) only, and the host must resolve to a public IP."""
+def url_safety(url: str) -> str:
+    """Why a URL is or is not fetchable: ok | bad_scheme | unresolvable | private.
+
+    Split out from the boolean because "this host does not exist in DNS" and "this host
+    resolves somewhere we refuse to go" are different facts, and discovery needs the
+    first one: a candidate domain that does not resolve is a REFUTED nomination, which
+    is reportable, whereas a private address is a policy refusal on our side. Collapsing
+    them into one error string made a fabricated tool indistinguishable from a blocked
+    request - and telling those apart is the whole defence against a hallucinated
+    replacement.
+    """
     p = urlparse(url or "")
     if p.scheme not in ("http", "https") or not p.hostname:
-        return False
+        return "bad_scheme"
     try:
-        for _fam, _t, _p, _c, sockaddr in socket.getaddrinfo(p.hostname, None):
+        infos = socket.getaddrinfo(p.hostname, None)
+    except Exception:
+        return "unresolvable"
+    try:
+        for _fam, _t, _p, _c, sockaddr in infos:
             ip = ipaddress.ip_address(sockaddr[0])
             if (ip.is_private or ip.is_loopback or ip.is_link_local
                     or ip.is_reserved or ip.is_multicast):
-                return False
-        return True
+                return "private"
     except Exception:
-        return False
+        return "private"
+    return "ok"
+
+
+def is_safe_public_url(url: str) -> bool:
+    """SSRF guard: http(s) only, and the host must resolve to a public IP."""
+    return url_safety(url) == "ok"
 
 
 def _throttle(host: str) -> None:
@@ -154,11 +174,37 @@ class Fetch:
             urlparse(self.url).path.rstrip("/") not in ("", "/")
 
 
+# Per-process body cache. `Fetch.from_cache` has been declared since the beginning and
+# never assigned, and the only other cache in the system is a dict local to one call of
+# `official.gather` - so the same vendor page was refetched once per claim kind, per
+# dependency, each time paying the 1.5s per-host courtesy gap. Discovery walks several
+# candidate domains per dependency, which turns that from wasteful into slow. Scoped to
+# the process on purpose: a run must not serve yesterday's bytes as today's evidence.
+_BODY_CACHE: dict[str, "Fetch"] = {}
+_CACHE_MAX = int(os.getenv("MIW_FETCH_CACHE", "400"))
+
+
+def clear_fetch_cache() -> None:
+    """Drop the per-process body cache. For tests, and between long-lived runs."""
+    _BODY_CACHE.clear()
+
+
 def fetch(url: str, *, timeout: float = 20.0, retries: int = 2,
-          method: str = "GET", headers: Optional[dict] = None) -> Fetch:
+          method: str = "GET", headers: Optional[dict] = None,
+          use_cache: bool = True) -> Fetch:
     """Polite fetch with backoff. Never raises; failures come back on `Fetch.error`."""
-    if not is_safe_public_url(url):
-        return Fetch(url=url, error="unsafe_or_unresolvable_url")
+    key = f"{method}\x1f{url}"
+    if use_cache and method == "GET" and key in _BODY_CACHE:
+        hit = _BODY_CACHE[key]
+        return dataclasses.replace(hit, from_cache=True)
+    safety = url_safety(url)
+    if safety != "ok":
+        # Distinct error strings: `unresolvable` is evidence about the world (no such
+        # host), the others are our own policy. A discovery nomination is only refuted
+        # by the first.
+        return Fetch(url=url, error={"unresolvable": "dns_does_not_resolve",
+                                     "private": "refused_private_address",
+                                     "bad_scheme": "unsupported_scheme"}[safety])
     if not robots_allows(url):
         # Reported as its own error so the probe stage can tell "we were asked not to
         # look" apart from "the tool is gone". Conflating them would invent findings.
@@ -195,6 +241,14 @@ def fetch(url: str, *, timeout: float = 20.0, retries: int = 2,
             last = out
             time.sleep(1.0 + attempt)
             continue
+        # Cache answers only. A transport error or a 5xx is not an answer about the
+        # world, and caching one would make a blip look like a settled fact for the
+        # rest of the run - the same conflation `reachable`/`ok` exists to prevent.
+        if use_cache and method == "GET" and out.status is not None \
+                and out.status not in (500, 502, 503, 504):
+            if len(_BODY_CACHE) >= _CACHE_MAX:
+                _BODY_CACHE.clear()
+            _BODY_CACHE[key] = out
         return out
     return last
 

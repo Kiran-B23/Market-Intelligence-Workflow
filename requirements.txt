@@ -1,4 +1,5 @@
-# Core (required)
+# Core — everything the ground-truth path needs. `pip install -r requirements.txt`
+# gives you a working system: official-page evidence, probing, findings, digest, UI.
 requests>=2.31
 PyYAML>=6.0
 openpyxl>=3.1
@@ -8,7 +9,8 @@ fastapi>=0.110
 uvicorn>=0.27
 pydantic>=2.0
 
-# Optional enrichment - the ground-truth path works without these.
-# The LLM defaults to the Claude Code CLI (`claude -p`), which needs no package.
-tavily-python>=0.7   ; extra == "search"
-openai>=2.0          ; extra == "openrouter"
+# Optional enrichment lives in requirements-optional.txt and is NOT installed by
+# default, so "works with no API key" holds by construction rather than by a marker.
+# It previously lived here behind `; extra == "..."` markers, which are pyproject
+# metadata: in a plain requirements file they evaluate False and pip skipped both lines
+# silently, leaving the API-key path unable to even import.

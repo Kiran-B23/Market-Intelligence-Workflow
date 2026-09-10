@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt tavily-python openai
+      - run: pip install -r requirements.txt -r requirements-optional.txt
       # Gate the run on the offline suites. They need no keys and no network, so a
       # broken extractor or a loosened trust rule fails here rather than in a digest.
       - run: python3 -m pytest tests/ -q

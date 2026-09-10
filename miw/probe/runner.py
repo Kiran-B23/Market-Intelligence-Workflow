@@ -89,6 +89,16 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             if stale is not None and stale > 730:
                 res.flag("no_release_in_2y")
 
+    elif dep.kind == "model":
+        from miw.probe.models import probe_model_dependency, verified_replacements
+        got = probe_model_dependency(dep)
+        # Carry the discovered provider and its declared change through unchanged; the
+        # scoring stage builds the cited claim from `declared_changes`.
+        for fld in ("status", "detail", "evidence_url", "provider", "provider_domains",
+                    "declared_changes", "signals", "latest_version"):
+            setattr(res, fld, getattr(got, fld))
+        res.alternatives_verified = verified_replacements(got)
+
     elif dep.kind == "n8n_node":
         _probe_n8n_node(dep, res, prev_version)
 
@@ -105,7 +115,18 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             res_from_urls(res, obs, prev_hash)
 
     # --- flap protection ----------------------------------------------------
-    if res.status in ("broken", "unreachable"):
+    # Two-run confirmation exists to stop a transient network failure reading as a dead
+    # tool. It does not apply to a vendor's own published declaration: re-reading Groq's
+    # deprecation table tomorrow adds no information, and delaying a critical finding by
+    # a day buys no safety. Absence observations still need confirming — "not in the
+    # source tree" could be a partial fetch — but a dated row in a vendor's table is a
+    # document, not an observation.
+    DECLARED = {"model_shutdown_passed", "model_deprecation_declared",
+                "model_tier_restricted", "breaking_change_declared",
+                "registry_deprecated"}
+    if DECLARED & set(res.signals):
+        res.consecutive_failures = 0
+    elif res.status in ("broken", "unreachable"):
         res.consecutive_failures = prev_fails + 1
         if res.status == "broken" and res.consecutive_failures < MIN_CONSECUTIVE_FAILURES:
             res.flag("awaiting_confirmation")

@@ -62,6 +62,15 @@ class IngestStats:
     pooling_units_seen: int = 0
     pooling_units_traversed: int = 0
     pooled_questions: int = 0
+    # Session numbering, which has two possible sources. `sessions` above is the
+    # POSITIONAL count (LEARNING_SET units carrying a video); these record what the
+    # workbook declared and how often the two disagreed, because on Intro to Gen AI
+    # they disagreed for 81 of 104 units and nothing surfaced it.
+    authoritative_sessions: int = 0
+    session_from_workbook: int = 0
+    session_inferred: int = 0
+    session_conflicts: int = 0
+    conflict_examples: list[str] = field(default_factory=list)
     by_source: dict[str, int] = field(default_factory=dict)
     skipped: list[str] = field(default_factory=list)
 
@@ -144,14 +153,28 @@ def _emit(course: str, topic: dict, unit: dict, c: dict, base: str,
         )
 
 
-def read_course(path: str, course: str) -> tuple[list[ContentRecord], IngestStats]:
-    """Walk one portal export. Never raises on shape surprises — they land in stats."""
+def read_course(path: str, course: str,
+                session_of_unit: Optional[dict] = None
+                ) -> tuple[list[ContentRecord], IngestStats]:
+    """Walk one portal export. Never raises on shape surprises — they land in stats.
+
+    `session_of_unit` maps `unit_id` -> the session number the curriculum team assigned,
+    read from the workbook by `ingest.outline`. Where it speaks it WINS, because
+    `is_session()` only infers numbering from position and is measurably off: Intro to
+    Gen AI's `Common Mistakes` is a LEARNING_SET carrying a video at position 8 but is
+    not a numbered session, so every later session was reported one too high. The
+    positional walk still runs — it is the fallback for units the workbook does not
+    cover (and for PSE, which has no workbook), and disagreements are counted rather
+    than silently resolved.
+    """
     with open(path) as fh:
         data = json.load(fh)
     obj = data[0] if isinstance(data, list) and data else data
     stats = IngestStats(course=course)
     out: list[ContentRecord] = []
     session_no = 0
+    declared = session_of_unit or {}
+    stats.authoritative_sessions = len(set(declared.values()))
 
     for ti, topic in enumerate(obj.get("topics", [])):
         stats.topics += 1
@@ -162,6 +185,23 @@ def read_course(path: str, course: str) -> tuple[list[ContentRecord], IngestStat
             if is_session(unit):
                 session_no += 1
                 stats.sessions += 1
+
+            # The number attached to every record from this unit. The workbook's
+            # answer where it has one, the positional walk otherwise.
+            told = declared.get(str(unit.get("unit_id") or "").strip())
+            if told is None:
+                effective = session_no
+                if session_no:
+                    stats.session_inferred += 1
+            else:
+                effective = told
+                stats.session_from_workbook += 1
+                if session_no and told != session_no:
+                    stats.session_conflicts += 1
+                    if len(stats.conflict_examples) < 8:
+                        stats.conflict_examples.append(
+                            f"{unit_label(unit)[:40]!r}: workbook s{told}, "
+                            f"position s{session_no}")
 
             # Question tags sit on the unit, not on a content. In the Gen AI export
             # many of these tag names *are* tool names, which makes this the
@@ -178,13 +218,13 @@ def read_course(path: str, course: str) -> tuple[list[ContentRecord], IngestStat
                         title=unit_label(unit), body_text=str(name),
                         field_path=f"{ubase}.question_tags[{qi}].tag_name_enum",
                         evidence_source="question_tag", source_file=path,
-                        session_no=session_no or None,
+                        session_no=effective or None,
                     ))
 
             for ci, c in enumerate(unit.get("contents") or []):
                 stats.contents += 1
                 out.extend(_emit(course, topic, unit, c, f"{ubase}.contents[{ci}]",
-                                 session_no or None, path, stats))
+                                 effective or None, path, stats))
 
             # --- pooled exams: the silent-skip trap -------------------------
             sections = unit.get("exam_sections")
@@ -201,7 +241,7 @@ def read_course(path: str, course: str) -> tuple[list[ContentRecord], IngestStat
                     traversed = True
                     out.extend(_emit(course, topic, unit, c,
                                      f"{ubase}.exam_sections[{si}].contents[{ci}]",
-                                     session_no or None, path, stats))
+                                     effective or None, path, stats))
             if isinstance(ed, list):
                 for ei, exam in enumerate(ed):
                     for qi, q in enumerate(exam.get("question_details") or []):
@@ -210,7 +250,7 @@ def read_course(path: str, course: str) -> tuple[list[ContentRecord], IngestStat
                         traversed = True
                         out.extend(_emit(course, topic, unit, q,
                                          f"{ubase}.exam_details[{ei}].question_details[{qi}]",
-                                         session_no or None, path, stats))
+                                         effective or None, path, stats))
             if has_pool:
                 if traversed:
                     stats.pooling_units_traversed += 1
