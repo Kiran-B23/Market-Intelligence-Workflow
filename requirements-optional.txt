@@ -1,0 +1,20 @@
+# Optional enrichment. None of this is needed for the deterministic pipeline; each
+# line unlocks one capability, and every one degrades to a clear message when absent.
+#
+#   pip install -r requirements.txt -r requirements-optional.txt
+
+# Search discovery for alternatives (TAVILY_API_KEY). Without it, MIW still reads
+# vendors' own pages — it just cannot go looking for replacements they do not name.
+tavily-python>=0.7
+
+# LLM note refinement via the Anthropic Messages API (ANTHROPIC_API_KEY).
+anthropic>=1,<2
+
+# LLM note refinement via OpenRouter (OPENROUTER_API_KEY), as an alternative.
+openai>=2.0
+
+# The agent graphs (`python3 main.py agent`). Orchestration only — model calls still go
+# through miw/llm.py, so the provider choice, tool denial and daily caps are unchanged.
+# Without these the deterministic pipeline is completely unaffected.
+langgraph>=1.2,<2
+langgraph-checkpoint-sqlite>=2.0

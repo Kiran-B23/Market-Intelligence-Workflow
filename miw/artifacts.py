@@ -36,6 +36,23 @@ def _index(rows: list[dict], key: str) -> dict[str, dict]:
     return {r[key]: r for r in rows if r.get(key)}
 
 
+def latest_sibling(path: Path) -> Optional[Path]:
+    """The most recent earlier artifact of the same family, or None.
+
+    Artifacts are named `<family>_<date>.json`, and `merge_by_dep` merges into *today's*
+    file. On the first run of a new day that file does not exist, so nothing carried
+    forward and a narrowly-scoped run left the day's artifact holding only its own
+    scope. That is not a display problem: `main.py verify` reads the LATEST probe
+    artifact to rebuild provider-widened authority, so after one `--limit 3` run it lost
+    the widening for every other dependency and reported false trust violations against
+    findings that were fine. Seeding from the previous day fixes the premise.
+    """
+    p = Path(path)
+    family = p.name.rsplit("_", 1)[0]
+    others = sorted(x for x in p.parent.glob(f"{family}_*{p.suffix}") if x != p)
+    return others[-1] if others else None
+
+
 def merge_by_dep(path: Path, *, new_rows: list[dict], examined: set[str],
                  meta: dict[str, Any], rows_key: str,
                  key: str = "dep_id") -> dict:
@@ -44,9 +61,14 @@ def merge_by_dep(path: Path, *, new_rows: list[dict], examined: set[str],
     Entries for dependencies this run examined are replaced — including being *dropped*
     when the run examined a dependency and produced nothing for it, which is how a
     resolved finding disappears. Entries for dependencies the run did not look at are
-    carried forward verbatim.
+    carried forward verbatim — from today's artifact, or from the most recent earlier
+    one when today's does not exist yet.
     """
     prev = _load(path)
+    if not prev:
+        sib = latest_sibling(path)
+        if sib is not None:
+            prev = _load(sib)
     kept = [r for r in (prev.get(rows_key) or [])
             if r.get(key) and r[key] not in examined]
     merged = kept + new_rows

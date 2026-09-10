@@ -87,6 +87,21 @@ PROSE_STOP = {
     "bertscore", "rouge", "bleu", "cloudfront", "localhost", "example", "today",
     "time", "reddit", "wikipedia", "youtube", "discord", "render", "vercel", "vite",
     "redis", "axios", "mozilla", "nvidia", "stanford", "reuters", "fortune",
+    # Ordinary words the curriculum uses constantly, each of which also happens to be
+    # a sheet-declared "tool". Measured prose contributions before this: email 358,
+    # http-request 336, fetch 237, webhook 234. They are the same class of false
+    # positive as "Python" contributing 1206, just with lower-profile names. The sheet
+    # declaration survives; only the prose matching stops.
+    "email", "emails", "fetch", "webhook", "webhooks", "excel", "sheet", "sheets",
+    "docs", "drive", "calendar", "forms", "slides", "mail", "gmail",
+    "http request", "http-request", "if node", "if-node", "mcp client", "mcp-client",
+    "switch", "merge", "filter", "code", "wait", "schedule", "form", "chat trigger",
+    # Library class and helper names. These are real curriculum content, but they are
+    # classes INSIDE langgraph / langchain / trl - there is no vendor page for
+    # `InMemorySaver`, so prose matching only inflates their blast radius.
+    "inmemorysaver", "humanintheloopmiddleware", "piimiddleware", "sfttrainer",
+    "huggingfaceembeddings", "huggingface hub", "chatprompttemplate",
+    "recursivecharactertextsplitter", "conversationbuffermemory",
 }
 PROSE_MIN_LEN = 5
 
@@ -306,7 +321,8 @@ class InventoryBuilder:
             self._models(r)
             self._n8n(r)
 
-    def feed_sheets(self, sheet_tools, workbook_courses: dict[str, str]) -> None:
+    def feed_sheets(self, sheet_tools, workbook_courses: dict[str, str],
+                    session_of_name: Optional[dict] = None) -> None:
         """Fold in the workbooks' hand-maintained tool columns.
 
         Sheets contribute two things the JSON export cannot: names of no-code and SaaS
@@ -315,7 +331,17 @@ class InventoryBuilder:
         uses a tool; it says nothing about where that tool's official pages live, so a
         sheet-only entry gets no authority set and therefore cannot substantiate a
         strict claim until a human adds one.
+
+        `session_of_name` maps `(course, lowercased session or unit name)` -> session
+        number, built by the caller from the already-ingested records. Without it every
+        sheet-derived Location had `session_no = None`, so 43 dependencies in Intro to
+        Gen AI - `Cerebras`, `Suno`, `gpt-4o` among them - were reported as being in the
+        course with no way to say *where*, and the UI showed "workbook" where a session
+        belonged. The tool sheets name the session in their own words ("Mastering Image
+        Generation", "AI News Summarizer"), which the records can resolve: measured on
+        Intro to Gen AI, all 361 declarations place.
         """
+        names = session_of_name or {}
         for t in sheet_tools:
             # A hand-recorded pin is a package version, so when a name resolves to
             # both a hosted service and a distribution, the pin belongs to the
@@ -332,13 +358,19 @@ class InventoryBuilder:
                                    aliases=[t.name], review_status="from_sheet",
                                    notes=f"declared in {t.workbook} / {t.sheet}"))
                 self._prose_re = None
-            course = workbook_courses.get(t.workbook, t.workbook)
+            # No fallback to the workbook name. That fallback is what turned a stale
+            # filename map into three phantom courses; skipping is recoverable, a
+            # phantom course silently corrupts every per-course number.
+            course = workbook_courses.get(t.workbook, "")
+            if not course:
+                continue
             loc = Location(
                 course=course, topic_name="(from workbook)", unit_id="",
                 unit_name=t.session or t.sheet, content_id="",
                 field_path=f"{t.workbook}::{t.sheet}",
                 evidence_source="sheet_pin" if t.taught_version else "sheet_declared",
-                object_type="SHEET")
+                object_type="SHEET",
+                session_no=names.get((course, (t.session or "").strip().lower())))
             before = len(dep.locations)
             dep.merge_location(loc)
             if len(dep.locations) != before:

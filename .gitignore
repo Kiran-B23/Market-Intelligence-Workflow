@@ -17,3 +17,14 @@ state/
 
 # Course content exports and source sheets (large, proprietary)
 data/
+
+# The writable course roster and its upload staging. Untracked on purpose: it points at
+# the course exports in data/, which are themselves untracked, so a tracked roster would
+# be a checked-in claim that no other clone could satisfy.
+data/course_registry.json
+data/.course_registry.lock
+data/.staging/
+
+# Build output of tools/build_font.py. The base64 it produces is inlined into
+# index.html, which IS tracked; this intermediate is not worth versioning.
+tools/fonts.generated.css

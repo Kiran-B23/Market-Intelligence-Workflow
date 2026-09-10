@@ -1,51 +1,148 @@
 [
-  {"name": "vendor's own docs settle a deprecation about that vendor",
-   "url": "https://docs.n8n.io/release-notes/",
-   "subject": {"name": "n8n", "homepage": "https://n8n.io", "docs_url": "https://docs.n8n.io/"},
-   "kind": "deprecation", "expect_tier": "AUTHORITATIVE", "expect_substantiates": true},
-
-  {"name": "the same vendor docs are only a lead about a DIFFERENT tool",
-   "url": "https://docs.n8n.io/release-notes/",
-   "subject": {"name": "Groq", "homepage": "https://groq.com"},
-   "kind": "deprecation", "expect_tier": "LEAD_ONLY", "expect_substantiates": false},
-
-  {"name": "PyPI settles a version question",
-   "url": "https://pypi.org/project/gradio/",
-   "subject": {"name": "gradio", "homepage": ""},
-   "kind": "version", "expect_tier": "AUTHORITATIVE", "expect_substantiates": true},
-
-  {"name": "PyPI does NOT settle a pricing question",
-   "url": "https://pypi.org/project/gradio/",
-   "subject": {"name": "gradio", "homepage": ""},
-   "kind": "pricing", "expect_tier": "CORROBORATING", "expect_substantiates": false},
-
-  {"name": "content farms are excluded outright",
-   "url": "https://theresanaiforthat.com/ai/deepwiki/",
-   "subject": {"name": "DeepWiki", "homepage": "https://deepwiki.com"},
-   "kind": "existence", "expect_tier": "EXCLUDED", "expect_substantiates": false},
-
-  {"name": "an SEO listicle URL pattern is excluded even on an unknown host",
-   "url": "https://someshop.example/best-10-n8n-alternatives-2026",
-   "subject": {"name": "n8n", "homepage": "https://n8n.io"},
-   "kind": "existence", "expect_tier": "EXCLUDED", "expect_substantiates": false},
-
-  {"name": "a reputable news outlet corroborates but never decides",
-   "url": "https://www.reuters.com/technology/some-story",
-   "subject": {"name": "n8n", "homepage": "https://n8n.io"},
-   "kind": "deprecation", "expect_tier": "CORROBORATING", "expect_substantiates": false},
-
-  {"name": "a directory can nominate an alternative but not substantiate a strict claim",
-   "url": "https://alternativeto.net/software/codetotutorial/",
-   "subject": {"name": "CodeToTutorial", "homepage": "https://codetotutorial.com"},
-   "kind": "existence", "expect_tier": "LEAD_ONLY", "expect_substantiates": false},
-
-  {"name": "an unknown blog is a lead, never evidence",
-   "url": "https://random-dev-blog.example/n8n-is-dead",
-   "subject": {"name": "n8n", "homepage": "https://n8n.io"},
-   "kind": "existence", "expect_tier": "LEAD_ONLY", "expect_substantiates": false},
-
-  {"name": "a non-strict claim can rest on corroboration",
-   "url": "https://www.reuters.com/technology/some-story",
-   "subject": {"name": "n8n", "homepage": "https://n8n.io"},
-   "kind": "alternative", "expect_tier": "CORROBORATING", "expect_substantiates": true}
+  {
+    "name": "vendor's own docs settle a deprecation about that vendor",
+    "url": "https://docs.n8n.io/release-notes/",
+    "subject": {
+      "name": "n8n",
+      "homepage": "https://n8n.io",
+      "docs_url": "https://docs.n8n.io/"
+    },
+    "kind": "deprecation",
+    "expect_tier": "AUTHORITATIVE",
+    "expect_substantiates": true
+  },
+  {
+    "name": "the same vendor docs are only a lead about a DIFFERENT tool",
+    "url": "https://docs.n8n.io/release-notes/",
+    "subject": {
+      "name": "Groq",
+      "homepage": "https://groq.com"
+    },
+    "kind": "deprecation",
+    "expect_tier": "LEAD_ONLY",
+    "expect_substantiates": false
+  },
+  {
+    "name": "PyPI settles a version question",
+    "url": "https://pypi.org/project/gradio/",
+    "subject": {
+      "name": "gradio",
+      "homepage": ""
+    },
+    "kind": "version",
+    "expect_tier": "AUTHORITATIVE",
+    "expect_substantiates": true
+  },
+  {
+    "name": "PyPI does NOT settle a pricing question",
+    "url": "https://pypi.org/project/gradio/",
+    "subject": {
+      "name": "gradio",
+      "homepage": ""
+    },
+    "kind": "pricing",
+    "expect_tier": "CORROBORATING",
+    "expect_substantiates": false
+  },
+  {
+    "name": "content farms are excluded outright",
+    "url": "https://theresanaiforthat.com/ai/deepwiki/",
+    "subject": {
+      "name": "DeepWiki",
+      "homepage": "https://deepwiki.com"
+    },
+    "kind": "existence",
+    "expect_tier": "EXCLUDED",
+    "expect_substantiates": false
+  },
+  {
+    "name": "an SEO listicle URL pattern is excluded even on an unknown host",
+    "url": "https://someshop.example/best-10-n8n-alternatives-2026",
+    "subject": {
+      "name": "n8n",
+      "homepage": "https://n8n.io"
+    },
+    "kind": "existence",
+    "expect_tier": "EXCLUDED",
+    "expect_substantiates": false
+  },
+  {
+    "name": "a reputable news outlet corroborates but never decides",
+    "url": "https://www.reuters.com/technology/some-story",
+    "subject": {
+      "name": "n8n",
+      "homepage": "https://n8n.io"
+    },
+    "kind": "deprecation",
+    "expect_tier": "CORROBORATING",
+    "expect_substantiates": false
+  },
+  {
+    "name": "a directory can nominate an alternative but not substantiate a strict claim",
+    "url": "https://alternativeto.net/software/codetotutorial/",
+    "subject": {
+      "name": "CodeToTutorial",
+      "homepage": "https://codetotutorial.com"
+    },
+    "kind": "existence",
+    "expect_tier": "LEAD_ONLY",
+    "expect_substantiates": false
+  },
+  {
+    "name": "an unknown blog is a lead, never evidence",
+    "url": "https://random-dev-blog.example/n8n-is-dead",
+    "subject": {
+      "name": "n8n",
+      "homepage": "https://n8n.io"
+    },
+    "kind": "existence",
+    "expect_tier": "LEAD_ONLY",
+    "expect_substantiates": false
+  },
+  {
+    "name": "a non-strict claim can rest on corroboration",
+    "url": "https://www.reuters.com/technology/some-story",
+    "subject": {
+      "name": "n8n",
+      "homepage": "https://n8n.io"
+    },
+    "kind": "alternative",
+    "expect_tier": "CORROBORATING",
+    "expect_substantiates": true
+  },
+  {
+    "name": "a forum thread on the vendor's own subdomain cannot settle a deprecation",
+    "url": "https://community.n8n.io/t/deprecated-packages-in-n8n-update/72380",
+    "subject": {
+      "name": "n8n",
+      "homepage": "https://n8n.io",
+      "docs_url": "https://docs.n8n.io/"
+    },
+    "kind": "deprecation",
+    "expect_tier": "LEAD_ONLY",
+    "expect_substantiates": false
+  },
+  {
+    "name": "a Q&A path on an official host cannot settle a deprecation",
+    "url": "https://example.com/questions/12345/is-this-deprecated",
+    "subject": {
+      "name": "Example",
+      "homepage": "https://example.com"
+    },
+    "kind": "deprecation",
+    "expect_tier": "LEAD_ONLY",
+    "expect_substantiates": false
+  },
+  {
+    "name": "the vendor's deprecated-nodes page still settles a deprecation",
+    "url": "https://docs.n8n.io/integrations/builtin/deprecated-and-versioned-nodes",
+    "subject": {
+      "name": "n8n",
+      "homepage": "https://n8n.io",
+      "docs_url": "https://docs.n8n.io/"
+    },
+    "kind": "deprecation",
+    "expect_tier": "AUTHORITATIVE",
+    "expect_substantiates": true
+  }
 ]

@@ -6,6 +6,7 @@ or audited without the others:
 
     python3 main.py ingest      # course JSON  -> out/content_records.jsonl
     python3 main.py extract     # records      -> out/inventory.json + registry/
+    python3 main.py watch       # vendors      -> out/signals_<date>.json  (daily)
     python3 main.py probe       # inventory    -> out/probe_<date>.json
     python3 main.py research    # flagged deps -> out/research_<date>.json
     python3 main.py analyse     # everything   -> out/findings_<date>.json
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -31,33 +33,93 @@ def _today() -> str:
     return date.today().isoformat()
 
 
+def _outlines_by_course() -> dict:
+    """course title -> the workbook's PPT-level `Outline` object.
+
+    Read at ingest time, not extract time, because the workbook is the only
+    authoritative source for SESSION NUMBERING and numbering has to be settled before a
+    single Location is written. An unmapped workbook is reported and skipped - the
+    fallback to its own filename is what once invented three phantom courses.
+    """
+    from miw.ingest.outline import read_outline
+    from miw.ingest.sheets import course_for_workbook
+
+    out, problems = {}, []
+    for book in sorted(Path("data/sheets").glob("*.xlsx")):
+        title = course_for_workbook(book.name)
+        if not title:
+            problems.append(f"workbook {book.name!r} maps to no course in "
+                            f"WORKBOOK_COURSES; its session numbering is SKIPPED")
+            continue
+        o = read_outline(book)
+        problems += [f"{book.name}: {e}" for e in o.stats.errors]
+        out[title] = o
+    return out, problems
+
+
 def cmd_ingest(args) -> int:
     from config.constants import COURSES
+    from miw.ingest.outline import outline_records
     from miw.ingest.portal import read_course
     from miw.schema import to_jsonable
 
     OUT.mkdir(exist_ok=True)
     total, problems = 0, []
+    outlines, problems = _outlines_by_course()
     with open(OUT / "content_records.jsonl", "w") as fh:
         for slug, meta in COURSES.items():
             path = DATA / f"{slug}.json"
             if not path.exists():
                 problems.append(f"missing export: {path}")
                 continue
-            records, st = read_course(str(path), meta["title"])
-            for r in records:
+            title = meta["title"]
+            outline = outlines.get(title)
+            records, st = read_course(str(path), title,
+                                      outline.session_of_unit if outline else None)
+
+            # The slide-level text, which reaches us nowhere else: measured on Intro to
+            # Gen AI, 0 of 24 session outlines appear anywhere in the JSON export.
+            ppt = outline_records(outline, title, str(path)) if outline else []
+            for r in [*records, *ppt]:
                 fh.write(json.dumps(to_jsonable(r)) + "\n")
-            total += len(records)
-            flag = "" if st.sessions == meta["expect_sessions"] else "  <-- SESSION COUNT MISMATCH"
-            print(f"  {meta['title']:26} sessions={st.sessions:3}/{meta['expect_sessions']:<3} "
-                  f"units={st.units:4} contents={st.contents:5} records={st.records:6}{flag}")
+            total += len(records) + len(ppt)
+
+            # The workbook's session count is the curriculum's own, so it is what
+            # `expect_sessions` is checked against when we have it. The positional
+            # count is still printed, because a gap between the two is exactly the
+            # `Common Mistakes` case and worth seeing.
+            declared = outline.session_count if outline else 0
+            counted = declared or st.sessions
+            flag = "" if counted == meta["expect_sessions"] else "  <-- SESSION COUNT MISMATCH"
+            src = "workbook" if declared else "position"
+            print(f"  {title:26} sessions={counted:3}/{meta['expect_sessions']:<3} "
+                  f"({src}) units={st.units:4} contents={st.contents:5} "
+                  f"records={st.records:6}{flag}")
             print(f"  {'':26} pooled questions={st.pooled_questions:5} "
                   f"pooling gap={st.pooling_gap}")
-            if st.sessions != meta["expect_sessions"]:
-                problems.append(f"{meta['title']}: {st.sessions} sessions, expected {meta['expect_sessions']}")
+            if outline:
+                print(f"  {'':26} PPT outline: {st.authoritative_sessions} session(s) "
+                      f"map {st.session_from_workbook} unit(s); {st.session_inferred} "
+                      f"unit(s) numbered by position; {len(ppt)} slide-text record(s)")
+                if st.session_conflicts:
+                    # NOT a problem: the workbook winning is the correction. But it is
+                    # printed, because it silently changed 81 session numbers the first
+                    # time it ran and a reviewer comparing digests deserves the reason.
+                    print(f"  {'':26} corrected {st.session_conflicts} unit(s) whose "
+                          f"positional number disagreed with the workbook:")
+                    for c in st.conflict_examples[:3]:
+                        print(f"  {'':28} {c}")
+                if declared and st.sessions != declared:
+                    print(f"  {'':26} note: the export has {st.sessions} video "
+                          f"session(s) but the workbook numbers {declared} - "
+                          f"{st.sessions - declared} unit(s) look like sessions and "
+                          f"are not numbered as one")
+            if counted != meta["expect_sessions"]:
+                problems.append(f"{title}: {counted} sessions ({src}), "
+                                f"expected {meta['expect_sessions']}")
             if st.pooling_gap:
-                problems.append(f"{meta['title']}: {st.pooling_gap} pooling units not traversed")
-            problems += [f"{meta['title']}: {s}" for s in st.skipped]
+                problems.append(f"{title}: {st.pooling_gap} pooling units not traversed")
+            problems += [f"{title}: {s}" for s in st.skipped]
     print(f"\n  {total} records -> {OUT / 'content_records.jsonl'}")
     for p in problems:
         print(f"  PROBLEM: {p}", file=sys.stderr)
@@ -85,24 +147,67 @@ def cmd_extract(args) -> int:
     print(f"  registry: {len(reg.entries)} entries on load")
 
     from miw.ingest.sheets import read_all
-    WORKBOOK_COURSES = {
-        "gen_ai_contents.xlsx": "Intro to Gen AI",
-        "llm_apps_contents.xlsx": "Building LLM Applications",
-        "ai_for_finance_contents.xlsx": "AI for Finance",
-    }
+    # Workbook filename -> course title. Matched on a NORMALISED stem rather than the
+    # exact filename: the exact-match version silently broke when the workbooks were
+    # renamed, and because the lookup fell back to the filename itself, 3,633 sheet
+    # locations were quietly attributed to three phantom courses called
+    # "AI for Finance - Course Contents.xlsx" and friends. An unmapped workbook is now
+    # a loud problem rather than a new course.
+    # The matcher itself lives in `miw/ingest/sheets.py`. It used to be duplicated here
+    # as a local literal, which is precisely what that module's own comment warns
+    # against - and the duplicate was not harmless: `ingest` used the shared version
+    # while `extract` used this copy, so a course the shared map knew about would get
+    # correct session numbering and then have EVERY workbook tool declaration and
+    # version pin dropped by `extract` with only a `sheet PROBLEM` line to show for it.
+    # Since S6 version-drift rests entirely on those hand-recorded pins, that course's
+    # S6 findings would silently never exist.
+    from miw.ingest.sheets import course_for_workbook
+
     sheet_tools, sheet_stats = read_all(sorted(Path("data/sheets").glob("*.xlsx")))
+    seen_books = sorted({t.workbook for t in sheet_tools})
+    mapping = {b: course_for_workbook(b) for b in seen_books}
+    unmapped = [b for b, c in mapping.items() if not c]
+    for b in unmapped:
+        print(f"  sheet PROBLEM: workbook {b!r} maps to no course in WORKBOOK_COURSES; "
+              f"its declarations would land in a phantom course and are SKIPPED",
+              file=sys.stderr)
+    WORKBOOK_COURSES = {b: c for b, c in mapping.items() if c}
     print(f"  sheets: {sheet_stats.workbooks} workbook(s), "
           f"{sheet_stats.sheets_with_tools} tool sheet(s), {sheet_stats.tools} "
           f"declarations, {sheet_stats.pins} hand-recorded version pins")
     for e in sheet_stats.errors[:3]:
         print(f"  sheet PROBLEM: {e}", file=sys.stderr)
 
+    # (course, session-or-unit name) -> session number, from the records we just
+    # loaded. The tool sheets name a session in their own words; this is what turns a
+    # sheet declaration into a Location with a real session number instead of None.
+    # Built by majority vote because a name can appear under two sessions (a "Part - 2"
+    # unit reusing its parent's title), and the most-referenced session is the honest
+    # answer rather than whichever row happened to come first.
+    from collections import Counter, defaultdict
+    votes: dict = defaultdict(Counter)
+    for r in records:
+        if not r.session_no:
+            continue
+        for nm in (r.unit_name, r.title):
+            nm = (nm or "").strip().lower()
+            if len(nm) >= 4:
+                votes[(r.course, nm)][r.session_no] += 1
+    session_of_name = {k: c.most_common(1)[0][0] for k, c in votes.items()}
+    print(f"  session names resolvable from records: {len(session_of_name)}")
+
     b = InventoryBuilder(reg)
     b.feed_structured(records)
     b.sync_registry()
-    b.feed_sheets(sheet_tools, WORKBOOK_COURSES)
+    b.feed_sheets(sheet_tools, WORKBOOK_COURSES, session_of_name)
     b.feed_prose(records)
     deps = b.finish()
+
+    placed = sum(1 for d in deps for l in d.locations
+                 if l.evidence_source.startswith("sheet") and l.session_no)
+    unplaced = sum(1 for d in deps for l in d.locations
+                   if l.evidence_source.startswith("sheet") and not l.session_no)
+    print(f"  sheet locations placed on a session: {placed}, still unplaced: {unplaced}")
     st = b.stats
 
     # Carry per-dependency identity across the rebuild. Without this, `first_seen` is
@@ -165,6 +270,9 @@ def _add_scope_args(ap) -> None:
                     help="watch tiers, comma separated (default: critical,standard)")
     ap.add_argument("--kinds", default="",
                     help="dependency kinds, comma separated")
+    ap.add_argument("--dep-id", action="append", dest="dep_id",
+                    help="target exact dependency ids (repeatable); what a vendor "
+                         "signal resolves to")
     ap.add_argument("--limit", type=int, default=None, help="cap the selection")
 
 
@@ -264,29 +372,56 @@ def cmd_research(args) -> int:
         sub = len([c for c in res.claims if c.substantiating])
         print(f"  [{i:3}/{total}] {dep.canonical_name[:34]:36} "
               f"pages={len(res.official_pages_seen):2} claims={sub:2} "
-              f"alts={len(res.alternatives):2} dropped={len(res.dropped)}")
+              f"alts={len(res.alternatives):2} rejected={len(res.dropped):2} "
+              f"unreadable={len(res.unreadable):2}"
+              + (f" refuted={len(res.refuted)}" if res.refuted else ""))
 
     from miw.schema import utcnow
     from miw.state import State
     state = State()
+    if getattr(args, "nominate", False):
+        from miw.llm import available_provider, budget_state
+        print(f"  model nomination via {available_provider()}; "
+              f"budget {budget_state()}")
     results = research_all(deps, probes,
                            max_deps=args.limit or settings.RESEARCH_MAX_DEPS,
                            scope=scope, dep_state=state.dep_state(),
+                           use_model=getattr(args, "nominate", False),
                            progress=progress)
     # Stamp the rotation clock so next week picks up where this run left off.
     state.mark_researched([r.dep_id for r in results], utcnow())
     state.close()
     out = OUT / f"research_{_today()}.json"
-    dump(out, {"researched_at": _today(),
-               "capabilities": settings.capability_note(),
-               "results": [to_jsonable(r) for r in results]})
+    # Merge, do not replace. `probe` and `analyse` have gone through `merge_by_dep`
+    # since a scoped run overwrote the day's probe file with its own slice; research
+    # was still a plain dump, so a course-scoped research run erased every other
+    # course's citations and nominations for the day. Same bug, one stage later.
+    from miw.artifacts import merge_by_dep
+    merged = merge_by_dep(
+        out, new_rows=[to_jsonable(r) for r in results],
+        examined={r.dep_id for r in results},
+        meta={"researched_at": _today(), "run_at": utcnow(),
+              "scope": scope.to_dict(),
+              "capabilities": settings.capability_note()},
+        rows_key="results")
     tot = sum(len([c for c in r.claims if c.substantiating]) for r in results)
-    print(f"\n  {len(results)} researched, {tot} substantiated claims -> {out}")
+    alts = sum(len([a for a in r.alternatives if a.verified]) for r in results)
+    unread = sum(len(r.unreadable) for r in results)
+    print(f"\n  {len(results)} researched, {tot} substantiated claim(s), "
+          f"{alts} verified alternative(s) -> {out}")
+    print(f"  merged: {len(results)} refreshed, {merged['carried_forward']} carried "
+          f"forward from earlier runs today")
+    if unread:
+        # Said out loud because it used to hide inside `dropped` and look like
+        # rejected evidence: these are guessed well-known paths that do not exist.
+        print(f"  {unread} page(s) could not be read (mostly guessed well-known "
+              f"paths that 404) - not rejected evidence, just absent")
     return 0
 
 
 def _load_research(day=None):
-    from miw.schema import Alternative, Claim, ResearchResult
+    from miw.schema import (Alternative, AlternativeNomination, AlternativeOpinion,
+                            Claim, ResearchResult)
     from miw.trust import ClaimKind, Tier
     day = day or _today()
     path = OUT / f"research_{day}.json"
@@ -310,8 +445,24 @@ def _load_research(day=None):
                 c["kind"] = ClaimKind(c["kind"])
                 c["tier"] = Tier[c["tier"]] if isinstance(c["tier"], str) else Tier(c["tier"])
                 ac.append(Claim(**c))
-            alts.append(Alternative(claims=ac, **a))
-        out[r["dep_id"]] = ResearchResult(claims=claims, alternatives=alts, **r)
+            # Rehydrate the opinion too, or a consumer gets a raw dict where it
+            # expects an object and crashes on the system's own artifact.
+            op = a.pop("opinion", None)
+            alt = Alternative(claims=ac, **a)
+            if isinstance(op, dict):
+                alt.opinion = AlternativeOpinion(
+                    **{k: v for k, v in op.items()
+                       if k in AlternativeOpinion.__dataclass_fields__})
+            alts.append(alt)
+        # Rehydrate nominations explicitly. `ResearchResult(**r)` would leave them as
+        # raw dicts, and every consumer reads them as objects - `analyse` would crash
+        # on the system's own artifact.
+        noms = [AlternativeNomination(
+                    **{k: v for k, v in n.items()
+                       if k in AlternativeNomination.__dataclass_fields__})
+                for n in r.pop("nominations", [])]
+        out[r["dep_id"]] = ResearchResult(claims=claims, alternatives=alts,
+                                          nominations=noms, **r)
     return out
 
 
@@ -420,10 +571,40 @@ def cmd_analyse(args) -> int:
     return 0
 
 
+def _nomination_tally(research) -> dict:
+    """Count what discovery considered, so a refutation is reported rather than lost.
+
+    "We looked and it is not there" is a result. Without this the digest cannot
+    distinguish it from "nothing looked", which is exactly the complaint the 2026
+    literature makes about citation-support metrics: they measure what survived and
+    never what was rejected.
+    """
+    from miw.schema import AlternativeNomination as AN
+    total = verified = refuted = blocked = rejected = 0
+    examples = []
+    for r in (research or {}).values() if isinstance(research, dict) else (research or []):
+        for n in (getattr(r, "nominations", None) or []):
+            total += 1
+            v = getattr(n, "verdict", "")
+            if v in ("verified", "vendor_named"):
+                verified += 1
+            elif v in AN.REFUTED:
+                refuted += 1
+                if len(examples) < 6:
+                    examples.append(f"{n.name}: {n.verdict_detail}")
+            elif v == "unverifiable_blocked":
+                blocked += 1
+            else:
+                rejected += 1
+    return {"total": total, "verified": verified, "refuted": refuted,
+            "blocked": blocked, "rejected": rejected, "examples": examples}
+
+
 def cmd_report(args) -> int:
     from config import settings
     from miw.reporters.markdown import render
-    from miw.schema import Finding, Location, Claim, Alternative
+    from miw.schema import (Alternative, AlternativeOpinion, Claim, Finding,
+                            Location)
     from miw.trust import ClaimKind, Tier
 
     path = OUT / f"findings_{_today()}.json"
@@ -447,18 +628,73 @@ def cmd_report(args) -> int:
             for c in a.pop("claims", []):
                 c["kind"] = ClaimKind(c["kind"]); c["tier"] = Tier[c["tier"]]
                 ac.append(Claim(**c))
-            alts.append(Alternative(claims=ac, **a))
+            # Rehydrate the opinion too, or a consumer gets a raw dict where it
+            # expects an object and crashes on the system's own artifact.
+            op = a.pop("opinion", None)
+            alt = Alternative(claims=ac, **a)
+            if isinstance(op, dict):
+                alt.opinion = AlternativeOpinion(
+                    **{k: v for k, v in op.items()
+                       if k in AlternativeOpinion.__dataclass_fields__})
+            alts.append(alt)
         findings.append(Finding(locations=locs, claims=claims, alternatives=alts, **f))
 
     inv = json.load(open(OUT / "inventory.json"))
     probes = _load_probes(); research = _load_research()
+    # The roll-up is ALWAYS re-rendered, and always from the whole merged artifact.
+    # Scoping `report` narrows which per-course digest it WRITES, never which findings
+    # it READS — anything else reinvents the bug that had a 91-dependency slice
+    # presented as the week's 229-dependency state.
+    noms = _nomination_tally(research)
     md = render(findings, resolved=raw.get("resolved") or [], run_date=_today(),
                 capability_note=settings.capability_note(),
                 inventory_size=len(inv["dependencies"]), probed=len(probes),
-                researched=len(research), suppressed=raw.get("suppressed_unchanged", 0))
+                researched=len(research), suppressed=raw.get("suppressed_unchanged", 0),
+                nominations=noms)
     out = OUT / f"digest_{_today()}.md"
     out.write_text(md)
     print(f"  {len(findings)} findings -> {out}")
+
+    # --- and one digest per course ----------------------------------------
+    from miw.analyse.project import project_all
+    from miw.schema import Dependency as _Dep
+    from miw.scope import resolve_courses, slug_of
+
+    deps_by_id = {}
+    for d in inv["dependencies"]:
+        locs = [Location(**{k: v for k, v in l.items()
+                            if k in Location.__dataclass_fields__})
+                for l in d.get("locations", [])]
+        deps_by_id[d["dep_id"]] = _Dep(
+            **{k: v for k, v in d.items()
+               if k in _Dep.__dataclass_fields__ and k != "locations"}, locations=locs)
+
+    all_courses = sorted({l.course for dep in deps_by_id.values()
+                          for l in dep.locations if l.course})
+    wanted = sorted(resolve_courses(args.course)) if getattr(args, "course", None) \
+        else all_courses
+    for course in wanted:
+        if course not in all_courses:
+            print(f"  ! no course named {course!r} in the inventory", file=sys.stderr)
+            continue
+        local = project_all(findings, deps_by_id, course)
+        # Per-course digests live in out/courses/<slug>/ because `_latest()` globs
+        # `digest_*.md` lexicographically: a top-level digest_pse_<date>.md sorts AFTER
+        # digest_<date>.md and would silently become "the" digest.
+        cdir = OUT / "courses" / slug_of(course)
+        cdir.mkdir(parents=True, exist_ok=True)
+        cmd_md = render(local, resolved=[], run_date=_today(),
+                        capability_note=settings.capability_note(),
+                        inventory_size=sum(1 for d in deps_by_id.values()
+                                           if any(l.course == course for l in d.locations)),
+                        probed=len(probes), researched=len(research),
+                        suppressed=sum(1 for f in local if f.diff_class == "unchanged"),
+                        course=course)
+        cpath = cdir / f"digest_{_today()}.md"
+        cpath.write_text(cmd_md)
+        reported = sum(1 for f in local if f.diff_class != "unchanged")
+        print(f"    {course:28} {len(local):2} finding(s) ({reported} reported) "
+              f"-> {cpath.relative_to(OUT.parent)}")
     return 0
 
 
@@ -526,6 +762,248 @@ def cmd_triage(args) -> int:
     return 0
 
 
+def cmd_watch(args) -> int:
+    """Daily entry point: did a vendor move, and what does it touch?
+
+    The other entry point is manual and already exists — `--course` / `--session` on any
+    stage, or the Run tab. This one is unattended. It reads no course content and calls
+    no model: a signal names identifiers, the inventory is an index keyed by those
+    identifiers, and resolution is a dict lookup.
+    """
+    import subprocess
+    from miw.schema import dump, to_jsonable
+    from miw.state import State
+    from miw.watch import poll_all, resolve_signal
+
+    deps = _load_inventory()
+    state = State()
+
+    def progress(source, outcome, detail):
+        if outcome != "unchanged" or args.verbose:
+            print(f"  {outcome:11} {source:34} {detail}")
+
+    signals, stats = poll_all(deps, state,
+                              packages=not args.no_packages,
+                              package_limit=args.package_limit,
+                              progress=progress)
+    print(f"\n  polled {stats['vendor_sources']} vendor catalogue(s) + "
+          f"{stats['package_sources']} package(s)")
+    print(f"  {stats['changed']} changed · {stats['baseline']} baseline · "
+          f"{stats['unchanged']} unchanged · {stats['unreadable']} unreadable")
+
+    out = OUT / f"signals_{_today()}.json"
+    dump(out, {"polled_at": _today(), "stats": stats,
+               "signals": [to_jsonable(s) for s in signals]})
+
+    if not signals:
+        print("  no vendor moved since the last poll")
+        state.close()
+        return 0
+
+    print(f"\n{len(signals)} signal(s) to resolve:")
+    plans = []
+    for sig in signals:
+        scope = resolve_signal(sig, deps)
+        names = sorted({d.canonical_name for d in deps if d.dep_id in scope.dep_ids})
+        print(f"   {sig.vendor_key}:{sig.trigger:14} -> "
+              f"{len(scope.dep_ids)} taught dependency(ies) "
+              f"{names[:4]}{'...' if len(names) > 4 else ''}")
+        if scope.dep_ids:
+            plans.append((sig, scope))
+        else:
+            # A vendor moved something we do not teach. Recorded, not investigated.
+            state.signal_mark(sig.signal_id, "investigated")
+
+    if not args.investigate:
+        print("\n  pass --investigate to run the scoped stages for these")
+        state.close()
+        return 0
+
+    for sig, scope in plans:
+        print(f"\n=== investigating {sig.source_key} "
+              f"({len(scope.dep_ids)} dependency(ies)) ===")
+        for stage in ("probe", "analyse"):
+            cmd = [sys.executable, "-u", "main.py", stage] + scope.to_cli_args()
+            rc = subprocess.run(cmd, cwd=str(Path.cwd())).returncode
+            if rc not in (0, 1):
+                print(f"  stage {stage} exited {rc}", file=sys.stderr)
+                break
+        state.signal_mark(sig.signal_id, "investigated")
+    subprocess.run([sys.executable, "-u", "main.py", "report"], cwd=str(Path.cwd()))
+    state.close()
+    return 0
+
+
+def cmd_resolve_packages(args) -> int:
+    """Retype sheet-declared names that are really distributions, verified on a registry.
+
+    A workbook records `pydantic@2.11.10` in a tools column. `feed_sheets` has no way to
+    know that is a PyPI distribution rather than a SaaS product, so it defaults to
+    `kind: tool` - and a `tool` with no vendor domain has no authority set, so it can
+    never produce a version, pricing or deprecation finding. Ten such entries were
+    hand-corrected once; ten more arrived on the next export, because every new sheet
+    declaration lands domainless forever. This is that fix, made repeatable.
+
+    It is deterministic and evidence-based, not a guess: a name is retyped only if the
+    registry actually serves a project under it, and the registry then becomes its
+    authority via `Dependency._REGISTRY_HOME`. Names that resolve nowhere are listed by
+    name rather than silently skipped, because that remainder is the real backlog.
+    """
+    from miw.probe import registries as R
+    from miw.registry import Registry
+
+    reg = Registry.load()
+    deps = _load_inventory()
+    # A hand-recorded VERSION PIN is the strong signal: nobody writes `pydantic@2.11.10`
+    # about a SaaS product. A bare declaration with no pin is weak - "Telegram" is
+    # sheet-declared and is not a distribution - so those are only checked with
+    # `--include-unpinned`, which costs a registry round trip per name.
+    def _pinned(d):
+        return any(l.evidence_source == "sheet_pin" for l in d.locations)
+    candidates = [d for d in deps
+                  if d.kind == "tool" and not d.official_domains and not d.registry
+                  and (_pinned(d) or args.include_unpinned)]
+    pinned = {d.canonical_name for d in candidates}
+    if args.only:
+        pinned &= set(args.only)
+    print(f"  {len(pinned)} sheet-declared name(s) with no authority to check")
+
+    retyped, unresolved = [], []
+    for name in sorted(pinned):
+        entry = reg.resolve(name, "tool")
+        if entry is None:
+            continue
+        hit = None
+        for which, fn in (("pypi", R.pypi), ("npm", R.npm)):
+            info = fn(name)
+            if info.get("found"):
+                hit = (which, info)
+                break
+        if not hit:
+            unresolved.append(name)
+            print(f"    {name:34} no registry project - stays a tool")
+            continue
+        which, info = hit
+        # Re-key: `Entry.key` is `kind:norm(name)`, so changing kind moves the entry.
+        reg.entries.pop(entry.key, None)
+        entry.kind = "package"
+        entry.registry = which
+        entry.registry_id = name
+        entry.review_status = "approved"
+        entry.notes = ((entry.notes or "") + f" | retyped tool->package: {which} serves "
+                       f"a project under this name, so the registry is its authority"
+                       ).strip(" |")
+        reg.add(entry)
+        retyped.append((name, which, info.get("latest_version") or "?"))
+        print(f"    {name:34} -> {which} (latest {info.get('latest_version')})")
+
+    if args.dry_run:
+        print(f"\n  dry run: {len(retyped)} would be retyped, nothing written")
+        return 0
+    reg.save()
+    print(f"\n  {len(retyped)} retyped, {len(unresolved)} still unresolved "
+          f"-> registry/tools.yaml")
+    if unresolved:
+        print(f"  unresolved (need a human to add an official domain): "
+              f"{', '.join(unresolved[:12])}"
+              + (f" +{len(unresolved) - 12} more" if len(unresolved) > 12 else ""))
+    print("  run `python3 main.py extract` to pick the new kinds up")
+    return 0
+
+
+def _read_latest(pattern: str) -> dict:
+    """The newest artifact matching `pattern`, or {}."""
+    files = sorted(OUT.glob(pattern))
+    if not files:
+        return {}
+    try:
+        return json.loads(files[-1].read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def cmd_agent(args) -> int:
+    """Run the agent graphs over one dependency, or a slice of the inventory.
+
+    Acquisition first (`signal_agent`, which is where a model plans), then impact
+    (`impact_agent`, which has no model in it). The impact graph stops at its review
+    gate: the run is suspended and durable, so nothing is reported until a human
+    resumes it. That is a real LangGraph interrupt backed by a SQLite checkpointer,
+    not a status column.
+    """
+    try:
+        from miw.agents import run_impact_agent, run_signal_agent
+    except ImportError:
+        print("the agent graphs need langgraph:\n"
+              "  pip install -r requirements-optional.txt", file=sys.stderr)
+        return 2
+
+    from miw.llm import budget_state, provider_status
+
+    deps = _load_inventory()
+    # A taught model id has an owner and a SERVER, and only the server can retire it.
+    # The probe artifact records which provider's catalogue named the exact id, which
+    # is what earns the authority widening (see `trust.with_provider`).
+    try:
+        probes = _load_probes()
+    except SystemExit:
+        probes = {}
+
+    if args.dep:
+        want = args.dep.lower()
+        chosen = [d for d in deps if d.canonical_name.lower() == want]
+        if not chosen:
+            chosen = [d for d in deps if want in d.canonical_name.lower()][:1]
+        if not chosen:
+            print(f"no dependency matching {args.dep!r}", file=sys.stderr)
+            return 2
+    else:
+        # Only subjects we can speak for officially: the rest cannot produce a claim,
+        # so spending a planning call on them is pure waste.
+        pool = [d for d in deps if d.official_domains and d.watch_tier == "critical"]
+        chosen = sorted(pool, key=lambda d: -len(d.locations))[:args.limit]
+
+    st = provider_status()
+    print(f"  provider: {st['provider']} ({st.get('model_logical','-')})  "
+          f"budget: {budget_state()['calls_today']}/{budget_state()['max_calls']} calls today")
+    print(f"  {len(chosen)} dependency(ies) selected\n")
+
+    reviewed = 0
+    for dep in chosen:
+        print(f"  {dep.canonical_name}  ({dep.kind}, {len(dep.locations)} locations)")
+        prov = getattr(probes.get(dep.dep_id), "provider_domains", None) or []
+        if prov:
+            print(f"      authority widened by serving provider: {', '.join(prov)}")
+        sig = run_signal_agent(dep, kinds=tuple(args.kinds),
+                               max_attempts=args.attempts, provider_domains=prov)
+        for line in sig.get("trajectory", []):
+            print(f"      {line}")
+        for bad in sig.get("rejected_urls", []):
+            print(f"      REJECTED off-allowlist: {bad}")
+        claims = sig.get("claims") or []
+        if not claims:
+            print(f"      -> {sig.get('status')}: no substantiated evidence\n")
+            continue
+        for c in claims[:3]:
+            print(f"      [{c.get('tier')}] {c.get('source_url')}")
+            print(f"        \"{(c.get('quote') or '')[:110]}\"")
+
+        imp, app = run_impact_agent(dep, sig.get("probe_signals") or args.signals,
+                                    claims)
+        for line in imp.get("trajectory", []):
+            print(f"      {line}")
+        for f in imp.get("findings", []):
+            print(f"      {f['course']}: {f['signal']} {f['severity']} "
+                  f"blast {f['blast_radius']} sessions {f['sessions']}")
+        print(f"      -> suspended at review gate (thread impact:{dep.dep_id})\n")
+        reviewed += 1
+
+    print(f"  {reviewed} dependency(ies) reached the review gate and are awaiting a "
+          f"human decision")
+    print(f"  spend today: ${budget_state()['spent_usd_today']:.4f}")
+    return 0
+
+
 def cmd_verify(args) -> int:
     """Audit the trust invariants on the artifacts that are actually on disk.
 
@@ -535,12 +1013,15 @@ def cmd_verify(args) -> int:
     officially is listed by name.
     """
     from miw.registry import Registry
-    from miw.trust import STRICT_KINDS, ClaimKind, Tier
+    from miw.trust import STRICT_KINDS, ClaimKind, Tier, classify
 
     problems: list[str] = []
     deps = _load_inventory()
     reg = Registry.load()
 
+    by_id = {d.dep_id: d for d in deps}
+    probe_rows = {r.get("dep_id"): r
+                  for r in (_read_latest("probe_*.json") or {}).get("results", [])}
     no_authority = [d for d in deps if not d.subject().official_domains]
     strict_capable = len(deps) - len(no_authority)
     print(f"  inventory: {len(deps)} dependencies")
@@ -566,7 +1047,33 @@ def cmd_verify(args) -> int:
             substantiating = []
             for c in claims:
                 kind = ClaimKind(c["kind"])
-                tier = Tier[c["tier"]] if isinstance(c["tier"], str) else Tier(c["tier"])
+                stored = Tier[c["tier"]] if isinstance(c["tier"], str) else Tier(c["tier"])
+                # RE-CLASSIFY, do not trust the stored tier. Reading the tier the
+                # artifact records makes this check the artifact against itself, which
+                # is the opposite of the point: the guarantee is meant to be verifiable
+                # by someone who did not write the code. It also means a tightened
+                # trust rule silently leaves old findings standing - which is exactly
+                # what happened when forum pages on a vendor's own subdomain stopped
+                # being authoritative and 14 stale criticals kept their AUTHORITATIVE
+                # stamp.
+                dep = by_id.get(f.get("dep_id"))
+                subj = dep.subject() if dep else None
+                # A model's authority set is widened by its SERVING provider, and that
+                # widening is recorded on the probe result, not on the finding. Rebuild
+                # it here or Groq's own deprecation table reads as LEAD_ONLY against a
+                # subject attributed to Meta - the exact bug `with_provider` exists to
+                # fix, reintroduced by the auditor rather than the analyser.
+                prov = (probe_rows.get(f.get("dep_id")) or {}).get("provider_domains")
+                if dep is not None and dep.kind == "model" and prov:
+                    subj = dep.subject_with_provider(prov)
+                actual = classify(c["source_url"], subj, kind)
+                if actual is not stored:
+                    problems.append(
+                        f"{f['canonical_name']} / {f['signal']}: claim records "
+                        f"{stored.name} but {c['source_url']} classifies as "
+                        f"{actual.name} today - the finding predates a trust rule "
+                        f"change and must be re-analysed")
+                tier = min(stored, actual)
                 if kind in STRICT_KINDS and tier is not Tier.AUTHORITATIVE:
                     problems.append(
                         f"{f['canonical_name']} / {f['signal']}: strict claim "
@@ -581,6 +1088,42 @@ def cmd_verify(args) -> int:
             for c in claims:
                 if len((c.get("quote") or "")) < 12:
                     problems.append(f"{f['canonical_name']}: claim quote too short to verify")
+
+            # A model's fit judgement may never become evidence. It cannot be built
+            # into a Claim by construction (no source_url, no quote), but assert the
+            # invariant against the artifact anyway: this is the one thing in the
+            # digest a model asserted rather than a page stated, and the whole point
+            # of `verify` is that the guarantee is checkable from the outside.
+            for a in f.get("alternatives") or []:
+                op = a.get("opinion")
+                if not op:
+                    continue
+                if not [c for c in (a.get("claims") or [])
+                        if c.get("substantiating")]:
+                    problems.append(
+                        f"{f['canonical_name']}: alternative {a.get('name')!r} carries "
+                        f"a model opinion but no substantiating claim - an opinion "
+                        f"must never travel alone")
+                if op.get("source") != "llm":
+                    problems.append(
+                        f"{f['canonical_name']}: alternative {a.get('name')!r} opinion "
+                        f"is not labelled as a model judgement")
+                blob = json.dumps(a.get("claims") or [])
+                if "fit_score" in blob or "one_line" in blob:
+                    problems.append(
+                        f"{f['canonical_name']}: a fit judgement leaked into a claim")
+            # Provider widening is the one place the trust layer was loosened, so it is
+            # asserted here: an S7 finding must name the provider that granted the
+            # authority, and that provider must have been discovered by its own
+            # catalogue listing the exact id (which is what sets `provider`).
+            if f.get("signal") == "S7" and claims:
+                probe_sigs = set(f.get("probe_signals") or [])
+                if probe_sigs & {"model_shutdown_passed", "model_deprecation_declared"} \
+                        and not (f.get("dep_id") and any(
+                            c.get("tier") in ("AUTHORITATIVE", 3) for c in claims)):
+                    problems.append(
+                        f"{f['canonical_name']}: S7 with no authoritative claim - "
+                        f"provider authority was not established")
 
     if problems:
         print(f"\n  {len(problems)} INVARIANT VIOLATION(S):")
@@ -620,7 +1163,14 @@ def cmd_run_weekly(args) -> int:
     return 0
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The CLI, as a value.
+
+    Split out of `main()` so a test can assert that the argv `miw/api/jobs.py` builds
+    for each stage actually parses. That guard exists because it did not: `report` was
+    added to `jobs.SCOPED`, started receiving `--tiers`, which its subparser does not
+    declare, and every UI-initiated run died at its last stage with exit 2.
+    """
     ap = argparse.ArgumentParser(prog="main.py", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -631,6 +1181,10 @@ def main() -> int:
     pr.add_argument("--verbose", action="store_true", help="show ok results too")
     rs = sub.add_parser("research", help="official-source research on flagged deps")
     _add_scope_args(rs)
+    # Opt-in, like `analyse --refine`. The deterministic nominators run either way;
+    # the model only adds candidates, and every one still faces the same ladder.
+    rs.add_argument("--nominate", action="store_true",
+                    help="also ask a model for candidate replacements (costs LLM calls)")
     an = sub.add_parser("analyse", help="score findings and diff against last run")
     _add_scope_args(an)
     an.add_argument("--refine", action="store_true",
@@ -646,21 +1200,53 @@ def main() -> int:
     tr.add_argument("--why", default="", help="correct the 'why it matters' wording")
     tr.add_argument("--when", default="", help="correct the urgency")
     tr.add_argument("--reviewer", default="gen-ai-content")
-    sub.add_parser("report", help="render the weekly markdown digest")
+    rpk = sub.add_parser("resolve-packages",
+                         help="retype sheet-declared names that are really packages")
+    rpk.add_argument("--dry-run", action="store_true")
+    rpk.add_argument("--only", action="append", default=[],
+                     help="restrict to these names; repeatable")
+    rpk.add_argument("--include-unpinned", action="store_true",
+                     help="also check names with no version pin (slower, weaker signal)")
+    rp = sub.add_parser("report", help="render the weekly markdown digest")
+    # `--course` narrows which per-course digest is WRITTEN. The roll-up is always
+    # re-rendered from the complete merged artifact, so it never goes stale behind a
+    # scoped run and never presents one slice as the whole week.
+    rp.add_argument("--course", action="append", default=[],
+                    help="course slug or title; repeatable. Default: every course.")
     rw = sub.add_parser("run-weekly", help="all stages, unattended")
     _add_scope_args(rw)
     rw.add_argument("--verbose", action="store_true")
     rw.add_argument("--refine", action="store_true")
+    wt = sub.add_parser("watch", help="poll vendors for releases and deprecations")
+    wt.add_argument("--investigate", action="store_true",
+                    help="run the scoped stages for each resolved signal")
+    wt.add_argument("--no-packages", action="store_true",
+                    help="vendor catalogues only, skip registry polling")
+    wt.add_argument("--package-limit", type=int, default=None)
+    wt.add_argument("--verbose", action="store_true", help="show unchanged sources too")
+    ag = sub.add_parser("agent", help="run the agent graphs (needs langgraph)")
+    ag.add_argument("--dep", default="", help="one dependency by name")
+    ag.add_argument("--limit", type=int, default=3, help="how many to sweep")
+    ag.add_argument("--attempts", type=int, default=2, help="replan budget per dep")
+    ag.add_argument("--kinds", nargs="+", default=["DEPRECATION", "PRICING"])
+    ag.add_argument("--signals", nargs="+", default=["model_deprecation_declared"],
+                    help="probe signals to classify against when none are on file")
+
     sub.add_parser("verify", help="audit trust invariants on the current artifacts")
     sv = sub.add_parser("serve", help="start the local web UI")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8000)
     sv.add_argument("--reload", action="store_true")
-    args = ap.parse_args()
+    return ap
+
+
+def main() -> int:
+    args = build_parser().parse_args()
     return {"ingest": cmd_ingest, "extract": cmd_extract, "probe": cmd_probe,
             "research": cmd_research, "analyse": cmd_analyse, "report": cmd_report,
             "verify": cmd_verify, "triage": cmd_triage, "serve": cmd_serve,
-            "run-weekly": cmd_run_weekly}[args.cmd](args)
+            "watch": cmd_watch, "resolve-packages": cmd_resolve_packages,
+            "run-weekly": cmd_run_weekly, "agent": cmd_agent}[args.cmd](args)
 
 
 if __name__ == "__main__":

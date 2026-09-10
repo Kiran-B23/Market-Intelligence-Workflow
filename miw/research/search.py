@@ -42,7 +42,18 @@ class SearchOutcome:
 
 
 _client = None
+# A preflight failure disables search for the REST OF THE RUN, not for the life of the
+# process. It was process-wide, so one bad response - a transient 429, a quota blip -
+# silently degraded every later dependency in the same run to "no search", and a
+# long-lived process (the API's job worker) never recovered at all. `reset_preflight()`
+# is called at the start of each research run.
 _preflight_failed = False
+
+
+def reset_preflight() -> None:
+    """Let a new run try again after an earlier one hit a quota or auth error."""
+    global _preflight_failed
+    _preflight_failed = False
 
 
 def _get_client():
@@ -109,7 +120,10 @@ DISCOVER_TEMPLATES = (
 def discover_alternatives(name: str, purpose: str = "") -> SearchOutcome:
     """Unfiltered discovery. Everything returned is a nomination, never evidence."""
     out = SearchOutcome()
-    for tpl in DISCOVER_TEMPLATES[:2]:
+    # All three templates. The `[:2]` slice silently dropped "tools like {name}", which
+    # is the phrasing that finds a functional peer rather than a comparison listicle -
+    # exactly what the nominator needs.
+    for tpl in DISCOVER_TEMPLATES:
         q = tpl.format(name=name)
         if purpose:
             q = f"{q} {purpose}"

@@ -7,7 +7,7 @@
 #
 # review_status: derived = inferred from the curriculum's own links;
 #                approved = a human has checked it.
-# 457 entries.
+# 474 entries.
 
 tools:
 - canonical_name: all-minilm-l6-v2
@@ -952,11 +952,29 @@ tools:
   registry: pypi
   registry_id: accelerate
   review_status: derived
+- canonical_name: agents
+  kind: package
+  aliases:
+  - agents
+  registry: pypi
+  registry_id: agents
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
 - canonical_name: assemblyai
   kind: package
   registry: pypi
   registry_id: assemblyai
   review_status: derived
+- canonical_name: beautifulsoup4
+  kind: package
+  aliases:
+  - beautifulsoup4
+  registry: pypi
+  registry_id: beautifulsoup4
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
 - canonical_name: bert_score
   kind: package
   registry: pypi
@@ -1002,6 +1020,15 @@ tools:
   registry: npm
   registry_id: crewai-google-genai
   review_status: derived
+- canonical_name: crewai-tools
+  kind: package
+  aliases:
+  - crewai-tools
+  registry: pypi
+  registry_id: crewai-tools
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
 - canonical_name: crewai_tools
   kind: package
   registry: pypi
@@ -1037,6 +1064,15 @@ tools:
   registry: pypi
   registry_id: finnhub-python
   review_status: derived
+- canonical_name: Flask
+  kind: package
+  aliases:
+  - Flask
+  registry: pypi
+  registry_id: Flask
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
 - canonical_name: flask-cors
   kind: package
   registry: pypi
@@ -1157,6 +1193,15 @@ tools:
   registry: pypi
   registry_id: langsmith
   review_status: derived
+- canonical_name: lm-eval
+  kind: package
+  aliases:
+  - lm-eval
+  registry: pypi
+  registry_id: lm-eval
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
 - canonical_name: mcp-adapters
   kind: package
   registry: pypi
@@ -1167,11 +1212,56 @@ tools:
   registry: npm
   registry_id: mongodb
   review_status: derived
+- canonical_name: murf
+  kind: package
+  aliases:
+  - murf
+  registry: pypi
+  registry_id: murf
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
 - canonical_name: openai-langchain
   kind: package
   registry: pypi
   registry_id: openai-langchain
   review_status: derived
+- canonical_name: opentelemetry-api
+  kind: package
+  aliases:
+  - opentelemetry-api
+  registry: pypi
+  registry_id: opentelemetry-api
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
+- canonical_name: opentelemetry-exporter-otlp-proto-grpc
+  kind: package
+  aliases:
+  - opentelemetry-exporter-otlp-proto-grpc
+  registry: pypi
+  registry_id: opentelemetry-exporter-otlp-proto-grpc
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
+- canonical_name: opentelemetry-proto
+  kind: package
+  aliases:
+  - opentelemetry-proto
+  registry: pypi
+  registry_id: opentelemetry-proto
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
+- canonical_name: opentelemetry-sdk
+  kind: package
+  aliases:
+  - opentelemetry-sdk
+  registry: pypi
+  registry_id: opentelemetry-sdk
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
 - canonical_name: pandas
   kind: package
   registry: pypi
@@ -1192,6 +1282,42 @@ tools:
   registry: pypi
   registry_id: playwright-web
   review_status: derived
+- canonical_name: protobuf
+  kind: package
+  aliases:
+  - protobuf
+  registry: pypi
+  registry_id: protobuf
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
+- canonical_name: pydantic
+  kind: package
+  aliases:
+  - pydantic
+  registry: pypi
+  registry_id: pydantic
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
+- canonical_name: pygbag
+  kind: package
+  aliases:
+  - pygbag
+  registry: pypi
+  registry_id: pygbag
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
+- canonical_name: pyngrok
+  kind: package
+  aliases:
+  - pyngrok
+  registry: pypi
+  registry_id: pyngrok
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
 - canonical_name: pypdf
   kind: package
   registry: pypi
@@ -1222,16 +1348,61 @@ tools:
   registry: pypi
   registry_id: scikit-learn
   review_status: derived
+- canonical_name: sentence-transformers
+  kind: package
+  aliases:
+  - sentence-transformers
+  registry: pypi
+  registry_id: sentence-transformers
+  review_status: approved
+  notes: 'declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
 - canonical_name: sentence_transformers
   kind: package
   registry: pypi
   registry_id: sentence_transformers
   review_status: derived
+- canonical_name: sentry-sdk
+  kind: package
+  aliases:
+  - sentry-sdk
+  registry: pypi
+  registry_id: sentry-sdk
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
 - canonical_name: serverless-http
   kind: package
   registry: npm
   registry_id: serverless-http
   review_status: derived
+- canonical_name: tf-keras
+  kind: package
+  aliases:
+  - tf-keras
+  registry: pypi
+  registry_id: tf-keras
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
+- canonical_name: tiktoken
+  kind: package
+  aliases:
+  - tiktoken
+  registry: pypi
+  registry_id: tiktoken
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
+- canonical_name: tokenizers
+  kind: package
+  aliases:
+  - tokenizers
+  registry: pypi
+  registry_id: tokenizers
+  review_status: approved
+  notes: 'declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U | retyped tool->package: pypi serves a project under this name, so the registry is its authority'
 - canonical_name: torch
   kind: package
   registry: pypi
@@ -1242,6 +1413,15 @@ tools:
   registry: pypi
   registry_id: torchao
   review_status: derived
+- canonical_name: torchvision
+  kind: package
+  aliases:
+  - torchvision
+  registry: pypi
+  registry_id: torchvision
+  review_status: approved
+  notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
+    verified present on PyPI, so its authority is the registry, not a website'
 - canonical_name: transformers
   kind: package
   registry: pypi
@@ -1591,6 +1771,7 @@ tools:
   kind: service
   aliases:
   - Hugging Face
+  - HuggingFace
   - huggingface.co
   homepage: https://huggingface.co
   official_domains:
@@ -1841,6 +2022,7 @@ tools:
 - canonical_name: Promptbase
   kind: service
   aliases:
+  - Prompt Base
   - Promptbase
   - promptbase.com
   homepage: https://promptbase.com
@@ -1915,6 +2097,7 @@ tools:
 - canonical_name: Scraperapi
   kind: service
   aliases:
+  - Scraper API
   - Scraperapi
   - scraperapi.com
   homepage: https://scraperapi.com
@@ -1926,6 +2109,7 @@ tools:
 - canonical_name: SerpAPI
   kind: service
   aliases:
+  - Serp API
   - SerpAPI
   - serpapi.com
   homepage: https://serpapi.com
@@ -1965,6 +2149,7 @@ tools:
   kind: service
   aliases:
   - Sunoapi
+  - suno-api
   - sunoapi.org
   homepage: https://sunoapi.org
   official_domains:
@@ -2033,6 +2218,7 @@ tools:
   kind: service
   aliases:
   - Twelve Data
+  - TwelveData
   - twelvedata.com
   homepage: https://twelvedata.com
   official_domains:
@@ -2163,6 +2349,13 @@ tools:
   - Beautiful.ai
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: BLEU
+  kind: tool
+  aliases:
+  - BLEU
+  review_status: from_sheet
+  notes: declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U
 - canonical_name: Bloomberg
   kind: tool
   aliases:
@@ -2667,12 +2860,6 @@ tools:
   - Hugging Face Spaces
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: HuggingFace
-  kind: tool
-  aliases:
-  - HuggingFace
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: HuggingFace Hub
   kind: tool
   aliases:
@@ -2781,6 +2968,13 @@ tools:
   - LlamaIndex
   review_status: from_sheet
   notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: LM Studio
+  kind: tool
+  aliases:
+  - LM Studio
+  review_status: from_sheet
+  notes: declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U
 - canonical_name: Local Storage
   kind: tool
   aliases:
@@ -3009,12 +3203,6 @@ tools:
   - Prettier
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Prompt Base
-  kind: tool
-  aliases:
-  - Prompt Base
-  review_status: from_sheet
-  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: ProtectAI
   kind: tool
   aliases:
@@ -3129,6 +3317,12 @@ tools:
   - Robinhood
   review_status: from_sheet
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: RSS Feed
+  kind: tool
+  aliases:
+  - RSS Feed
+  review_status: from_sheet
+  notes: declared in Intro to Generative AI - Course Contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: RunPod
   kind: tool
   aliases:
@@ -3147,12 +3341,6 @@ tools:
   - Scholar AI
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Scraper API
-  kind: tool
-  aliases:
-  - Scraper API
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: SEBI Financial Education Booklet
   kind: tool
   aliases:
@@ -3169,18 +3357,6 @@ tools:
   kind: tool
   aliases:
   - Sendsteps.ai
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: sentence-transformers
-  kind: tool
-  aliases:
-  - sentence-transformers
-  review_status: from_sheet
-  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Serp API
-  kind: tool
-  aliases:
-  - Serp API
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: SFTTrainer
@@ -3261,18 +3437,19 @@ tools:
   - Suno
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: suno-api
-  kind: tool
-  aliases:
-  - suno-api
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Tacotron 2
   kind: tool
   aliases:
   - Tacotron 2
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Tavily Search
+  kind: tool
+  aliases:
+  - Tavily Search
+  review_status: from_sheet
+  notes: declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U
 - canonical_name: Telegram
   kind: tool
   aliases:
@@ -3303,12 +3480,6 @@ tools:
   - TOON
   review_status: from_sheet
   notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: TwelveData
-  kind: tool
-  aliases:
-  - TwelveData
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Udio
   kind: tool
   aliases:

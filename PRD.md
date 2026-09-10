@@ -83,7 +83,8 @@ dies; inventory recall vs. a hand audit of one course.
 | Curriculum lead | Decide what gets revised this sprint | Severity- and blast-radius-ranked list across all 4 courses |
 | Delivery / support | Stop being surprised by a live cohort | Early warning on anything a running cohort touches this week |
 
-**Phase 1 course scope (decided):** Intro to Gen AI (26 sessions), Building LLM
+**Phase 1 course scope (decided):** Intro to Gen AI (25 sessions — see §31; the
+figure was 26 until the workbook's own numbering was read), Building LLM
 Applications (29), AI for Finance (18), PSE (13) — the four already exported as
 JSON + xlsx in `/home/nxtwave/Market Intelligence Workflow/`.
 
@@ -284,10 +285,16 @@ Two things the ingest layer must get right, because both fail *silently*:
   ingest-time assertion should reconcile the count of units carrying
   `exam_details`/`exam_sections` against the number actually traversed.
 
-Sheets are a parallel input, not a second source of truth: the workbooks
-contribute the `Tools` columns and session ordering
-(`topic_number_in_course`, `unit_number_in_course`), joined to the JSON on
-normalised title.
+~~Sheets are a parallel input, not a second source of truth~~ — **corrected in §31.**
+The workbooks are the bridge back to the *authoring* source: the slide deck is what
+MCQs, coding questions and reading materials are written from, and the export is the
+published artifact downstream of it. The workbook is therefore the **authority** for
+session numbering (the export's positional inference was wrong for 19 of 26 sessions in
+Intro to Gen AI) and the **only** source for slide content. It contributes four things:
+the `Tools` columns, hand-recorded version pins, the `Course Outline` sheet's per-session
+outline and deck link, and the `Session-Practice Content Linked` sheet's
+`Session ID -> Unit ID` lineage — joined to the JSON on **`unit_id`, exactly**
+(104 of 104 rows), not on normalised title.
 
 ### [2] Extract — the dependency inventory
 
@@ -350,7 +357,7 @@ guard from `src/sources/base.py`, and a `probe_status` of
 as a dead tool: a finding requires N consecutive failing runs or corroboration
 from a second vantage point.
 
-### [4] Research — targeted, Tavily + LLM
+### [4] Research — targeted, Tavily (no LLM: see §21)
 
 Runs **only** for: anything the probe marked `changed`/`broken`; every
 `critical`-tier dependency on a rotating schedule (so S3/S5/S10 are caught even
@@ -512,7 +519,7 @@ Guardrails:
 | M | Milestone | Done when |
 |---|---|---|
 | M0 | This PRD committed as `MIW/PRD.md`; repo scaffold, settings, `data/` populated with 4 JSON + 4 xlsx | `main.py --help` lists all stages |
-| M1 | **Ingest** — schema adapter + traversal reuse | `content_records.jsonl` for all 4 courses; session counts match 26/29/18/13; pooled exams traversed; skip reasons reported |
+| M1 | **Ingest** — schema adapter + traversal reuse | `content_records.jsonl` for all 4 courses; session counts match **25/29/17/13** (the curriculum's own counts, per §31 — this milestone read 26/29/18/13 while `expect_sessions` was calibrated to the export's positional count); pooled exams traversed; skip reasons reported |
 | M2 | **Extract** — registry + 7 extractors + review queue | `inventory.json`; PSE no longer returns empty tool lists; question tags, `solution_answer` imports, n8n node versions, and URL hosts all mined |
 | M3 | **Probe** — http/pypi/npm/github/n8n + `state.db` snapshots | two consecutive runs produce identical `probe_status` for unchanged deps |
 | M4 | **Research** — Tavily + LLM, citation-enforced | every claim carries `{source_url, retrieved_at, quote}`; uncited claims dropped |
@@ -588,8 +595,10 @@ inventory (`standard` tier, `deepwiki.com`) and is monitored.
 **The workbooks *do* carry recoverable version pins.** §5 stated the sheets' pins
 (`n8n@2.17.8`, `gradio@6.6.0`) "were recorded by hand at recording time and cannot be
 recovered from the export" — true of the JSON, but they are readable from the workbooks
-themselves. `miw/ingest/sheets.py` recovers **50 pins across 3 workbooks**, giving 42
-dependencies a `taught_version` where the JSON alone yielded only n8n `typeVersion`s.
+themselves. `miw/ingest/sheets.py` recovers **1,740 pin declarations across 3
+workbooks**, giving **86** dependencies a `taught_version` where the JSON alone yielded
+only n8n `typeVersion`s. (This paragraph read "50 pins / 42 dependencies" when first
+written, before the tool sheets were read in full.)
 That makes S6 version-drift detection real rather than aspirational. The no-invented-pin
 rule in §12 still stands: pins are read, never inferred.
 
@@ -770,3 +779,1425 @@ count by eight. A dead package reports zero, because there is no flow to re-capt
 refresh, and unauthenticated GitHub allows 60 per hour. The seven-day cache is what
 makes this safe; set `GITHUB_TOKEN` (5,000/hour) before lowering the TTL. Measured cold
 refresh: 406s for 692 node types and 36 rules, 0 errors.
+
+---
+
+## 19. Phase 2 · P0 + P1 — release-triggered model verification
+
+Built, and it found four live problems the sweep could not see.
+
+### What the curriculum is teaching right now
+
+| Model | Provider says | Locations | Graded items | Vendor's replacement |
+|---|---|---|---|---|
+| `llama-3.3-70b-versatile` | Groq: deprecated, shutdown **08/16/26** | 18 | 15 (5 execute it) | `openai/gpt-oss-120b`, `qwen/qwen3.6-27b` |
+| `gemini-2.0-flash` | Google: **(Shut down)** | 16 | 16 | — |
+| `llama-3.1-8b-instant` | Groq: deprecated, shutdown **08/16/26** | 4 | — | `openai/gpt-oss-20b` |
+| `gemini-3-pro-preview` | Google: **(Shut down)** | 1 | — | — |
+
+All four are **critical**: the announced dates have passed. Each carries an
+AUTHORITATIVE citation to the provider's own page with the verbatim table row as the
+quote, and where the vendor named a successor it is attached as the alternative — after
+being checked back against the same catalogue to confirm the provider still lists it.
+No API key was used at any point.
+
+### P0 — provider authority
+
+`llama-3.3-70b-versatile` was attributed to **Meta** (the extractor's `MODEL_VENDORS`
+matches the `llama` prefix), but **Groq** serves it and Groq retired it. So Groq's
+deprecation page classified as `LEAD_ONLY` against a Meta subject, the claim was built
+non-substantiating, and the finding was dropped — for a model in 15 graded items.
+
+`trust.with_provider` + `Dependency.subject_with_provider` fold the serving provider's
+domains into the authority set. This is the one deliberate loosening of the trust layer
+in the project, so it is fenced three ways: **models only**; only for a provider whose
+**own catalogue names the exact id** (self-verifying — if Groq lists it, Groq serves
+it); and asserted in `main.py verify`, which now refuses an S7 finding that has no
+authoritative claim behind it.
+
+### P1 — column-role table reading
+
+`miw/probe/catalogue.py` never looks at a character offset in page text. It segments
+`<table>` → `<tr>` → `<td>` and binds each column to a role read from its header.
+
+**Why that is load-bearing, measured on Groq's page:** `llama-3.3-70b-versatile`
+appears **eight times** — once in the `Deprecated Model` column and **seven times** in
+`Recommended Replacement Model ID`, because it was the successor to seven older models.
+"Is this id on the deprecations page?" therefore fires eight times and is wrong seven,
+and before August it would have fired purely as a replacement while the model was
+perfectly healthy. Column-role binding is the only thing that separates the one true
+row from the seven false ones.
+
+Two vendor-shape details cost real debugging and are worth recording:
+
+* **Google states the status in the *name* cell** ("Gemini 2.0 Flash (Shut down)") while
+  the exact id sits in a `<code>` span in that row's Endpoint cell. Both columns map to
+  the `id` role, so `Table.identifier_cell` prefers the coded one for matching and
+  `status_in_row` reads the parenthetical from either.
+* **Groq's models table writes display name and id in one cell** —
+  "GPT OSS 120B openai/gpt-oss-120b" — with no code span. An id-shaped token rule
+  (lowercase, carrying a hyphen or a namespace slash) lifts the id out; requiring both
+  properties is what stops "Gemini 2.0 Flash" or "Shut down" being read as an id.
+
+### A correction to the plan
+
+The plan's golden case said `gemini-2.0-flash` must **not** be reported as shut down,
+on the basis that the status belonged to Flash-Lite's row. Reading the table
+structurally shows that was a misreading of the proximity evidence: **each row carries
+its own `(Shut down)`**, and `gemini-2.0-flash` genuinely is retired. The real
+must-not-fire case is the substring collision — `gemini-2.0-flash` must not implicate
+`-lite`, `-001` or `-exp`, all of which are separate inventory entries — and that is
+what the suite now pins.
+
+### Two-run confirmation, correctly scoped
+
+The flap-protection rule that requires two agreeing runs before reporting `broken`
+exists to stop a transient network failure reading as a dead tool. It does not apply to
+a vendor's own published declaration: re-reading Groq's table tomorrow adds no
+information, and delaying a critical finding by a day buys no safety. Absence
+observations ("not in the source tree") still need confirming; a dated row in a
+vendor's table is a document, not an observation.
+
+### Three defects the first end-to-end run exposed
+
+* A model retired by its provider was **also** reported as S1 "dead URL", because the
+  generic broken-status fallback fired alongside S7 — 8 findings where there were 4.
+  The fallback now only fires when nothing more specific did.
+* The note read "**may** be retired" for a model whose shutdown date had already passed.
+  Definite where the vendor was definite.
+* All 15 graded items were counted as "may need rewording". A model id inside a coding
+  question is **passed to an API at run time**, so a retired id fails at call time —
+  `Dependency._executes` now treats it as execution, splitting the 15 into 5 that break
+  and 10 that merely name it.
+
+### State
+
+`miw/probe/catalogue.py`, `miw/probe/models.py`, `miw/vendors/{base,groq,google_ai}.py`,
+`Scope.dep_ids` + `--dep-id`, plus `trust.with_provider`. **88 tests** (19 new),
+**42 golden cases** across three suites, all at 100%. Vendor pages cached 12 hours.
+
+---
+
+## 20. The two entry points: one manual, one daily
+
+The requirement: *"The workflow needs to work in both scenarios. One while running
+manually and the other to check the news updates daily. How can we check the curriculum
+across different courses, because sending all the course data will make the context grow
+and grow and make the agent hallucinate."*
+
+The two modes are the same six stages entered at different points, not two pipelines.
+
+```
+MANUAL                                  DAILY
+main.py <stage> --course X --session 6   main.py watch [--investigate]
+Run tab in the UI                        (cron, unattended)
+        │                                       │
+        │                              poll_all() — watermarks only
+        │                                       │
+        │                              Signal(vendor, trigger, refs=[ids])
+        │                                       │
+        │                              resolve_signal() — dict lookup
+        │                                       ▼
+        └──────────────► Scope ◄────────────────┘
+                           │
+              probe → analyse → report (scoped)
+                           │
+                  merge_by_dep: this slice refreshed,
+                  every other vendor carried forward
+```
+
+### Why the context never grows
+
+This was the stated worry, so it is worth stating as a measurement rather than a claim:
+
+| | |
+|---|---|
+| course text across four exports | **9.2 M chars** (~2.3 M tokens) |
+| the one LLM prompt the pipeline sends | **3,510 chars** (~877 tokens) |
+| ratio | **2,618 : 1** |
+| course body text inside that prompt | **0 chars** |
+| LLM calls during signal resolution | **0** |
+
+The reason is structural, not a budget or a truncation rule. A signal names
+**identifiers** (`llama-3.3-70b-versatile`), and the inventory is an index **keyed by
+identifiers** — 464 dependencies, each already carrying its 10,612 locations with
+course, session, unit and content_id. So "which of our sessions does this touch" is a
+dict lookup:
+
+```
+signal ref  llama-3.3-70b-versatile
+  → index lookup            O(1), 18 locations
+  → courses                 ['Building LLM Applications', 'Intro to Gen AI']
+  → sessions                [6, 8, 10, 11, 12]
+  → 15 graded items, 5 of which execute the id
+```
+
+Course content is read exactly once, at ingest, to build that index. Nothing downstream
+re-reads it — which is also why cross-course checking costs nothing extra: a fifth course
+adds rows to the index, not tokens to a prompt.
+
+### The watermark, and why a first sighting reports nothing
+
+`miw/watch/signal.py` records one watermark per source. For a package it is the
+published version; for a vendor catalogue it is `row_set_hash` — a hash of the table's
+*meaning* (sorted `(id, status, replacement)` triples), so a redesign, a reordering or
+new marketing prose around the table is not an event, while a status cell changing is.
+
+Three outcomes, and only one of them is news:
+
+* **baseline** — first observation of a source. Recorded, reported as a baseline, never
+  investigated. Without this, first deploy would emit every historical deprecation as
+  though it had just happened.
+* **unchanged** — silent.
+* **changed** — one signal, carrying only the rows behind the move.
+
+A signal's id is derived from `(vendor, source, trigger, from, to)`, so re-observing the
+same state is an idempotent upsert and the ledger reports it as new exactly once.
+
+### Notify on findings, never on releases
+
+A vendor event is recorded silently and only reaches a person once it has resolved
+against the inventory *and* produced a finding. Two rules keep that honest:
+
+* A signal naming ids we do not teach resolves to an **empty scope** and is marked
+  investigated without running a stage. This is what keeps a busy vendor quiet.
+* A **bare registry bump raises no finding.** 48 of the 71 taught packages pin no
+  version at all, so under daily polling every patch release of those would have raised
+  an S6 that no reviewer could act on — the session never named a version, so nothing in
+  it went stale. A release is curriculum news only when it leaves the taught pin behind
+  (`major_behind_taught_pin`), which is the `langchain 1.3.1` vs `1.4.0` case. The new
+  version is still written to the artifact: **state is recorded, only news is reported.**
+
+### Verified progression
+
+```
+poll 1   baseline groq:catalogue 50 rows · baseline google_ai:catalogue 42 rows
+         → "no vendor moved since the last poll"
+poll 2   0 changed · 0 baseline · 2 unchanged        → silent
+poll 3   1 changed  (watermark rewound to simulate a vendor edit)
+         → resolved to 4 of 464 taught dependencies:
+           llama-3.1-8b-instant, llama-3.3-70b-versatile,
+           whisper-large-v3, whisper-large-v3-turbo
+  --investigate
+         → probe: 4 probed {broken: 2, ok: 2}
+         → merged: 4 refreshed, 38 carried forward   (Google's findings untouched)
+         → 2 findings raised {critical: 2} → out/digest_2026-09-09.md
+```
+
+The `38 carried forward` is the artifact-merge guarantee under a scoped run: a Groq
+signal refreshes Groq's slice and leaves every other vendor's findings exactly as they
+were. The periodic full sweep stays as the safety net, because **silent death emits no
+release event** — codetotutorial never announced itself, it just stopped answering.
+
+---
+
+## 21. Suggestion quality, and why it is now the whole product
+
+The team confirmed the boundary: **MIW never writes to course content or the CMS.**
+
+> "Currently we are not fixing anything here, because we dont have the access to Prod to
+> fix from here. I will check that feasibility and add later. For now lets focus on
+> identifying the chnages and suggesting fixes."
+
+That raises the stakes rather than lowering them. With no write-back, the suggestion *is*
+the deliverable, so a finding that is technically correct but wrong about urgency, blast
+radius or cause is not a near-miss — it is the whole output being wrong. Triaging the
+watcher's first four real findings proved the point: **all four were true positives, and
+three were described wrongly.**
+
+### What was wrong
+
+Every one came out `critical`, every one read *"A retired model id fails at call time, so
+every example in the session stops working"*, and every one said *"This sprint"*:
+
+| Finding | Locations | Executes? | Reality |
+|---|---|---|---|
+| `llama-3.3-70b-versatile` | 18 (5 coding, 10 MCQ, 2 reading, 1 sheet) | **5** | correctly described |
+| `gemini-2.0-flash` | 16, **all MCQs** | 0 | nothing fails at call time |
+| `llama-3.1-8b-instant` | 4 (3 reading, 1 sheet) | 0 | reading material, not an outage |
+| `gemini-3-pro-preview` | **1** reading resource | 0 | `critical` indefensible |
+
+### Severity now follows what the curriculum *does* with the id
+
+`score.py` hard-set `critical` for `model_shutdown_passed`. It now reads the fields the
+finding already carried: **executes → `critical`; graded but not executed → `high`;
+named in prose only → one step below the base.** `Dependency._executes` already knew the
+difference — a model id inside a coding question is passed to an API at run time.
+
+This repaired urgency for free, because `WHEN_BY_SEVERITY` derives from severity. The
+"This sprint" prefix was also being stamped on every dated finding regardless; now the
+urgency follows severity while still naming the earliest affected session, which is the
+genuinely useful half.
+
+A fourth defect surfaced while fixing these: `miw/probe/models.py` was **fabricating a
+vendor severity** (`"critical" if date_passed else "high"`) which `score.py` then
+honoured as though the vendor had declared it, overriding the ladder. For n8n that field
+really is vendor-declared; for a model provider it was our own inference wearing the
+vendor's authority. Removed — the date already reaches scoring as the choice between
+`model_shutdown_passed` and `model_deprecation_declared`.
+
+### The reconcile defect: a vendor can say two true things at once
+
+`build_catalogue()` folded all of a vendor's pages into one dict keyed by identifier and
+resolved collisions with "a retired row wins", discarding the second sighting. So MIW
+read one of Groq's pages and ignored the other:
+
+* `console.groq.com/docs/deprecations` — `llama-3.3-70b-versatile | 08/16/26 | openai/gpt-oss-120b`
+* `console.groq.com/docs/models` — **still lists that exact id**, as `Llama 3.3 70B Enterprise`, price and rate limits `Contact Sales`
+
+Both official. The id did not disappear; it **left the developer plan**. A reviewer who
+opens the models page sees the id listed and concludes the digest is wrong.
+
+The discriminator is structural, not textual, and it needed a new column role: every
+other model in that table carries a real per-token price. `ROLE_LEXICON` gained `price`
+and `rate_limit` — verified purely additive, since every header on both vendors' pages
+previously resolved to `None` for those. `CatalogueEntry` now keeps the availability
+sighting alongside the retirement row, and the pair yields a distinct outcome:
+`model_tier_restricted`.
+
+**The conjunction is what decides.** `minimaxai/minimax-m2.7` is also listed at
+`Contact Sales` and appears in no deprecation table — that is a pricing tier, not a
+retirement, and raises nothing. Only *retired **and** still listed* is tier-restriction.
+This is the same distinction `Catalogue` already draws between `ok` and `supported`
+("collapsing them is how a monitoring system starts inventing outages"), one level down.
+
+The finding now cites **both halves of the vendor's own contradiction**, each
+AUTHORITATIVE with its verbatim row — including the one a reviewer would otherwise have
+used to disprove us.
+
+### The four findings, after
+
+```
+CRITICAL  llama-3.3-70b-versatile  "still served, but no longer on the provider's
+                                    developer plan, so the 5 graded items that run it
+                                    fail on a student's free key"   · this sprint
+HIGH      gemini-2.0-flash         "16 graded questions ask students about a model id
+                                    its provider no longer serves, so the answer keyed
+                                    as correct is now wrong"        · within two weeks
+MEDIUM    llama-3.1-8b-instant     prose only                       · next cycle
+MEDIUM    gemini-3-pro-preview     one reading resource             · next cycle
+```
+
+Which is exactly what the reviewer concluded independently at triage.
+
+---
+
+## 22. One workflow, either provider
+
+> "the agentic workflow should be designed to work as it is with API key. So make sure
+> the prompts and tools are attached how the current mode using cluade code is working."
+
+### Why this was impossible until now
+
+`requirements.txt` ended with `; extra == "search"` / `; extra == "openrouter"` markers.
+Those are pyproject metadata; in a plain requirements file they evaluate **False**, so
+`pip install -r requirements.txt` **silently skipped `openai` and `tavily-python`**.
+After a clean install the API path could not even import — which is why *"does the output
+come similar with the API key approach?"* stayed unanswered. Core and optional
+dependencies are now separate files, so "works with no key" holds by construction rather
+than by an inert marker.
+
+### Parity is achieved by omission, not translation
+
+The whole LLM surface is one 279-line module with **one** semantic caller
+(`notes.refine`), **one** prompt file, and **zero tool schemas**. Isolation is
+*subtractive*: the CLI has 16 ambient tools that must be denied; the HTTP APIs grant
+none. So the API paths honour "tools attached the same way" by sending **no** `tools`,
+`tool_choice`, `system` or `response_format` — and `DENY_TOOLS` becomes an invariant to
+**assert** rather than a flag to translate.
+
+What is checkable, and now asserted in `tests/test_provider_parity.py`:
+
+* `_claude_code_argv()` is extracted and pure, so the isolation flags are inspectable
+  with no `claude` binary and no spend — including that `--allowedTools` is still never
+  used, and that no `--mcp-config` / `--permission-mode` / `--append-system-prompt`
+  widens the surface.
+* every `ProviderSpec.grants_tools` is `False`, and the denylist is a **superset** of the
+  16 known-dangerous tools (so a newly shipped CLI tool passes, a removed deny fails).
+* one rendered prompt reaches all three transports **byte-identical**.
+* no provider adds a system prompt.
+
+**The one asymmetry, stated rather than papered over:** the CLI still injects its own
+reduced system prompt and runs an agent loop up to `--max-turns`; the HTTP paths are a
+single turn with nothing in reach. The API paths are therefore *strictly more* isolated,
+not identically isolated. `LLMResult.isolation` records which mechanism held
+(`denylist:16` vs `no-tools`), because "no tool attempts because the denylist worked" and
+"no tool attempts because nothing was on offer" are different facts.
+
+### Other fixes on the same surface
+
+* **A typo used to change backend.** `available_provider()` fell through a ternary, so
+  any unrecognised `MIW_LLM_PROVIDER` landed on OpenRouter. It now returns `none` loudly.
+* **`auto` prefers the CLI even when `ANTHROPIC_API_KEY` is set.** Testing runs on a
+  Claude Code entitlement precisely to avoid metered spend; a key exported for an
+  unrelated tool must not silently start charging. Spending is opt-in.
+* **One logical model name** (`haiku`/`sonnet`/`opus`) resolved per provider across three
+  namespaces, with unknown names passed through so an exact snapshot can be pinned.
+  `haiku` resolves to the literal `haiku` for the CLI, so **the 15 cached entries keep
+  their keys** — pinned by a test.
+* **Cost is real on the API paths.** A per-model price table plus a three-valued
+  `cost_basis` (`reported`/`estimated`/`unpriced`). Without it `MAX_SPEND_USD` silently
+  degraded into a call cap, which is what OpenRouter had been doing.
+* **Two capability channels disagreed about the same feature.**
+  `settings.LLM_ENABLED = False` was hardcoded and read by nothing, while
+  `capability_note()` claimed "no LLM stage in Phase 1" — and `--refine` existed, worked,
+  and reported its provider through a different channel entirely. One source of truth
+  now: `llm.provider_status()`.
+
+### Answering the question honestly
+
+`eval/parity.py` is opt-in and kept out of `run_eval.py`, whose contract is "no network,
+no LLM, no API key". Its default `--dry-run` renders every prompt, asserts byte-identity
+and replays the existing cache for free; a live run needs `--yes` and respects the
+budget caps.
+
+It prints **within-provider variance first**, because `temperature=0` is not determinism:
+if a provider disagrees with itself as much as it disagrees with another, the comparison
+is noise. It also reports that only **2 of 9** current golden prompts carry a
+substantiating claim, so the `<untrusted>` block — the part most likely to make providers
+diverge — is barely exercised, and says so rather than quoting a flattering number.
+
+**What it can prove:** identical prompt bytes; comparable gate accept/reject rates; that
+no provider invents sources more often; measured cost per call.
+**What it cannot:** that the prose is *better*. There is no reference triad and no human
+in the loop. That answer comes from `Finding.note_provider` accumulating in
+`review_decisions` — refined notes are now attributed in the digest and in the UI chip —
+and breaking reviewer precision out by provider. Until that has a sample, the honest
+statement is that the workflow is provider-portable, not that the providers are equal.
+
+---
+
+## 23. One page per course, and runs that stay put
+
+> "UI also a bit querky - Make sure each course has its own page and each run should be
+> mixed with other." — confirmed to mean runs should **not** be mixed.
+
+### Why findings are projected, not partitioned
+
+Per-course artifacts are the obvious reading and the wrong answer. A finding's identity
+is `(dependency, signal)` — `finding_id = _id(dep_id, signal)`, no course in it — and
+**133 of 464 dependencies are referenced by more than one course** (per-course counts
+255 + 184 + 155 + 59 = 653 against 464 actual).
+
+Partitioning would mean probing the same vendor page up to four times against a 1.5 s
+per-domain courtesy gap; letting `probe_state.consecutive_failures` — global by design
+for flap protection — disagree with itself, so one 502 counts four times toward the
+two-run confirmation threshold; and re-keying `finding_state`, `review_decisions` and
+every triage fingerprint, which would ask a reviewer to reject the same event up to four
+times and split `triage.split_of` so one event lands in `learn` for one course and
+hold-out for another, contaminating the very precision measurement it feeds.
+
+**So: evidence stays global, findings are projected onto a course, run history becomes
+per-course.** `state/miw.db` needed no schema change at all.
+
+### The distortion, measured
+
+| finding | global blast / graded | honest per course |
+|---|---|---|
+| `llama-3.3-70b-versatile` | 65 / 15 | LLM Apps 53/12 · **Intro 12/3** |
+| `gemini-2.0-flash` | 64 / 16 | LLM Apps 44/11 · **Intro 20/5** |
+| `llama-3.1-8b-instant` | 7 / 0 | AI for Finance 5/0 · LLM Apps 2/0 |
+
+An Intro to Gen AI page copying the stored `blast_radius` claims **65** where the honest
+figure is **12** — a 5.4× overstatement, on the page whose only job is telling that
+course's owner how much work they have. That is the "quirky".
+
+**A second trap, found while building it:** `score.py:130` stores
+`locations=dep.locations[:12]`. `llama-3.3-70b-versatile` has 18, so projecting off the
+*finding* shows Building LLM Applications with 9 instead of 15 — it understates the
+busiest course by a third. `miw/analyse/project.py` therefore joins back to
+`out/inventory.json` by `dep_id` and never reads `Finding.locations`.
+
+**The invariant that makes it testable**, verified on every live finding:
+`sum(per-course blast_radius) == global blast_radius` (65 = 53+12, 64 = 44+20, 7 = 5+2,
+508 = 508), because the weights are additive over locations and locations partition
+cleanly by course. One assertion catches double-counting, truncation and any attempt to
+apportion a global figure.
+
+### Severity, twice, and why
+
+The **global** severity is the headline: it is what `finding_state` stores, what
+`diff_class` was computed against and what `precision_stats()` counts, so a page-local
+figure disagreeing with the database and the digest would be its own lie. But `critical`
+above "three prose mentions in this course" is also a lie, so the local reading sits
+beside it whenever the two differ — `critical` · *in this course: high*.
+
+That exposed one more inconsistency worth recording: `notes.compose()` reads `severity`
+to choose the urgency line, so the first version rendered *"in this course: high"* next
+to *"This sprint"* — the critical wording — leaving the reader to reconcile two of our
+own statements. `compose()` now sees the local severity while the stored field stays
+global.
+
+### Routing
+
+Hash routing inside the existing single `index.html`. Multiple files would duplicate
+~200 lines of CSS and the whole renderer four times, or force a shared `app.js`, trading
+away the deliberate single-file / no-external-request property; server rendering would
+need a template engine, contradicting no-build. Hash routing replaced the 11-line tab
+handler, needs **zero** server change (the fragment is never sent), and delivers the
+three properties that were missing: linkable, bookmarkable, reload-safe. Tabs are real
+`<a href>` elements, so middle-click and browser-back work.
+
+```
+#/                    course overview, one row per course
+#/c/<slug>/<view>      findings | runs | inventory | digest | run
+#/watch                the vendor-signal timeline
+#/global/<view>        runs | trust | digest
+```
+
+Slugs come from `config/constants.py`, which was their only home and never exposed them
+past `cmd_ingest`. Resolution is **lenient** — `?course=pse` and `?course=PSE` both work
+— so a URL can carry the slug while the existing scope-preview widget keeps sending
+titles unchanged, and `Scope.courses` stays a set of titles because that is what
+`Location.course` holds.
+
+### Runs
+
+A `job_courses(run_id, course_slug)` side table, not a `course` column: `scope.courses`
+is a list and a run may legitimately span courses, so a scalar column could only
+represent that by lying. It lives inside the `SCHEMA` string `jobs.py` already
+`executescript`s, so there is **no migration script**; a `_backfill_job_courses()`
+beside `recover_interrupted()` gave the four existing runs their rows (all
+`intro_to_gen_ai`).
+
+`course_slug = '*'` means unscoped, which is the honest semantic: an all-courses sweep
+really did audit PSE and belongs in PSE's history, while a run scoped to one course must
+not appear elsewhere. For a **watch-triggered** run — where `Scope.dep_ids` wins outright
+and names no courses at all — the ids are resolved through the inventory; if the
+inventory cannot be read the answer is `'*'`, because "may be relevant to any course"
+hides nothing whereas "relevant to none" would drop the run out of every history.
+
+Watch runs get **both** views, as asked: `#/watch` keeps the vendor-signal timeline (a
+signal is about a vendor, not a course) and each affected course page shows the run in
+its own history.
+
+### Digests: per course, plus the roll-up
+
+```
+out/digest_<date>.md                    # roll-up, meaning unchanged
+out/courses/<slug>/digest_<date>.md     # new
+```
+
+The **subdirectory is load-bearing**. `_latest()` is `sorted(OUT.glob(...))[-1]`,
+lexicographic — a top-level `digest_pse_2026-09-09.md` sorts *after*
+`digest_2026-09-09.md` (`p` > `2`) and would silently become "the" digest for everyone.
+`OUT.glob("digest_*.md")` does not descend, so the hijack is structurally impossible,
+and a test asserts it.
+
+`report` joined `SCOPED`, with the qualification that matters most here: **scoping
+`report` changes which per-course digest it _writes_, never which findings it _reads_.**
+It always loads the whole merged `findings_<date>.json` and always re-renders the
+roll-up, so the roll-up cannot go stale behind a scoped run and no slice is ever
+presented as the week's state. Anything else reinvents the bug that put 91 Gen-AI-only
+probe results in place of a sweep's 229 — the bug `miw/artifacts.py` exists because of.
+A test asserts the ordering in `cmd_report` so the guarantee cannot be quietly dropped.
+
+**`probe_<date>.json` and `findings_<date>.json` stay per-date and global, untouched.**
+They are *state of the world* keyed on `dep_id`; `merge_by_dep`, `coverage`,
+`carried_forward` and `resolve_absent(examined_dep_ids=)` all keep working unchanged.
+Mixing and blending are different problems at different layers, and conflating them is
+how this gets built wrong.
+
+### What each page admits about itself
+
+* **"3 of 18 references are in this course; the numbers below are this course's share.
+  Also taught in Building LLM Applications (15 refs, blast 53)"** — with a link. Without
+  it a course page silos, and 133 of 464 dependencies are shared.
+* **A triage warning at the point of the click**: a decision is recorded against a
+  `finding_id`, which has no course in it, so accepting here also applies to the other
+  courses that share the finding. Named, not footnoted.
+* **`precision (all courses)`** in the header, because reviewer precision has no course
+  dimension. `/api/summary` returns a `global_only` list so the UI can label rather than
+  imply a filter.
+* **A course declared in `config/constants.py` but absent from the inventory** renders
+  "has not been ingested yet — this is not the same as no problems found", never an
+  innocuous empty page.
+* **`probe_counts` is now recounted from the rows** rather than read from
+  `probe["counts"]`, a meta dict written by whichever run touched the file last. It was
+  reporting a 4-dependency run's counts over a 42-row artifact; the global figure was
+  `{'broken': 4}` where the truth is `{'ok': 38, 'broken': 4}`.
+* **`suppressed_unchanged` is recounted per course**, because a page listing 3 standing
+  findings that claimed 5 were suppressed was a contradiction the reader had to resolve.
+
+---
+
+## 24. The discovery layer, phase D0–D1: the founding story, finally working
+
+The team looked at the finished system and said *"the architecture is not looks like an
+agentic or multi agent system. Let me know if I'm wrong."* They were not wrong: one LLM
+call site in 12,434 lines, zero findings whose text came from a model, and every finding
+a regression. **MIW solved detection and never solved discovery** — a probe can tell you
+`codetotutorial` returns 404; it cannot tell you `deepwiki` is the replacement.
+
+### S10 could not fire, and no agent would have fixed that
+
+Four defects, all keyless, all independent of any model. Each was verified by
+construction rather than read off the source.
+
+**D-1 · The successor sentence never reached the scanner.** Vendors write the
+replacement in a *separate* sentence that does not repeat the subject — *"X is
+deprecated. Migrate to Y."* — and `_relevant` keeps only sentences naming the subject.
+Worse, `_is_prose("Please migrate to DeepWiki.")` is **False**: 2 of its 4 tokens are
+capitalised, over the 0.45 cap. So the commonest form of the notice was discarded twice
+over. The lead scanner now reads the neighbouring sentence from the **raw** split, with
+`_MACHINE` and the length floor still applied.
+
+This is the one place in the codebase where proximity is used, and it is deliberate.
+Elsewhere nearby text is banned as evidence, because a status sitting near an identifier
+says nothing about it. Here the output is a **nomination**: the quote carries both
+sentences so a reviewer sees what produced it, and the name must still survive
+verification before anything is claimed about the tool itself. *A lead may be proximate;
+a fact may not.*
+
+**D-2 · The cue was case-sensitive**, so every sentence-initial form missed —
+`Superseded by…`, `Migrate to…`. Naive `re.I` is worse: the name group then swallows
+lowercase words (`"migrate to DeepWiki now"` captured `"DeepWiki now"`). Fixed with
+scoped inline flags — case-insensitive cue, case-sensitive name — plus the missing
+`we recommend` / `we suggest` cues, and trailing punctuation stripped (`[\w.+-]` admits
+dots for `Node.js`, so it also swallowed the full stop).
+
+**D-3 · The alternative carried no citation.** `official.py` built
+`Alternative(claims=[])`, so `.verified` was False and `score.findings_for` filtered it
+out. The one producer that needs no API key was silently discarding every result it
+found — even though the quote naming the successor is already on the **old** vendor's own
+authoritative page. Measured after the fix:
+
+```
+claim tier      AUTHORITATIVE          (the old vendor's own domain)
+substantiates   True                   (ALTERNATIVE is not in STRICT_KINDS)
+alt.verified    True                   <- was False
+blog-sourced:   LEAD_ONLY, False       <- the guard still holds
+```
+
+The statement is *"CodeToTutorial's own documentation names DeepWiki as the successor"* —
+a fact about the old vendor's **recommendation**, which its page is authoritative for.
+Not *"DeepWiki does the job"*, which that page cannot establish and which stays unmade.
+
+**D-4 · `is_substantiated` silently ate every S10.** This is the one that mattered most,
+and it would have made all the other fixes worthless. `Finding.is_substantiated` reads
+`probe_signals` and `self.claims`; an S10 has no probe signals, and its evidence lives on
+`alternatives[*].claims`. So even with the `else: ensure("S10")` branch executing and a
+genuinely verified alternative, `findings_for` returned `[]`:
+
+```
+alt.verified: True
+findings with probe=None: []      <- dropped at `if not f.is_substantiated`
+```
+
+The S10 now lifts its alternatives' substantiating claims onto `f.claims`. They are
+already properly built with the right subject and tier, so this needs no new trust
+machinery, and it simultaneously fixes `evidence_urls`, the digest's evidence block, the
+UI's claim filter and `cmd_verify`.
+
+### A regression the citation fix introduced, and caught
+
+Attaching a citation made an existing false positive *reportable*: *"the legacy endpoint
+is retired, please use HTTPS for all requests"* nominated **`HTTPS`** — and it now
+arrived AUTHORITATIVE, looking verified. A `GENERIC_TOKENS` stop-list (protocols,
+formats, languages, platform nouns) plus a self-reference guard closes it. Must-not-fire
+cases now pin all of it: a generic protocol, a tool nominated as its own replacement, and
+a migration notice two sentences away all yield nothing.
+
+### The result, with no API key
+
+```
+#### HIGH · S1 Dead / moved URL — CodeToTutorial
+- What to do: … Candidate replacement: DeepWiki (homepage not yet verified)
+- Alternative: DeepWiki — named as the successor by the vendor itself
+```
+
+The replacement rides on the S1, which is the right presentation for a dead tool — S10 is
+reserved for *"still works, no longer best"*, which needs the opportunity rotation (D6).
+Note the honest `homepage not yet verified`: a vendor-named successor is a **name** until
+it has been checked against its own domain, and rendering `DeepWiki ()` advertised a
+missing field.
+
+### Consistency fixes shipped alongside (D1)
+
+* The digest rendered **every** alternative while the refinement prompt filtered on
+  `.verified` — two surfaces disagreeing about what "verified" means. Both filter now.
+* `research` was **unchecked by default in the UI**, so the stage that produces citations
+  and replacements never ran outside `run-weekly`.
+* `ResearchResult.dropped` conflated rejected evidence with unreadable pages — 169 of 203
+  entries in one real run were speculative well-known-path 404s, which made the genuine
+  rejections invisible. Split into `dropped` (evidence we refused), `unreadable` (pages
+  we could not read) and `refuted` (nominations actively disproven, for D3). The stage
+  now says so: `rejected= 1 unreadable=13` rather than `dropped=14`.
+* `ClaimKind.ALTERNATIVE`'s own comment claimed *"a replacement exists **and does the
+  taught job**"* — overstating what any citation can carry. Corrected.
+
+### What the 2026 literature contributed
+
+The pattern MIW already implements has a name — **verifier-first grounded citation
+retrieval** — and MIW enforces it more strictly than the pattern requires. The useful
+part was the measured failure data: **3–13% of URLs cited by deep-research agents are
+fabricated**, citation accuracy runs **40–80%**, hallucination **11–57%**, and larger
+models hallucinate *more* confidently at synthesis. All of it is answered by one rule,
+which is now the spine of the design: **the model may emit only a name and a candidate
+domain; our code fetches it, and a claim exists only if we read the page ourselves.**
+A fabricated URL cannot survive DNS; a fabricated tool cannot survive a probe of its own
+domain.
+
+Deliberately not adopted: fan-out, debate, swarm and supervisor orchestration. The
+bottleneck is that nothing proposes candidates at all, not reasoning throughput — and a
+swarm of unverified nominators multiplies exactly the failure modes above.
+
+---
+
+## 25. D2: the registry triage, and the treadmill behind it
+
+Before building a domain-finding agent, the population it would work on was measured.
+**227 dependencies could not be spoken for officially.** The honest read was that most of
+that number was not an agent problem.
+
+### What it actually was
+
+| slice | n | fix |
+|---|---|---|
+| PyPI distributions mis-typed as `tool` | **20** | registry data, verified against PyPI |
+| duplicate spellings of an already-resolved entry | **6** | one alias line each |
+| ordinary English words matched from prose | ~15 | `PROSE_STOP` |
+| library class names with no vendor page | ~9 | `PROSE_STOP` (they are classes *inside* langgraph/langchain/trl) |
+
+`Email` contributed 358 locations, `http-request` 336, `Fetch` 237, `webhook` 234 — the
+same class of false positive as "Python" once contributing 1206, just with lower-profile
+names. The sheet declaration survives; only the prose matching stops.
+
+The 6 alias merges were found by normalising: `HuggingFace` ↔ `Hugging Face`,
+`Scraper API` ↔ `Scraperapi`, `TwelveData` ↔ `Twelve Data`, `Serp API` ↔ `SerpAPI`,
+`Prompt Base` ↔ `Promptbase`, `suno-api` ↔ `Sunoapi`. In each case one spelling already
+carried the domain and the other carried nothing.
+
+### The result
+
+```
+cannot be spoken for   227 -> 203
+  of which critical     10 -> 0        <- every critical dependency is now speakable-for
+packages                 71 -> 91
+review_status                          20 approved (the first non-derived entries)
+```
+
+The 203 that remain are **entirely `mention-only` tier**, which the default scope
+(`critical,standard`) excludes from probe and research anyway. That is the honest state:
+the gap is no longer blocking anything.
+
+### Four findings that were structurally invisible
+
+Retyping is not bookkeeping. A `tool` with no domain has no authority set, so it can
+never produce a version finding. Once these became `package`, the registry became their
+authority via `Dependency._REGISTRY_HOME`, and the probe immediately found:
+
+```
+sentence-transformers  taught 5.2.0    latest 6.0.1     HIGH   S6  blast 39
+protobuf               taught 6.33.6   latest 7.36.1    HIGH   S6  blast 29
+sentry-sdk             taught 1.27.0   latest 2.69.1    MEDIUM S6  blast  3
+pyngrok                taught 7.5.0    latest 8.1.2     MEDIUM S6  blast  2
+```
+
+And the noise rule held: `pydantic` (2.11.10 → 2.13.5) and `tiktoken` (0.8.0 → 0.14.0)
+produced **nothing**, because neither crosses the taught major.
+
+### `resolve-packages`, because hand-fixing ten was a treadmill
+
+Ten entries were corrected by hand. Re-extracting surfaced **ten more** — `Flask`,
+`pydantic`, `tiktoken`, `sentry-sdk`, `pyngrok`, `tokenizers`, `crewai-tools`,
+`lm-eval`, `murf`, `pygbag` — because every new sheet declaration arrives domainless
+forever. That is the recurring-coverage argument, and it does not need an agent either.
+
+`python3 main.py resolve-packages` retypes a sheet-declared name **only if a registry
+actually serves a project under it**, then records `review_status: approved` with the
+reason. Evidence-based, not a guess: a wrong `registry_id` would hand a dependency an
+authority set it had not earned, so all 20 were confirmed present on PyPI before being
+retyped.
+
+It defaults to names carrying a **version pin**, which is the strong signal — nobody
+writes `pydantic@2.11.10` about a SaaS product, whereas `Telegram` is sheet-declared and
+is not a distribution. `--include-unpinned` widens it at the cost of a registry round
+trip per name. Names that resolve nowhere are listed by name rather than silently
+skipped, because that remainder is the real backlog.
+
+### One planned item deliberately dropped
+
+The plan proposed harvesting the vendor URLs that `miw/ingest/sheets.py:44,81` discards
+from tool cells. Measured: 10 such URLs, of which **9 point at domains already known**,
+and the 3 unknown ones are an AI-tool aggregator (which the exclusion list should reject
+anyway), an arXiv citation, and one real product. Not worth a code change. Recorded here
+so the option is not re-proposed as though it were untried.
+
+### The research artifact now merges
+
+`probe` and `analyse` have gone through `artifacts.merge_by_dep` ever since a scoped run
+overwrote the day's probe file with its own slice. `research` was still a plain `dump()`,
+so a course-scoped research run erased every other course's citations and nominations for
+the day — the same bug, one stage later. Verified after the fix: two sequential
+single-dependency runs leave both results in the artifact, the second reporting
+`merged: 1 refreshed, 1 carried forward`.
+
+### A phantom-course bug this exposed
+
+Re-extracting surfaced something that had been wrong for a while: `WORKBOOK_COURSES`
+in `cmd_ingest` was keyed on `gen_ai_contents.xlsx`, while the workbooks on disk are
+named `Intro to Generative AI - Course Contents.xlsx`. **The keys never matched.** And
+because `feed_sheets` fell back to `workbook_courses.get(t.workbook, t.workbook)`, every
+unmapped workbook became its own course:
+
+```
+before:  'Building LLM Applications - Course Contents.xlsx'  1113 locations
+         'AI for Finance - Course Contents.xlsx'             1069
+         'Intro to Generative AI - Course Contents.xlsx'      333
+after:   0 phantom courses
+```
+
+3,633 sheet locations — every hand-recorded version pin among them — were attributed to
+three courses that do not exist, which corrupted every per-course figure the new UI
+computes. Two fixes: the mapping now matches a **normalised stem**, so a rename does not
+silently re-break it; and `feed_sheets` **skips** an unmapped workbook with a loud
+`sheet PROBLEM` rather than inventing a course, because skipping is recoverable and a
+phantom course is not. A test asserts the live artifact contains no course outside
+`config/constants.py`.
+
+---
+
+## 26. D3–D8: the nomination ladder
+
+The nominate/verify split was already in the schema — `Alternative`'s docstring reads
+*"Nominated anywhere, verified officially"*, with `nominated_by` for the LEAD_ONLY source
+and tri-state judgement fields. It had no producer. This is that producer, and the
+adjudicator that decides what may be said about its output.
+
+### The rule everything follows from
+
+**A model may emit a name and at most a bare domain. Never a fact, never a quote, never
+a URL it claims to have read.** Our code fetches the domain; a `Claim` exists only if we
+read the page ourselves. `miw/research/nominate.py` is the ladder, cheapest rung first,
+each terminal:
+
+```
+R0  policy      excluded host · the vendor's own domain · a generic token
+R1  DNS         a fabricated domain dies here, before any HTTP
+R2  no domain   resolve by registry, or report a name-only nomination.
+                NEVER guess https://<name>.com
+R3  liveness    404/410 refutes. 401/403/429 does NOT. A redirect is a correction.
+R4  evidence    `official.gather` on the candidate's OWN domain, AUTHORITATIVE only
+```
+
+R3's distinction is the highest-value line in the file, and it cuts both ways:
+reporting our own blocked request as a dead tool is the fastest way to lose a reviewer's
+trust, and reporting a hallucinated tool as real is the fastest way to lose it
+permanently. `net.Fetch` already separated `gone` from `blocked`; the ladder inherits it.
+
+R2's refusal to guess is the subtle one. A guessed `https://<name>.com` that happens to
+return 200 is **invented evidence** — precisely how a hallucinated tool acquires a
+citation. A name-only nomination is reportable with nothing claimed about it.
+
+### `net.url_safety`, split out of a boolean
+
+`is_safe_public_url` returned `False` for both "this host is not in DNS" and "this host
+resolves somewhere we refuse to go", and `fetch` collapsed both into
+`unsafe_or_unresolvable_url`. Those are different facts, and discovery needs the first:
+a candidate that does not resolve is a **refuted** nomination, which is reportable,
+whereas a private address is a policy refusal on our side. Now
+`url_safety() -> ok | bad_scheme | unresolvable | private`, with the boolean as a
+one-line wrapper so no caller changed.
+
+### The body cache, filling a seam declared and never used
+
+`Fetch.from_cache` had existed since the beginning and was never assigned, and the only
+other cache was a dict local to one call of `official.gather` — so the same vendor page
+was refetched once per claim kind, per dependency, each time paying the 1.5 s per-host
+courtesy gap. Discovery walks several candidate domains per dependency, which turns that
+from wasteful into slow. Measured:
+
+```
+first  fetch   687 ms   from_cache=False
+second fetch     0 ms   from_cache=True    (identical bytes)
+```
+
+Scoped to the process on purpose, and **answers only**: a transport error or a 5xx is
+not an answer about the world, and caching one would make a blip look like a settled
+fact for the rest of the run — the same conflation `reachable`/`ok` exists to prevent.
+
+### Refutations are reported, never dropped
+
+`ResearchResult` gained `nominations` (every candidate with the rung it reached) and
+`refuted`. The digest carries a per-run tally:
+
+> _Discovery: 7 replacement candidate(s) considered · 2 verified · 3 refuted · 1
+> unverifiable (host alive but would not serve us — not treated as absent) · 1 rejected
+> on policy._
+
+**A refutation rate that falls to zero is a suspicious signal, not a good one** — it
+means the verifier stopped running. Without this the digest cannot tell "we looked and
+found nothing" from "nothing looked", which is exactly the 2026 complaint about
+citation-support metrics: they measure what survived and never what was rejected.
+
+`dropped` was also split three ways, because it was doing three jobs: `dropped`
+(evidence we refused), `unreadable` (pages we could not read — 169 of 203 entries in one
+real run), and `refuted` (nominations disproven).
+
+### The opportunity rotation, and why S10 could not fire
+
+`NEEDS_ALTERNATIVES` fires only on breakage, but S10 means *"still works, no longer
+best"* — the case you want **before** the 404. `alternatives_reason()` now records
+`breakage` | `rotation` | `""` explicitly rather than letting scoring infer it, which
+also closes a latent bug: `_load_probes` and `_load_research` fall back to the newest
+file independently, so a dependency with last week's alternatives and this week's clean
+probe would have produced MIW's first S10 as a **stale-artifact accident**.
+
+Selection is a sub-slice of the existing rotation, not a second clock — a second clock
+would fight the first, because `mark_researched` stamps everything the stage touched.
+Eligible means a curriculum decision is actually possible: a `tool` or `service` with an
+authority set, still healthy. Measured against the live inventory:
+
+```
+critical                          194
+  tool/service with authority      35
+  and healthy                      35
+DISCOVERY_SLICE=4  ->  a full cycle in ~9 weeks
+```
+
+Packages are excluded because "an alternative to `requests`" is not a curriculum
+question; n8n nodes because that is an n8n-internal choice already covered by S9; models
+because the same-vendor catalogue path is strictly better and already live.
+
+### Two bugs found by running it
+
+**The vendor's citation was lost between `gather` and the ladder.** The
+`ClaimKind.ALTERNATIVE` claim lives on the `Alternative` that `gather` built, not on
+`res.claims` — so looking for it there returned the successor *unverified*, and it was
+filtered out again one layer further on. Exactly the same failure as D-3, one layer up.
+
+**A redirect correction was overwritten.** `deepwiki.io redirects to deepwiki.com` is the
+candidate telling us its real home, and a reviewer needs to see that the domain verified
+is not the one nominated. It was being clobbered by the final verdict detail.
+
+### `suite_discovery` — claim-level auditing inside the existing gate
+
+A fourth suite in `eval/run_eval.py` at threshold 1.0, offline and keyless: DNS is a
+set, HTTP a dict, and **a fabricated domain is tested by simply being absent from the
+set**. 17 cases, over half of them must-not-fire:
+
+* a fabricated domain is refuted at DNS **and never fetched**
+* a bare name is never turned into a guessed URL, and nothing is fetched
+* a model-supplied full URL is rejected, not repaired
+* a dead candidate is refuted; **a 403 is not**
+* a candidate whose own site says nothing checkable is refuted
+* a generic protocol, an excluded source, and the vendor's own domain all raise nothing
+
+One test-hygiene note worth recording: once a `TAVILY_API_KEY` appeared in `.env`, three
+of these tests silently began reaching the live network — 8.8 s and non-deterministic.
+`search.verify_on_official` and `discover_alternatives` are now stubbed in every test.
+The suite's offline/keyless contract has to be enforced, not assumed.
+
+### The research artifact merges, and its nominations round-trip
+
+`research_<date>.json` went through `merge_by_dep`, so a course-scoped run no longer
+erases the day's other courses. And `nominations` are rehydrated explicitly in
+`_load_research`: `ResearchResult(**r)` would have left them as raw dicts and `analyse`
+would have crashed on the system's own artifact.
+
+---
+
+## 27. What enabling search discovery exposed
+
+A `TAVILY_API_KEY` arrived mid-build, so D5 came earlier than planned — and the first
+live run turned **4 findings into 18, sixteen of them critical.** Every one of the new
+criticals was false, and the causes were four separate holes that only open when open
+search is on. This section is the interesting part of the phase, because none of them
+were in the plan.
+
+### Hole 1 · A vendor's forum was AUTHORITATIVE about that vendor
+
+`community.n8n.io` is a subdomain of `n8n.io`, and `_host_matches` accepts subdomains —
+so a thread written by any passing user classified as **AUTHORITATIVE** about every n8n
+node. The evidence behind those criticals included other users' questions and pasted
+JSON workflow dumps.
+
+**A vendor hosting a forum is not the vendor speaking on it.** `trust.is_user_generated`
+now demotes forum and Q&A URLs — by host prefix (`community.`, `forum.`, `discuss.`,
+`answers.`) and by path (`/t/`, `/questions/`, `/threads/`) — to **LEAD_ONLY**, checked
+*before* the authority test, because the whole problem is that they pass it. Demoted
+rather than excluded: a forum thread is a fine pointer to something worth checking on the
+real docs. It simply cannot settle anything.
+
+### Hole 2 · The search engine's snippet was being quoted as our evidence
+
+This was the big one. `verify_on_official` ran a domain-restricted Tavily search and
+built a `Claim` straight from `Hit.snippet` — **no `_is_prose` check, no subject-term
+check, and AUTHORITATIVE because the search was domain-restricted.** A 600-character
+snippet of n8n's generic "Deprecated nodes" index page, nav chrome included
+(``n8n Docs ⌘Ctrl k ForumChangelog…``), became a critical deprecation finding against
+seven nodes that are not deprecated.
+
+It also violated the project's own principle, which is stated everywhere else and was
+quietly broken here: **search points, it does not testify.** A hit now yields only a
+URL; `official.gather_url` fetches it and lifts prose under exactly the same rules as any
+other page, so a claim still rests only on text we read ourselves. Asserted against the
+source: nothing may build a `Claim` out of `Hit.snippet`.
+
+The honest consequence is a large drop in yield. Across ten dependencies the stage went
+from 22 "substantiated claims" to **0**, while pages actually read went *up* (6–9 per
+dependency, from 3–4). Those 22 were an artifact of quoting snippets.
+
+### Hole 3 · A page title passed every prose test
+
+The one alternative a live run verified rested on
+`Pricing | Zite - The AI builder that means business` — 0.40 caps ratio, ten words, a
+lowercase bigram, so it satisfied `_is_prose`, and it matched the PRICING keyword using
+the word "Pricing" **from its own title**. It says nothing about pricing.
+`_TITLEISH` now rejects pipe- and bullet-delimited fragments, and a short fragment with
+no terminal punctuation is treated as a heading. Long text is exempt, because a genuine
+sentence truncated by the quote cap has no full stop either.
+
+`_MACHINE` was also evaded by **smart quotes**: a forum post pasting a workflow renders
+`"id":` as `“id”:`, which walked past the straight-quote patterns and got quoted as
+deprecation evidence.
+
+### Hole 4 · `verify` was checking the artifact against itself
+
+`cmd_verify` exists so the guarantees are *"checkable after the fact, by someone who did
+not write the code"*. It was reading the tier each claim **records**, not re-deriving it
+from the URL. So it reported "all trust invariants hold" over fourteen findings whose
+evidence was forum posts — and, worse, a tightened trust rule silently left every old
+finding standing with its stale stamp.
+
+It now re-classifies every claim's `source_url` and reports a disagreement explicitly:
+
+> `chainLlm / S4: claim records AUTHORITATIVE but https://community.n8n.io/t/… classifies
+> as LEAD_ONLY today — the finding predates a trust rule change and must be re-analysed`
+
+That immediately caught all fourteen. It also caught **a bug in itself**: rebuilding the
+subject without the serving-provider widening made Groq's own deprecation table read as
+LEAD_ONLY against a model attributed to Meta — the exact bug `with_provider` exists to
+prevent, reintroduced by the auditor rather than the analyser. `verify` now rebuilds
+provider authority from the probe artifact.
+
+### What this says about the discovery layer
+
+The mechanism is sound and the verifier does its job: on live data, **6 nominations
+produced 1 verified, 4 refuted and 1 unverifiable-blocked** — and after the page-title
+fix, 0 verified. A fabricated domain dies at DNS, a page title is not evidence, and a
+403 is never read as absence.
+
+But the yield is currently **zero**, and that is a recall problem, not a correctness one —
+the documented ceiling of the verifier-first pattern. Two causes, both worth stating
+plainly rather than dressing up:
+
+* **Open-web nomination quality is poor.** Tavily suggested `Youtube` as an alternative
+  to Lovable, and `Crewai` for SerpAPI. They were refuted, but on "no checkable
+  evidence" grounds rather than "irrelevant" — the verifier caught them for the wrong
+  reason, which is luck.
+* **Vendor pricing pages rarely carry liftable prose** matching our keywords. The
+  candidates were real products with real sites; none of them said anything about
+  pricing in a sentence we would accept.
+
+So the layer is safe to run and does not yet produce opportunities. The `refuted` list is
+what makes that visible instead of looking like silence — and a refutation rate that
+falls to zero would be the suspicious signal, not a good one.
+
+---
+
+## 28. The alternatives researcher, and the recall wall it hit
+
+The discovery layer had a ladder, an audit trail and two deterministic nominators — and
+no model in it. The agent the whole phase was named after was still missing.
+
+### The model's entire output surface
+
+`prompts/nominate_alternatives_v1.txt` asks for a **name and, at most, a bare domain**.
+Nothing else it writes is read as fact: no URL, no price, no version, no quote. It is
+opt-in (`research --nominate`), runs last, and is strictly additive — a parse failure,
+a refusal, or no provider at all leaves the deterministic nominators working exactly as
+they did. `parse_nominations` rejects rather than repairs: `https://bolt.new` in the
+domain field is dropped, not stripped, because choosing what we fetch is the one thing
+the model may never do.
+
+One flaw the tests caught immediately: the cap was applied to the **input rows**, so
+three malformed entries could starve a good fourth. A sloppy reply lost its own best
+candidate. The cap is now on accepted nominations.
+
+### It works, and the improvement is not subtle
+
+Same two dependencies, same search results, nominators side by side:
+
+| taught tool | open search proposed | the model proposed |
+|---|---|---|
+| Lovable (AI web-app builder) | `Youtube`, `Zite` | **Bubble**, **WeWeb** |
+| Murf.AI (AI voice) | `Audeus`, `Speaktor` | **ElevenLabs**, **Google Cloud TTS**, **Amazon Polly** |
+
+`candidate_domains()` ranks by frequency across hits, which is why `Youtube` was offered
+as a replacement for a web-app builder — it appears in every result set. Reading the
+taught job alongside the same snippets is a judgement, and it is the only one asked.
+Three LLM calls, $0.128.
+
+### Then the bottleneck moved, and the diagnosis was exact
+
+Nomination quality was fixed and **every candidate still refuted** —
+`refuted_no_evidence` on ElevenLabs, Bubble, Amazon Polly. Real products with real
+pricing pages. So the verifier, not the nominator, was now wrong.
+
+`elevenlabs.io/pricing` returns 200 with 6,865 characters and **21 sentences matching
+the pricing keywords**, including:
+
+> Monthly price and included credits per plan: Free $0 (10,000 credits); Starter $6
+> (30,000 credits); Creator $22 (121,000 credits…
+
+**Zero survived** `_relevant`, because it also required the sentence to name the
+subject — and a vendor's own pricing page does not repeat its own name in every
+sentence. Why would it?
+
+The subject-term check is right for a **multi-subject** page: a changelog lists every
+release, a deprecations index lists every retired node, and there a sentence must name
+its subject or you attribute one product's retirement to another. That check is exactly
+what stopped the seven false n8n criticals. It is wrong for a single-product page
+reached at the subject's own well-known path, where the page *is* the subject by
+construction. So it is now scoped to `MULTI_SUBJECT_KINDS` — DEPRECATION, VERSION,
+IMPLEMENTATION — and relaxed for PRICING and AVAILABILITY.
+
+**And the first version of that fix was wrong, in a way worth recording.** Scoping the
+relaxation by *claim kind* — "PRICING pages are about the site's own product" — held for
+`elevenlabs.io` and broke immediately for platforms. Within one run it attributed
+*"5,000 free search requests per month (shared across all **Gemini 3.x** models)"* to
+`gemini-2.0-flash`, and HuggingFace's per-TB **storage** pricing to a Meta model served
+by Groq. Both cited authoritatively, both nonsense.
+
+The discriminator is not the claim kind; it is whether **the subject IS the site**. A
+name matching the domain stem owns everything on that domain (`ElevenLabs` ↔
+`elevenlabs.io`); a product hosted on somebody's platform does not
+(`gemini-2.0-flash` on `ai.google.dev`). `_site_is_the_product` makes that the test, and
+it happens to cover the case that needed fixing exactly — a nominated alternative is
+always verified against a domain derived from its own name.
+
+After the fix, on the same dependency:
+
+```
+ALTERNATIVE Speaktor    verified=True  free=True
+  https://speaktor.com/#pricing
+  > Convert text to speech for free with no credit card and no signup wall.
+ALTERNATIVE ElevenLabs  verified=True  free=True
+  https://elevenlabs.io/pricing
+  > Monthly price and included credits per plan: Free $0 (10,000 credits)…
+== verified: 3 ==
+```
+
+Two more evidence-quality rules came out of reading those quotes: a **page title** is
+not evidence (`Pricing | Zite - The AI builder that means business` matched the pricing
+keyword using the word "Pricing" from its own title), and a **question** is not an
+assertion (`How do text characters and credits work?` was quoted as pricing evidence —
+an FAQ heading matches topic keywords perfectly and states nothing).
+
+### The fit judgement, and the wall around it
+
+`miw/research/fit.py` is the only judgement in the system. The model emits bounded
+per-factor estimates; **Python owns the arithmetic and the thresholds**. That split is
+the one genuinely good idea in the prior Curriculum Gap Analyzer, with two of its
+mistakes deliberately not copied:
+
+* it substitutes **0.5** for a factor it could not parse, which makes a real 0.5 and a
+  crash identical in the database — here an unparseable factor is `None`, `None` is
+  excluded from the mean with the remaining weights **renormalised**, and too few known
+  factors means `fit_score` is `None` rather than a plausible number;
+* it never **clamps**, so a model returning 1.5 inflates the total unchallenged.
+
+`does_taught_job` is treated as not optional: a score computed without it measures
+everything except the question that was asked.
+
+The output is an `AlternativeOpinion`, not a `Claim`, and it cannot become one — it has
+no `source_url` and no `quote`, so `Claim.build` could not accept it. It carries its own
+provenance (`provider`, `model`, `assessed_at`, `basis_urls`) so a reviewer can check it
+against the same quotes we showed the model, and it renders on its own line:
+
+> _Model opinion (not evidence · claude_code/haiku · 2026-09-10): fit 0.98 — likely does
+> the taught job — Free and frictionless access confirmed, but API and coding
+> integration for practical sessions remain undocumented. Unknown: coverage_of_steps,
+> maturity._
+
+And when the model does not give enough to score, it says so rather than producing a
+number:
+
+> _Model opinion (not evidence · claude_code/haiku): not assessed — the candidate's own
+> pages did not say enough._
+
+Three routes by which an opinion could launder into a fact are closed: it never enters
+`Finding.claims`; it is never passed to the note-refinement prompt (feeding a model its
+own prior opinion back as input is how a hypothesis becomes a "fact" over three weekly
+runs); and `cmd_verify` asserts that an opinion never travels without a substantiating
+claim, is always labelled `source: llm`, and never leaks a fit score into a claim.
+
+`Alternative.evidence` was added alongside, as a closed vocabulary
+(`self` | `vendor_named` | `self+vendor`), because "its own pages say so" and "the tool
+it replaces says so" are different strengths that were being rendered identically.
+
+---
+
+## 29. Audit: everything built, checked against what was planned
+
+Every planned item was re-checked mechanically against the code rather than from
+memory. Workstreams A, B and C (PRD §21–23) come out **22/22**. Phase 4 came out
+**26/33**, and the seven gaps are worth listing individually because two of them are
+not "not done yet".
+
+### Closed after the audit
+
+| gap | what was wrong |
+|---|---|
+| `_preflight_failed` was process-wide | One transient 429 silently degraded every *later* dependency in the same run to "no search", and the API's long-lived job worker never recovered at all. Now reset per run. |
+| `DISCOVER_TEMPLATES[:2]` | The slice dropped `"tools like {name}"` — the phrasing that finds a functional peer rather than a comparison listicle. |
+| `purpose=` never passed | The parameter existed and no caller used it, so an open search for `"Murf.AI alternative"` had nothing to distinguish a voice tool from anything else. Now narrowed by unit names: `Murf.AI` → *"Mastering Audio Generation"*, `Alpaca` → *"Trading Agent Stock"*. Still no course body text, so the stage's context cost does not move. |
+| `SEVERITY_OFFSETS` not adopted | Now a **`Finding.due_by`** date derived from severity — `critical +7d`, `high +30d`, `medium +90d`. Derived, not a second guess: `WHEN_BY_SEVERITY` stays the only prose, so the digest and the field cannot disagree about the same deadline, and the execution-aware severity ladder reaches the deadline for free. |
+
+### Deliberately not built, with the evidence
+
+**Harvesting the vendor URLs `sheets.py` discards.** Measured: 10 such URLs, 9 pointing
+at domains already known, and the three unknowns are an AI-tool aggregator (which the
+exclusion list rejects anyway), an arXiv citation, and one real product. Not worth a
+code change. Already recorded in §25.
+
+**A keyless nominator from our own registry.** The plan asked for one; the data refuses
+it. Three rankings were measured against the live inventory:
+
+```
+same-kind, alphabetical   -> a stock-trading API proposed for a text-to-speech tool
+co-occurrence in a unit    -> ElevenLabs top for Murf.AI, Tavily top for SerpAPI
+                              (right!) but GitHub / OpenAI / n8n co-occur with
+                              everything, being infrastructure rather than peers
+...divided by ubiquity     -> over-rewards anything in exactly one unit, so
+                              AssemblyAI and Discord outranked ElevenLabs
+```
+
+No ranking works because **co-occurrence conflates substitutes with complements, and
+those are opposites**: Murf.AI and ElevenLabs are alternatives, Murf.AI and Lovable are
+co-taught in one project. Nothing in the inventory distinguishes them and the registry
+has no capability field to lean on. Shipping it would spend fetches on irrelevant
+candidates and pad the audit trail with refutations that teach nobody anything — the
+failure the plan's own risk section warns about. The gap is covered where it can be
+answered: the model nominator does this judgement well from the same inputs. The
+measurements are recorded in `miw/research/nominate.py` where the function would have
+gone, so the option is not re-proposed as untried.
+
+### Changes made that were never planned
+
+Twelve, all discovered by running the thing rather than by design, and all documented
+above in §26–28: the forum-authority hole, snippets quoted as evidence, page titles and
+questions accepted as evidence, smart-quoted JSON, the subject-check relaxation and its
+wrong first version, `verify` checking the artifact against itself, `verify` losing
+provider authority, the phantom `.xlsx` courses, `resolve-packages`, the research
+artifact not merging, and the `url_safety` split.
+
+That ratio — 12 unplanned fixes against 33 planned items — is the honest signal from
+this phase: **turning search on is what exposed them**, and every one was a defect that
+had been sitting in a path nothing exercised.
+
+---
+
+## 30. The UI, restyled
+
+The team's read was *"a bit flat and old modeled rather than attractive"*, which was
+fair and specific enough to act on. The screenshots said why: six identical tiles, so
+"open findings 7" carried the same visual weight as "unmonitorable 61"; severity as pale
+washes where `high` and `medium` were nearly indistinguishable; one type size; borders
+on the tiles *and* the container that held them, which flattens everything it touches.
+
+References taken from current practice rather than taste: Linear's density (~36–40px
+rows, minimal chrome), Vercel's progressive disclosure (summary up top, detail one click
+deep), and — the load-bearing one — the accessibility guidance that status must be
+carried by **text, colour and shape together**, on a temperature scale, most severe
+first.
+
+### What changed
+
+* **One lead figure, then the supporting cast.** The strip is no longer six equal tiles:
+  open findings gets a 38px figure on an accent wash, the rest stay compact. The label
+  reserves two lines so a wrapped one ("unchanged, suppressed") does not push its own
+  number out of line with the row.
+* **Severity three ways.** The word, a colour (slate → blue → amber → red), and a dot —
+  square for critical, so the most urgent state differs in *shape* too. Every finding
+  card gets a 3px severity rail; so does every course row on the overview, which is what
+  turns "which course needs me" into a glance.
+* **Dense rows.** The standing-findings list went from wrapping three-line blocks to
+  single 38px rows with the summary truncated, dividers instead of a border per row.
+  Stacked bordered rows double every line and read as a pile of unrelated boxes.
+* **The inventory is readable again.** 200 rows rendered a **9,604px** page you had to
+  scroll past to reach anything. A capped scroller reusing the sticky header that
+  already existed brings it to **953px**.
+* **"Nothing to report" takes two lines, not a 120px dashed box** — it is good news, and
+  it now says so in the ok colour.
+* Sticky header and nav with an underline active state, a real type scale, tabular
+  numerals on every figure, and `prefers-reduced-motion` honoured.
+
+### Contrast checked, not assumed
+
+Every meaning-carrying pairing was measured. Two failed and were fixed: `--muted`
+carries 12px hint text and sat at **4.14:1** on white — below AA for text that size — so
+it was darkened to clear 4.5 on *both* grounds it appears against (5.34 on white, 4.73
+on the sunk fill). And the dark theme's primary button had white text on a **light**
+teal accent; dark ink on that fill reads at 6.46:1. Inverting a palette is not the same
+as designing the second theme.
+
+### What was not allowed to change
+
+The offline guarantee — no font host, no CDN, no external request — which is why this
+uses a system stack, as Linear, Vercel and GitHub all do. Verified live: loading twelve
+routes issued **zero** requests off the origin.
+
+And every affordance that exists because the page was misleading without it: the
+projection banner ("16 of 20 references are in this course"), the cross-course triage
+warning, the local-vs-global severity chip, the coverage line, and the *"not evidence"*
+label on a model opinion. `tests/test_ui_contract.py` now pins all of them, plus the
+offline promise, so the next restyle cannot quietly drop one.
+
+Functionally re-verified after the change: 12 routes each showing exactly one section
+with the right tab active, reload keeping its route, and the triage panel still toggling
+— with no JS errors.
+
+## 31. The PPT is the source, and the session numbers were wrong
+
+The curriculum team corrected a premise the whole ingest layer rested on:
+
+> "the JSON will provide all the details, but the content inside the PPT is our main
+> stream because based on that only we will create mcqs, coding questions and RMs.
+> That's why I provided the sheet data where you can find the outline that what we
+> mentioned in each PPT."
+
+Everything through Phase 4 treated the JSON export as primary and the workbooks as
+supplementary tool lists — §7 said so explicitly, and `miw/ingest/sheets.py` read only
+the tool columns. The real order of authorship is the other way round:
+
+```
+slide deck  ->  the session is taught  ->  MCQs, coding questions, RMs are written
+   (source)                                  (the JSON export: the PUBLISHED artifact)
+```
+
+The export is downstream. The workbook is the only bridge back to the source, and three
+of the four things it carries were being discarded.
+
+### What the workbook carries, measured
+
+All three workbooks share an identical `Course Outline` sheet, skipped in full because
+it has no tool column, plus a `Session-Practice Content Linked` sheet.
+
+| Column | Filled (Intro to Gen AI) | In the JSON export? | Verdict |
+|---|---|---|---|
+| `Outline` — the PPT outline | 24/25, avg 382 chars | **0 of 24** | unique; the only record of the decks |
+| `Key Takeaways` | 24/25 | 3 of 24 | mostly unique |
+| `Session PPT` — deck link | 25/25 | **0 of 25** | unique, and still unused |
+| `Session No.` / `Session ID` | 25/25 | not expressible | **authoritative numbering** |
+| `Reading Material Content` | 25/25, avg 8.8 KB | **24 of 25** | redundant — not read |
+| `Recorded Session Transcript` | 17/25 | 17 of 17 | redundant — not read |
+
+A method note worth keeping, because the first measurement was wrong: comparing
+normalised sheet text against the *raw* JSON file made the reading-material text look
+22/25 absent, because the file's escape sequences do not match normalised prose. Against
+the parsed string corpus it is 24/25 present. "Is this text in the export" must be asked
+of parsed strings, never of file bytes.
+
+### The lineage the export cannot express
+
+```
+Course Outline                   Session ID -> Session No., outline, deck link
+Session-Practice Content Linked  Session ID -> Unit ID + artifact type
+the JSON export                  Unit ID
+```
+
+104 of 104 rows join on Intro to Gen AI, 71 of 71 on each of the others. This records
+**which MCQ and coding units were authored from which session's deck** — a relation the
+export has no field for.
+
+### The bug: 81 of 104 units carried the wrong session number
+
+`portal.is_session()` infers a session by position — a LEARNING_SET unit carrying an
+INTERACTIVE_VIDEO. Intro to Gen AI has a unit of exactly that shape, `Common Mistakes`,
+which is not a numbered session:
+
+```
+Intro to Gen AI   export 26 "sessions", workbook numbers 25
+                  diverges at position 8; every later session reported ONE TOO HIGH
+                  81 of 104 units disagreed
+AI for Finance    export 18, workbook 17 (`AI Finance Add-On Session`, last -> no shift)
+LLM Applications  export 29, workbook 29 — agrees exactly
+PSE               no workbook; positional is all there is
+```
+
+It reached the reviewer. `gemini-2.0-flash` was reported at sessions 11/12/17/21; the
+true sessions are **10/11/16/20**, and a digest reading "the earliest affected session is
+session 11" pointed at the deck for session 10.
+
+**Why no guard caught it, and the rule that follows.** `expect_sessions` was 26 and 18 —
+calibrated to the export's positional count, i.e. to the defect. The check existed and
+was tuned to the thing it was checking, so it could not fail. *An integrity check's
+expected value must come from a different source than the value being checked.* It now
+comes from the workbook, and `ingest` prints which source it used.
+
+### What was built
+
+* **`miw/ingest/outline.py`** — reads both PPT sheets; returns numbered sessions, the
+  `unit_id -> session_no` map, and the slide text as `ContentRecord`s. Headers resolved
+  by alias, as everywhere else in this codebase; a workbook with no `Session No.` column
+  reports that and numbers nothing rather than guessing.
+* **`portal.read_course(..., session_of_unit)`** — the workbook wins where it speaks;
+  the positional walk stays as the fallback for units it does not cover and for PSE.
+  Disagreements are **counted and printed with examples**, never silently resolved:
+  changing 81 session numbers without saying so is how a reviewer stops trusting a
+  digest.
+* **`feed_sheets(..., session_of_name)`** — tool-sheet declarations now carry a session
+  number, resolved from the corrected records by majority vote (a name can appear under
+  two sessions where a "Part - 2" unit reuses its parent's title; the most-referenced
+  session is the honest answer). **2,515 sheet locations placed, 0 unplaced** — every one
+  was `None` before, which is why 43 dependencies in Intro to Gen AI could be reported as
+  "in this course" with no way to say where.
+* **`sheets.course_for_workbook`** — the workbook->course matcher moved out of `main.py`
+  so `ingest` and `extract` share one copy. Two copies of that map is how the phantom-
+  course bug of §25 would return.
+* **`locate.py`** resolves a workbook **cell** (`Book.xlsx::Course Outline::Outline::row7`),
+  so slide text appears in the detail panel with the matched term highlighted — 186 of
+  186 slide-outline locations resolve. A tool-sheet path names no cell and correctly
+  stays unresolvable.
+* `expect_sessions` -> 25/29/17/13, with the reason recorded beside it.
+
+Effect: every S6 finding now names its sessions — all four were empty, because all four
+rest only on workbook pins. Every location in every course now carries a session number
+(49/49, 46/46, 59/59). 91 dependencies in Intro to Gen AI gained a location traced to
+slide text, `DeepWiki` and `Gamma AI` among them.
+
+Gates: 368 tests (21 new, including the `Common Mistakes` shape reproduced from a
+synthetic export), eval 4/4 suites at 100%, `verify` clean, `ingest` exit 0 on all four
+courses.
+
+### Measured and not built: the outlines as an alternatives nominator
+
+Recorded because it looked strong. Phase 4's discovery layer is bounded by nomination
+recall, and one outline line is the curriculum's own nomination, better sourced than any
+search hit:
+
+```
+- Similar Tools: Beautiful.ai,Sendsteps,ai,Canva
+```
+
+Across all three workbooks' 135 outline and takeaway cells there is **exactly one** such
+line. A wider `vs`/`alternatives` sweep returns 34, but they are conceptual comparisons —
+"Stock vs Share", "AI Ethics vs Responsible AI", "Full Fine-Tuning vs PEFT" — not tool
+substitutions. One instance is not a signal. Dropped with the measurement, as the
+registry-neighbour nominator was in §26.
+
+### Still open
+
+* **The 68 decks are never checked.** `Session PPT` records 68 Google Slides URLs; 0
+  dependencies carry a `docs.google.com` referenced URL, because `INFRA_HOSTS` excludes
+  the host and `extract._links` skips it. A deleted or unshared deck is invisible — the
+  codetotutorial failure applied to our own authoring source. §7's reason for the
+  exclusion ("a single dead Google Slides deck is a content bug, not tool drift") holds
+  for a deck linked from prose, not for the 68 the workbook names as each session's
+  source. Complicated by permissions: Slides returns 200 for a deck a student cannot
+  open, so an unauthenticated probe would report false health. A decision, not an
+  implementation.
+* **Lineage is loaded but unused for blast radius.** We know unit -> session but do not
+  yet flag the MCQs authored from a deck that taught a now-dead tool where they never
+  name it. This is the sharpest remaining use of the data; it needs a *derived* location
+  class weighted below a direct mention, the additivity invariant re-asserted, and a
+  before/after on all nine live findings, because blast radius feeds severity.
+* **`link:a_href` attributes by domain**, so every `docs.n8n.io/...` link lands on
+  whichever entry owns that host. `@n8n/n8n-nodes-langchain.agent` carries 31 referenced
+  URLs including Gmail's docs page while the real `n8n-nodes-base.gmail` carries none,
+  overstating that S4's 72 locations. The panel no longer amplifies it (a URL may
+  highlight only if it names the dependency) but the extraction is unchanged, because
+  fixing it moves severities.

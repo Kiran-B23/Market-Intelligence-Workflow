@@ -2,7 +2,7 @@
 # These are NOT in the inventory and are not monitored. Promote a real tool by
 # adding it to registry/tools.yaml with its official_domains; leave lesson
 # topics alone. Unreviewed guesses are deliberately kept out of the inventory.
-# 2113 candidates.
+# 2109 candidates.
 
 candidates:
 - name: UNDERSTAND
@@ -1148,10 +1148,6 @@ candidates:
   occurrences: 2
   courses:
   - Building LLM Applications
-- name: LM Studio
-  occurrences: 2
-  courses:
-  - Building LLM Applications
 - name: Requirements for Running Models Locally
   occurrences: 2
   courses:
@@ -1667,6 +1663,10 @@ candidates:
   courses:
   - PSE
 - name: What Is AWS
+  occurrences: 2
+  courses:
+  - PSE
+- name: Frontend Deployment Services
   occurrences: 2
   courses:
   - PSE

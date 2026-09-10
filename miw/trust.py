@@ -51,7 +51,10 @@ class ClaimKind(enum.Enum):
     VERSION = "version"                # latest version, breaking release
     IMPLEMENTATION = "implementation"  # the taught flow / API / UI changed
     AVAILABILITY = "availability"      # reachable from India, signup required
-    ALTERNATIVE = "alternative"        # a replacement exists and does the taught job
+    # A citation can establish that a replacement EXISTS and what its own pages say
+    # about it. Whether it does the taught job is a judgement no page settles, so that
+    # never becomes a Claim - see `Alternative.maturity_note`.
+    ALTERNATIVE = "alternative"        # a replacement exists; its own pages say what
 
 
 # Claim kinds that may never rest on anything below AUTHORITATIVE. These are the ones
@@ -104,6 +107,29 @@ EXCLUDED_DOMAINS = frozenset({
 _EXCLUDED_HINTS = ("best-", "top-10", "top10", "-alternatives-2024", "-alternatives-2025",
                    "-alternatives-2026", "listicle", ".blogspot.", "翻译", "aggregator")
 
+# User-generated content hosted ON a vendor's own domain. `community.n8n.io` is a
+# subdomain of `n8n.io`, so a forum thread written by any passing user classified as
+# AUTHORITATIVE about every n8n node - and once open search was enabled it produced 14
+# critical "deprecated" findings whose evidence included JSON workflow dumps and other
+# users' questions. A vendor hosting a forum is not the vendor speaking on it.
+#
+# These are demoted to LEAD_ONLY rather than excluded: a forum thread is a perfectly
+# good pointer to something worth checking on the vendor's real docs. It just cannot
+# settle anything on its own.
+_UGC_HOST_PREFIXES = ("community.", "forum.", "forums.", "discuss.", "answers.",
+                      "ask.", "support-community.", "users.", "help-community.")
+_UGC_PATH_HINTS = ("/t/", "/questions/", "/discussions/", "/threads/", "/topic/",
+                   "/viewtopic", "/forum/", "/community/")
+
+
+def is_user_generated(url: str) -> bool:
+    """Is this a forum or Q&A page, even on an otherwise official host?"""
+    host = domain(url).lower()
+    low = (url or "").lower()
+    if any(host.startswith(p) for p in _UGC_HOST_PREFIXES):
+        return True
+    return any(h in low for h in _UGC_PATH_HINTS)
+
 
 def _host_matches(host: str, allowed: Iterable[str]) -> bool:
     """True if host equals, or is a subdomain of, any allowed domain."""
@@ -147,6 +173,33 @@ class Subject:
         )
 
 
+def with_provider(subject: Subject, provider_domains: Iterable[str]) -> Subject:
+    """Fold a serving provider's domains into a subject's authority set.
+
+    A taught model id has two parties: the **family owner** and the **serving
+    provider**. `llama-3.3-70b-versatile` is Meta's model, but Groq is who serves it and
+    therefore who can retire it. Without this, Groq's own deprecation table classifies
+    as LEAD_ONLY against a subject attributed to Meta, the claim is built
+    non-substantiating, and the finding is silently dropped - which is exactly what
+    happened for a model sitting in 15 graded items.
+
+    This widens authority, so the caller must have earned it: `probe/models.py` only
+    calls this for a provider whose **own catalogue names the exact id**, which is
+    self-verifying - if Groq lists it, Groq serves it. `main.py verify` asserts that
+    invariant against the artifacts.
+    """
+    extra = {d.strip().lower() for d in provider_domains if d and d.strip()}
+    if not extra:
+        return subject
+    return Subject(
+        name=subject.name,
+        official_domains=tuple(sorted(set(subject.official_domains) | extra)),
+        docs_url=subject.docs_url, homepage=subject.homepage,
+        changelog_url=subject.changelog_url, pricing_url=subject.pricing_url,
+        status_url=subject.status_url,
+    )
+
+
 def classify(url: str, subject: Optional[Subject] = None,
              kind: Optional[ClaimKind] = None) -> Tier:
     """Authority of `url` for a claim of `kind` about `subject`."""
@@ -157,6 +210,11 @@ def classify(url: str, subject: Optional[Subject] = None,
     low = (url or "").lower()
     if _host_matches(host, EXCLUDED_DOMAINS) or any(h in low for h in _EXCLUDED_HINTS):
         return Tier.EXCLUDED
+
+    # A forum on the vendor's own host is not the vendor. Checked BEFORE the authority
+    # test, because the whole problem is that it passes that test.
+    if is_user_generated(url):
+        return Tier.LEAD_ONLY
 
     # The subject's own domains outrank everything else, for every claim kind.
     if subject and _host_matches(host, subject.official_domains):

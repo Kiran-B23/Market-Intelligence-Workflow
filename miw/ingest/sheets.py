@@ -50,6 +50,101 @@ NOT_A_TOOL = {"", "-", "n/a", "na", "none", "nil", "tbd", "todo", "react", "reac
               "babel", "no tools", "not applicable"}
 
 
+# Workbook filename -> course title. Matched on a NORMALISED STEM, never the exact
+# filename: an exact-match version silently broke when the workbooks were renamed, and
+# because the lookup fell back to the filename itself, 3,633 sheet locations were
+# attributed to three phantom courses called "AI for Finance - Course Contents.xlsx" and
+# friends. This lives here rather than in `main.py` because BOTH `ingest` (for the
+# authoritative session numbering) and `extract` (for the tool columns) need it, and two
+# copies of this map is how the phantom-course bug would come back.
+# Filename fragment -> course title, for workbooks whose name predates the derivation
+# rule below. These are ALIASES and they are load-bearing: "Intro to Generative AI -
+# Course Contents.xlsx" normalises to `introtogenerativeai`, while the course's slug and
+# title both normalise to `introtogenai` — neither is a substring of the other. Derive
+# only, and the biggest course silently loses its workbook: session numbering falls back
+# to positional (the 81-unit off-by-one of PRD §31 returning) and `ingest` exits 1.
+LEGACY_WORKBOOK_KEYS = {
+    "genai": "Intro to Gen AI", "generativeai": "Intro to Gen AI",
+    "llmapps": "Building LLM Applications",
+    "llmapplications": "Building LLM Applications",
+    "aiforfinance": "AI for Finance",
+    "pse": "PSE",
+}
+# Kept as the old name so nothing that imported it breaks.
+WORKBOOK_COURSES = LEGACY_WORKBOOK_KEYS
+
+# Below this length a key matches by EQUALITY only. Substring matching on a short key is
+# how a course slugged `ai` would steal `AI for Finance - Course Contents.xlsx`.
+_MIN_SUBSTRING_KEY = 5
+
+
+def norm_stem(workbook: str) -> str:
+    return re.sub(r"[^a-z0-9]", "",
+                  str(workbook).lower().replace("course contents", "")
+                  .replace("contents", "").replace(".xlsx", ""))
+
+
+def workbook_keys() -> dict:
+    """key -> course title, built from the roster plus the legacy aliases.
+
+    Composed so earlier sources win: an entry's explicit `workbook_keys`, then the
+    legacy aliases (filtered to courses still in the roster), then keys derived from
+    each course's slug and title. A course registered through the UI needs no alias,
+    because the API names its uploaded workbook `<title> - Course Contents.xlsx`, whose
+    stem IS the derived title key.
+    """
+    from config.constants import COURSES
+
+    out: dict = {}
+    roster = dict(COURSES.items())
+    titles = {m["title"] for m in roster.values()}
+    for meta in roster.values():
+        for k in (meta.get("workbook_keys") or []):
+            out.setdefault(norm_stem(k), meta["title"])
+    for k, title in LEGACY_WORKBOOK_KEYS.items():
+        if title in titles:
+            out.setdefault(k, title)
+    for slug, meta in roster.items():
+        out.setdefault(norm_stem(slug), meta["title"])
+        out.setdefault(norm_stem(meta["title"]), meta["title"])
+    return {k: v for k, v in out.items() if k}
+
+
+def course_for_workbook_detail(workbook: str) -> tuple:
+    """(title, reason). An empty title is always a problem the caller must report.
+
+    Ambiguity resolves to "" as well: two courses matching one filename is exactly the
+    phantom-course risk that returning "" exists to prevent, and guessing between them
+    would attribute a whole course's tool declarations to the wrong place.
+    """
+    stem = norm_stem(workbook)
+    if not stem:
+        return "", "filename normalises to nothing"
+    keys = workbook_keys()
+    if stem in keys:
+        return keys[stem], ""
+    hits = set()
+    for key in sorted(keys, key=len, reverse=True):
+        if len(key) < _MIN_SUBSTRING_KEY:
+            continue                      # short keys match by equality only
+        if key in stem or stem in key:
+            hits.add(keys[key])
+    if not hits:
+        return "", "maps to no course in the roster"
+    if len(hits) > 1:
+        return "", f"ambiguous: matches {' and '.join(sorted(hits))}"
+    return hits.pop(), ""
+
+
+def course_for_workbook(workbook: str) -> str:
+    """The course a workbook belongs to, or "" when it maps to none.
+
+    Returning "" is deliberate and callers must treat it as a problem to report: a
+    fallback to the workbook's own name is what invented the phantom courses.
+    """
+    return course_for_workbook_detail(workbook)[0]
+
+
 def _norm_header(v) -> str:
     return re.sub(r"\s+", " ", str(v or "").strip().lower())
 
