@@ -110,6 +110,25 @@ CREATE INDEX IF NOT EXISTS idx_events_run ON job_events(run_id, id);
 -- column could only represent that by lying. `course_slug = '*'` means unscoped, which
 -- is the honest semantic: an all-courses sweep really did audit PSE and belongs in
 -- PSE's history, while a run scoped to one course must not appear elsewhere.
+-- What a run FOUND, captured the moment its `analyse` stage exits.
+--
+-- It has to be recorded rather than inferred. The findings artifact carries
+-- `examined_this_run` and a `coverage` map of dep_id -> stamp, but both describe the
+-- LAST analyse to touch the file: one later run, or one manual `main.py analyse`, and
+-- an earlier run's findings can no longer be told apart. A log line saying "19 findings
+-- raised" is not something a reviewer can click.
+CREATE TABLE IF NOT EXISTS job_findings (
+    run_id     TEXT,
+    finding_id TEXT,
+    dep_id     TEXT,
+    signal     TEXT,
+    severity   TEXT,
+    name       TEXT,
+    diff_class TEXT,
+    courses    TEXT,
+    PRIMARY KEY (run_id, finding_id)
+);
+
 CREATE TABLE IF NOT EXISTS job_courses (
     run_id      TEXT,
     course_slug TEXT,
@@ -242,6 +261,53 @@ class JobRunner:
         self.q.put(run_id)
         return run_id
 
+    def _record_findings(self, run_id: str) -> None:
+        """Snapshot the findings this run's `analyse` just produced.
+
+        Keyed on `examined_this_run`, which is the set of dependencies the stage
+        actually looked at — a finding carried forward from another scope was not found
+        by this run and must not be claimed as such.
+        """
+        import glob
+
+        try:
+            files = sorted(glob.glob(str(ROOT / "out" / "findings_*.json")))
+            if not files:
+                return
+            data = json.loads(Path(files[-1]).read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            self.event(run_id, "analyse", f"-- could not record findings: {exc} --")
+            return
+
+        examined = set(data.get("examined_this_run") or [])
+        rows = [f for f in (data.get("findings") or [])
+                if not examined or f.get("dep_id") in examined]
+        with self.lock:
+            for f in rows:
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO job_findings (run_id, finding_id, dep_id,"
+                    " signal, severity, name, diff_class, courses)"
+                    " VALUES (?,?,?,?,?,?,?,?)",
+                    (run_id, f.get("finding_id", ""), f.get("dep_id", ""),
+                     f.get("signal", ""), f.get("severity", ""),
+                     f.get("canonical_name", ""), f.get("diff_class", ""),
+                     json.dumps(f.get("courses") or [])))
+            self.conn.commit()
+        self.event(run_id, "analyse",
+                   f"recorded {len(rows)} finding(s) against this run")
+
+    def findings_for(self, run_id: str) -> list:
+        """What this run found, newest-severity first."""
+        order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        rows = [dict(r) for r in self._read(
+            "SELECT * FROM job_findings WHERE run_id=?", (run_id,))]
+        for r in rows:
+            try:
+                r["courses"] = json.loads(r["courses"] or "[]")
+            except json.JSONDecodeError:
+                r["courses"] = []
+        return sorted(rows, key=lambda r: (order.get(r["severity"], 9), r["name"]))
+
     def _backfill_job_courses(self) -> None:
         """Give pre-existing runs their course rows. Idempotent, one pass.
 
@@ -352,6 +418,10 @@ class JobRunner:
                     cmd.append("--refine")
                 self.event(run_id, stage, f"$ {' '.join(cmd[2:])}")
                 code = self._stream(run_id, stage, cmd)
+                if stage == "analyse" and code in (0, 1):
+                    # Immediately after, while `examined_this_run` in the artifact is
+                    # still this run's. Any later analyse overwrites it.
+                    self._record_findings(run_id)
                 # `ingest` exits 1 on data problems it has already reported; that is a
                 # warning, not a stage failure.
                 if code not in (0, 1):

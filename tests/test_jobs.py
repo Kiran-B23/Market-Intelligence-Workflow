@@ -215,3 +215,98 @@ def test_an_existing_jobs_db_gains_the_llm_column(tmp_path, monkeypatch):
         assert json.loads(r.get(rid)["llm"]) == {"provider": "anthropic"}
     finally:
         r.conn.close()
+
+
+# ------------------------------------------- what a run FOUND, not just logged
+
+def test_a_runs_findings_are_recorded_against_it(tmp_path, monkeypatch):
+    """The run view used to show only a log. "19 findings raised" is not actionable.
+
+    Recorded at the moment `analyse` exits, because the artifact's
+    `examined_this_run`/`coverage` describe the LAST analyse to touch the file — one
+    later run, or one manual `main.py analyse`, and an earlier run's findings can no
+    longer be told apart.
+    """
+    from miw.api import jobs as J
+
+    with _bare_runner(tmp_path) as r:
+        out = tmp_path / "out"
+        out.mkdir()
+        (out / "findings_2026-01-02.json").write_text(json.dumps({
+            "analysed_at": "2026-01-02",
+            "examined_this_run": ["d1", "d2"],
+            "findings": [
+                {"finding_id": "f1", "dep_id": "d1", "signal": "S7",
+                 "severity": "critical", "canonical_name": "gizmo-1",
+                 "diff_class": "new", "courses": ["Intro to Gen AI"]},
+                {"finding_id": "f2", "dep_id": "d2", "signal": "S6",
+                 "severity": "low", "canonical_name": "lib", "diff_class": "unchanged",
+                 "courses": ["PSE"]},
+                # Carried forward from another scope: this run did not examine d9, so
+                # claiming it found this would be false.
+                {"finding_id": "f3", "dep_id": "d9", "signal": "S1",
+                 "severity": "high", "canonical_name": "elsewhere",
+                 "diff_class": "unchanged", "courses": ["PSE"]},
+            ]}))
+        monkeypatch.setattr(J, "ROOT", tmp_path)
+
+        rid = r.submit(scope={"courses": ["PSE"]}, stages=["analyse"])
+        r._record_findings(rid)
+
+        got = r.findings_for(rid)
+        assert [f["finding_id"] for f in got] == ["f1", "f2"], \
+            "only what this run examined"
+        assert got[0]["severity"] == "critical", "severest first"
+        assert got[0]["courses"] == ["Intro to Gen AI"]
+        assert got[1]["diff_class"] == "unchanged", \
+            "carried-forward is recorded as such, not passed off as new"
+
+
+def test_recording_is_idempotent_so_a_replay_does_not_double_count(tmp_path, monkeypatch):
+    from miw.api import jobs as J
+    with _bare_runner(tmp_path) as r:
+        out = tmp_path / "out"; out.mkdir()
+        (out / "findings_2026-01-02.json").write_text(json.dumps({
+            "examined_this_run": ["d1"],
+            "findings": [{"finding_id": "f1", "dep_id": "d1", "signal": "S7",
+                          "severity": "high", "canonical_name": "x",
+                          "diff_class": "new", "courses": []}]}))
+        monkeypatch.setattr(J, "ROOT", tmp_path)
+        rid = r.submit(scope={}, stages=["analyse"])
+        r._record_findings(rid)
+        r._record_findings(rid)
+        assert len(r.findings_for(rid)) == 1
+
+
+def test_a_missing_or_broken_artifact_is_reported_not_raised(tmp_path, monkeypatch):
+    """A recording failure must not fail the run that already succeeded."""
+    from miw.api import jobs as J
+    with _bare_runner(tmp_path) as r:
+        (tmp_path / "out").mkdir()
+        monkeypatch.setattr(J, "ROOT", tmp_path)
+        rid = r.submit(scope={}, stages=["analyse"])
+        r._record_findings(rid)                    # no artifact at all
+        assert r.findings_for(rid) == []
+
+        (tmp_path / "out" / "findings_2026-01-02.json").write_text("{ not json")
+        r._record_findings(rid)                    # malformed
+        assert r.findings_for(rid) == []
+        assert any("could not record findings" in e["line"]
+                   for e in r.events(rid, 0))
+
+
+def test_findings_are_recorded_only_for_the_run_that_examined_them(tmp_path, monkeypatch):
+    from miw.api import jobs as J
+    with _bare_runner(tmp_path) as r:
+        out = tmp_path / "out"; out.mkdir()
+        (out / "findings_2026-01-02.json").write_text(json.dumps({
+            "examined_this_run": ["d1"],
+            "findings": [{"finding_id": "f1", "dep_id": "d1", "signal": "S7",
+                          "severity": "high", "canonical_name": "x",
+                          "diff_class": "new", "courses": []}]}))
+        monkeypatch.setattr(J, "ROOT", tmp_path)
+        a = r.submit(scope={}, stages=["analyse"])
+        b = r.submit(scope={}, stages=["analyse"])
+        r._record_findings(a)
+        assert len(r.findings_for(a)) == 1
+        assert r.findings_for(b) == [], "a second run inherits nothing"

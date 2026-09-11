@@ -994,6 +994,7 @@
     </div>
 
     <h2>Run log</h2>
+    <div id="runfindings"></div>
     <pre class="log" id="log">No run started in this session. Pick a scope above and press Run audit.</pre>
 
     <h2>Recent runs</h2>
@@ -2416,6 +2417,8 @@ async function poll(runId, after) {
   clearTimeout(POLL);
   const d = await get(`/api/runs/${runId}?after=${after}`);
   renderLog(d.events, false);
+  /* Findings first, log second: the log is how it ran, these are what it means. */
+  renderRunFindings(d.findings, d.run);
   const st = d.run.status;
   const stage = d.run.stage_now ? ` · ${d.run.stage_now}` : '';
   $('#runstatus').innerHTML = (st === 'running' || st === 'queued')
@@ -2512,6 +2515,47 @@ $('#cancelbtn').onclick = async () => {
   await fetch(`/api/runs/${CURRENT_RUN}/cancel`, {method:'POST'});
 };
 
+/* ---------- what a run found ----------
+   The run view used to show only its log. "19 findings raised" in a log line is not
+   something a reviewer can act on, so the findings are recorded against the run when
+   its `analyse` stage exits and rendered here, each one opening the detail panel.
+
+   Recorded rather than inferred on purpose: the findings artifact's `examined_this_run`
+   and `coverage` both describe the LAST analyse to touch the file, so one later run —
+   or one manual `main.py analyse` — makes an earlier run's findings unattributable. */
+function renderRunFindings(rows, run) {
+  const box = $('#runfindings');
+  if (!box) return;
+  const stages = (() => {
+    try { return JSON.parse((run && run.stages) || '[]'); } catch (e) { return []; }
+  })();
+  if (!rows || !rows.length) {
+    box.innerHTML = stages.includes('analyse')
+      ? `<div class="empty">This run examined its scope and recorded
+         <b>no findings</b> — nothing in scope was in a state worth reporting.</div>`
+      : `<div class="empty">No findings: this run did not include the
+         <code>analyse</code> stage, so nothing was scored.</div>`;
+    return;
+  }
+  const fresh = rows.filter(r => r.diff_class !== 'unchanged').length;
+  box.innerHTML = `<h2>What this run found (${rows.length})</h2>
+    <p class="hint">${fresh
+      ? `<b>${fresh}</b> new or worsened, ${rows.length - fresh} already open and
+         unchanged.`
+      : `All ${rows.length} were already open and unchanged — this run confirmed them
+         rather than finding anything new.`} Click one to see where it is, what proves
+      it, and what to change.</p>
+    <div class="panel" style="padding:0">` + rows.map(r => `
+      <div class="srow" data-detail="${esc(r.finding_id)}" role="button" tabindex="0"
+           title="Where it is used, and what to change">
+        <span class="chip ${esc(r.severity)}">${esc(r.severity)}</span>
+        <span class="chip sig">${esc(r.signal)}</span>
+        <span><b>${esc(r.name)}</b>
+          <span class="note"> · ${esc((r.courses || []).join(', ') || 'no course')}${
+            r.diff_class === 'unchanged' ? ' · unchanged' : ' · ' + esc(r.diff_class)}</span>
+        </span></div>`).join('') + '</div>';
+}
+
 async function loadRuns() {
   /* Course-scoped: an unscoped sweep still appears here (it really did audit this
      course), but another course's scoped run does not. */
@@ -2522,11 +2566,19 @@ async function loadRuns() {
       (sc.sessions||[]).length ? 's' + sc.sessions.join(',') : null].filter(Boolean).join(' · ');
     const cls = {done:'ok', failed:'critical', interrupted:'high',
       cancelled:'n', running:'sig', queued:'n'}[r.status] || 'n';
+    /* What it FOUND, on the row itself. A run that only says "done" tells a reviewer
+       nothing about whether to look at it. */
+    const n = r.findings_count || 0;
+    const sev = r.worst_severity || '';
+    const found = n
+      ? `<span class="chip ${esc(sev || 'n')}">${n} finding${n === 1 ? '' : 's'}</span>`
+      : '<span class="note">no findings recorded</span>';
     return `<div class="runrow">
       <span class="chip ${cls}">${esc(r.status)}</span>
       <span class="mono">${esc(r.run_id)}</span>
       <span>${esc(r.label || where)}<span class="note"> · ${esc(JSON.parse(r.stages||'[]').join(', '))}</span></span>
-      <a href="#" class="mono" data-open="${esc(r.run_id)}">view log</a></div>`;
+      ${found}
+      <a href="#" class="mono" data-open="${esc(r.run_id)}">open</a></div>`;
   }).join('') : '<div class="runrow"><span class="note">no runs yet</span></div>';
   document.querySelectorAll('[data-open]').forEach(a => a.onclick = e => {
     e.preventDefault(); renderLog([], true); poll(a.dataset.open, 0);

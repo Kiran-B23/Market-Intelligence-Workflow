@@ -358,3 +358,36 @@ def test_the_active_provider_is_readable_beside_the_control():
     fact is how they come to disagree."""
     assert "LLM.active.provider" in PAGE, "the rail names what `auto` resolves to"
     assert "Change the provider or model" not in PAGE, "the old link is gone"
+
+
+# ------------------------------- a run has to show what it found
+
+def test_the_run_view_shows_what_it_found_not_only_its_log():
+    """"19 findings raised" in a log line is not something a reviewer can act on."""
+    assert 'id="runfindings"' in PAGE
+    assert "function renderRunFindings" in PAGE
+    assert "What this run found" in PAGE
+
+
+def test_each_finding_from_a_run_opens_the_detail_panel():
+    body = PAGE[PAGE.index("function renderRunFindings"):]
+    body = body[:body.index("\n}\n")]
+    assert "data-detail=" in body, "reuses the existing slide-over"
+    assert 'role="button" tabindex="0"' in body, "and stays keyboard reachable"
+
+
+def test_carried_forward_findings_are_not_passed_off_as_new():
+    assert "already open and\n         unchanged" in PAGE or "already open and" in PAGE
+    assert "confirmed them" in PAGE
+
+
+def test_a_run_without_the_analyse_stage_says_why_it_has_no_findings():
+    """Empty because nothing was scored is a different fact from empty because nothing
+    was wrong, and a reviewer needs to know which."""
+    assert "did not include the" in PAGE and "stage, so nothing was scored" in PAGE
+    assert "nothing in scope was in a state worth reporting" in PAGE
+
+
+def test_the_history_row_says_what_the_run_produced():
+    assert "findings_count" in PAGE and "worst_severity" in PAGE
+    assert "no findings recorded" in PAGE

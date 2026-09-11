@@ -1084,7 +1084,15 @@ def list_runs(limit: int = 20, course: str = "") -> dict:
     title = _resolve_course(course)
     r = runner()
     rows = r.list(limit, course_slug=slug_of(title) if title else "")
-    return {"active": r.active(), "runs": [dict(x) for x in rows], "course": title}
+    out = []
+    for x in rows:
+        row = dict(x)
+        # So a history row can say what it produced, not just that it finished.
+        found = r.findings_for(row["run_id"])
+        row["findings_count"] = len(found)
+        row["worst_severity"] = found[0]["severity"] if found else ""
+        out.append(row)
+    return {"active": r.active(), "runs": out, "course": title}
 
 
 @app.get("/api/runs/{run_id}")
@@ -1095,8 +1103,12 @@ def get_run(run_id: str, after: int = 0) -> dict:
     if row is None:
         raise HTTPException(404, f"no run {run_id}")
     events = [dict(e) for e in r.events(run_id, after)]
+    # What the run FOUND, not only what it logged. "19 findings raised" in a log line
+    # is not something a reviewer can act on; each row here carries its finding_id, so
+    # the UI can open it in the detail panel.
     return {"run": dict(row), "events": events,
-            "last_event_id": events[-1]["id"] if events else after}
+            "last_event_id": events[-1]["id"] if events else after,
+            "findings": r.findings_for(run_id)}
 
 
 @app.post("/api/runs/{run_id}/cancel")
