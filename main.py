@@ -616,7 +616,7 @@ def cmd_gaps(args) -> int:
     re-classify each citation without trusting the tier the artifact records - the same
     arrangement the probe artifact provides for provider widening.
     """
-    from miw.analyse.curriculum import CurriculumIndex
+    from miw.analyse.curriculum import CurriculumIndex, session_bodies
     from miw.analyse.gaps import area_coverage, find_gaps, load_areas
     from miw.analyse.score import fingerprint_of
     from miw.artifacts import merge_by_dep
@@ -631,10 +631,20 @@ def cmd_gaps(args) -> int:
         print("no workbook could be mapped to a course, so no session has a "
               "description to compare against; nothing to do", file=sys.stderr)
         return 2
-    index = CurriculumIndex.from_outlines(outlines)
+    # Everything the sessions actually contain, not just the workbook's summary of
+    # them. The coverage check used to see 0.4% of the curriculum text already on disk.
+    bodies = session_bodies()
+    index = CurriculumIndex.from_outlines(outlines, bodies)
     areas = load_areas(getattr(args, "topics", None) or "registry/topics.yaml")
+    summary_chars = sum(len(d.outline) + len(d.key_takeaways) + len(d.session_name)
+                        for d in index.docs)
+    body_chars = sum(len(d.body) for d in index.docs)
+    with_body = sum(1 for d in index.docs if d.body)
     print(f"  {len(index.docs)} session(s) indexed from {len(outlines)} workbook(s); "
           f"{len(areas)} curriculum area(s) declared")
+    print(f"  coverage reads {summary_chars + body_chars:,} char(s): "
+          f"{summary_chars:,} of deck summary + {body_chars:,} of session content "
+          f"({with_body}/{len(index.docs)} session(s) have content)")
     if not areas:
         print("  registry/topics.yaml declares no area with a source; nothing to do")
         return 0
@@ -1198,6 +1208,35 @@ def cmd_verify(args) -> int:
     else:
         raw = json.load(open(path[-1]))
         findings = raw["findings"]
+
+        def _subject_for_claim(f: dict, claim: dict, dep_subject):
+            """Whose authority settles THIS claim.
+
+            Usually the dependency's. But a finding also carries claims about its
+            candidate REPLACEMENTS, lifted onto it so the digest can cite them, and
+            those are about a different subject entirely: an S10 on Murf.AI carries a
+            pricing claim sourced from `vozo.ai`, which is authoritative about Vozo and
+            LEAD_ONLY about Murf.AI. Re-classifying it against the dependency reported
+            a violation that was not one - the auditor rebuilding the wrong subject,
+            which is the same mistake `with_provider` exists to prevent one step above.
+            `Claim.subject_name` has recorded the true subject since the beginning, so
+            this needs no new data, only for the auditor to read it.
+            """
+            from miw.trust import Subject, domain as _dom
+            want = (claim.get("subject_name") or "").strip().casefold()
+            if not want:
+                return dep_subject
+            for alt in (f.get("alternatives") or []):
+                if (alt.get("name") or "").strip().casefold() != want:
+                    continue
+                doms = {d for d in (_dom(alt.get("homepage") or ""),) if d}
+                for c in (alt.get("claims") or []):
+                    d = _dom(c.get("source_url") or "")
+                    if d:
+                        doms.add(d)
+                return Subject(name=alt.get("name", ""),
+                               official_domains=tuple(sorted(doms)))
+            return dep_subject
         print(f"  findings: {len(findings)} in {path[-1].name}")
         for f in findings:
             claims = f.get("claims") or []
@@ -1233,6 +1272,8 @@ def cmd_verify(args) -> int:
                 prov = (probe_rows.get(f.get("dep_id")) or {}).get("provider_domains")
                 if dep is not None and dep.kind == "model" and prov:
                     subj = dep.subject_with_provider(prov)
+                # A claim about a candidate replacement is about the replacement.
+                subj = _subject_for_claim(f, c, subj)
                 actual = classify(c["source_url"], subj, kind)
                 if actual is not stored:
                     problems.append(

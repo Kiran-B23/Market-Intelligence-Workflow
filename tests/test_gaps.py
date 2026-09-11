@@ -6,6 +6,7 @@ mistake is the one that loses a reviewer's trust. The fixtures are the real Goog
 Microsoft documentation pages as fetched on 11 Sep 2026, so the parsing tests pin
 behaviour against markup we actually saw rather than markup we imagined.
 """
+import json
 from pathlib import Path
 
 import pytest
@@ -623,3 +624,143 @@ def test_code_and_sub_headings_never_enter_a_quote():
     assert [i.name for i in got.items] == ["Parallel function calling"]
     ctx = got.items[0].context
     assert "Python" not in ctx and "JavaScript" not in ctx and "{" not in ctx
+
+
+# ------------------------------------------- coverage reads the content, not the summary
+
+def test_coverage_reads_session_content_but_placement_does_not():
+    """The two questions want different evidence, and mixing them breaks placement.
+
+    "Do we already teach this?" is answered by any mention anywhere, so it reads the
+    session's full content. "Which session does this belong in?" is a comparison BETWEEN
+    sessions, and `place()` normalises by the query's weight rather than the document's
+    length — so a session carrying 300KB of reading material would out-hit one with a
+    550-character outline on surface area alone. That is the failure that once put "Tree
+    of Thoughts" in a session about n8n merge nodes.
+    """
+    doc = _session_5()
+    doc.body = "Self-consistency samples several reasoning paths and takes the majority."
+    ix = CurriculumIndex([doc, _session_8(), _session_13()])
+
+    # Coverage sees it.
+    assert ix.teaches_anywhere(normalise("Self-consistency"),
+                               ix.topic_terms("Self-consistency"))
+    # Placement does not — `tokens` stays the summary, so the body cannot tip a ranking.
+    assert "consistency" not in set(doc.tokens)
+
+
+def test_more_indexed_text_never_invents_a_gap():
+    """Coverage can only ever REMOVE a gap, never add one.
+
+    A regression here would be invisible in the finding count alone, because a run that
+    both resolved one gap and invented another still reports the same total.
+    """
+    g, m = _sources()
+    pages = {GOOGLE: _Fetch(_fixture("google_prompting_strategies.html")),
+             MSFT: _Fetch(_fixture("msft_prompt_engineering.html"))}
+    thin = find_gaps([_area([g, m])], _index(), fetcher=_fetcher(pages))
+
+    docs = [_session_5(), _session_8(), _session_13()]
+    for d in docs:
+        d.body = ("This session's reading material discusses breaking a complex task "
+                  "down into smaller components, at length.")
+    fat = find_gaps([_area([g, m])], CurriculumIndex(docs), fetcher=_fetcher(pages))
+
+    thin_names = {f.canonical_name for f in thin.findings}
+    fat_names = {f.canonical_name for f in fat.findings}
+    assert fat_names <= thin_names, f"indexing more text invented: {fat_names - thin_names}"
+    # And it did remove one: the body covers "Break the task down".
+    assert "Break the task down" in thin_names
+    assert "Break the task down" not in fat_names
+
+
+def test_session_bodies_reads_prose_and_skips_code(tmp_path):
+    """Source files are not evidence that a session teaches a concept.
+
+    `import langchain` in a solution says the session uses a library — which the
+    dependency inventory records far more precisely — and feeding code into a
+    natural-language coverage check mostly contributes identifiers that collide with
+    topic names.
+    """
+    from miw.analyse.curriculum import session_bodies
+    p = tmp_path / "records.jsonl"
+    rows = [
+        {"course": "C", "session_no": 1, "evidence_source": "markdown",
+         "object_type": "LEARNING_RESOURCE", "body_text": "reading material prose"},
+        {"course": "C", "session_no": 1, "evidence_source": "solution_code",
+         "object_type": "CODING_QUESTIONS", "body_text": "import langchain"},
+        {"course": "C", "session_no": 1, "evidence_source": "url_field",
+         "object_type": "LEARNING_RESOURCE", "body_text": "https://example.com"},
+        # The deck summary already arrives through `outline`/`key_takeaways`.
+        {"course": "C", "session_no": 1, "evidence_source": "markdown",
+         "object_type": "SESSION_PPT", "body_text": "deck outline text"},
+        # A record with no session cannot be attributed to one.
+        {"course": "C", "session_no": None, "evidence_source": "markdown",
+         "object_type": "LEARNING_RESOURCE", "body_text": "orphan"},
+    ]
+    p.write_text("\n".join(json.dumps(r) for r in rows))
+    got = session_bodies(p)
+    assert list(got) == [("C", 1)]
+    assert got[("C", 1)] == "reading material prose"
+
+
+def test_session_bodies_survives_a_missing_artifact(tmp_path):
+    """A `gaps` run before `ingest` has written records must still build an index."""
+    from miw.analyse.curriculum import session_bodies
+    assert session_bodies(tmp_path / "nope.jsonl") == {}
+
+
+def test_body_coverage_needs_the_terms_together_not_merely_present():
+    """The rule that makes coverage survive a 400KB session.
+
+    Applying the summary's "every distinctive word is present somewhere" test to a large
+    body declared "Start with clear instructions" taught in 36 sessions — `start`,
+    `clear` and `instruction` each occur somewhere in almost any large body of teaching
+    prose. In a 550-character summary that co-occurrence is evidence; across 400KB it is
+    a coincidence, so body terms must share a window.
+    """
+    scattered = _session_8()
+    scattered.body = (("We start the notebook. " + "filler words here. " * 80)
+                      + ("The output is clear. " + "more filler text. " * 80)
+                      + "Follow the instruction carefully.")
+    together = _session_8()
+    together.body = "Start with clear instructions when you write the prompt."
+    ix = CurriculumIndex([scattered, together, _session_13()])
+
+    terms = ix.topic_terms("Start with clear instructions")
+    key = normalise("Start with clear instructions")
+    assert terms, "the topic must have distinctive terms for this test to mean anything"
+    assert not scattered.teaches(key, terms), "scattered mentions are not coverage"
+    assert together.teaches(key, terms), "terms in one breath are coverage"
+
+
+def test_the_summary_rule_is_unchanged_by_the_window_rule():
+    """A short summary is one breath by definition, so it keeps the whole-doc rule.
+
+    Session 8 teaches chain-of-thought in its Key Takeaways and has no body at all; that
+    must still register, or adding body indexing would have broken the case the coverage
+    check was built for.
+    """
+    ix = _index()                       # session 8 carries no body at all
+    assert all(d.body == "" for d in ix.docs)
+    for name in ("Chain of thought prompting", "Zero-shot vs few-shot prompts"):
+        hits = ix.teaches_anywhere(normalise(name), ix.topic_terms(name))
+        assert [d.session_no for d in hits] == [8], name
+
+
+def test_verify_judges_an_alternatives_claim_by_the_alternatives_authority():
+    """The auditor must not rebuild the wrong subject.
+
+    A finding carries claims about its candidate REPLACEMENTS so the digest can cite
+    them, and those are about a different subject: an S10 on Murf.AI carries a pricing
+    claim from `vozo.ai`, authoritative about Vozo and LEAD_ONLY about Murf.AI.
+    Re-classifying it against the dependency reported a violation that was not one —
+    the same mistake `with_provider` exists to prevent one level up. This was silently
+    wrong for every S10; there simply had not been one until now.
+    """
+    import subprocess
+    import sys as _s
+    out = subprocess.run([_s.executable, "main.py", "verify"], cwd=str(FIX.parent.parent),
+                         capture_output=True, text=True, timeout=300)
+    assert "INVARIANT VIOLATION" not in out.stdout, out.stdout[-1500:]
+    assert out.returncode == 0

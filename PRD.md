@@ -60,16 +60,15 @@ implied to work.
 | **S7** | Model deprecated or superseded | regression → *Fix* | high | 5 |
 | **S8** | Docs rewritten | regression → *Fix* | low | 3 |
 | **S9** | n8n node / version update | regression → *Fix* | medium | 14 |
-| **S10** | Better alternative available | opportunity → *Change* | low | — |
+| **S10** | Better alternative available | opportunity → *Change* | low | 2 |
 | **S11** | Curriculum topic gap | opportunity → *Change* | low | 5 |
 
 Four have no open finding today, for three different reasons, and the difference
 matters. **S4** is wired and has fired (one open on 9 Sep); nothing is deprecated this
 cycle. **S2** and **S3** depend on a vendor changing its access or pricing *wording*,
 which none has this cycle — these are the quietest signals by design, because a pricing
-page that merely lists prices is not a finding. **S10** has never produced a finding on
-any artifact, and §G says exactly why rather than leaving it to look like the same
-situation as the other three.
+page that merely lists prices is not a finding. **S10** is the rarest signal and fires
+only from the rotation path; §G explains why, and why its count moves so slowly.
 
 **The scope boundary, which is not negotiable.** MIW **never writes to course content or
 the CMS**. It has no production access and is not asking for any. It identifies changes
@@ -376,6 +375,66 @@ python3 main.py serve                      # the UI, http://127.0.0.1:8000
 python3 main.py run-weekly                 # all seven stages, unattended
 ```
 
+### B.2 Coverage now reads the curriculum, not a summary of it
+
+The gap check answers "do we already teach this?" It used to answer it from the
+workbook's four summary fields — **39,144 characters across all 71 sessions** — while
+**9,226,771 characters** of course content sat on disk, already parsed, already carrying a
+session number on every record. It was deciding from **0.4% of the evidence**.
+
+`analyse/curriculum.py` now joins each session's own prose from
+`out/content_records.jsonl`: reading material, question text, worked explanations. Prose
+only — `solution_code` and bare URLs are excluded, because `import langchain` says the
+session *uses* a library (which the dependency inventory records far more precisely) and
+mostly contributes identifiers that collide with topic names.
+
+Two rules keep this honest, and the second was only discovered by measuring:
+
+* **Coverage reads everything; placement still ranks on the summary.** `place()`
+  normalises by the query's weight, not the document's length, so a session carrying
+  300KB of reading material would out-hit one with a 550-character outline on surface
+  area alone — the failure that once put "Tree of Thoughts" in a session about n8n merge
+  nodes. The outline says what a session is *about* (right for placement); the body is
+  evidence of what it *contains* (right for coverage).
+* **In the body, terms must appear together, not merely appear.** Applying the summary's
+  "every distinctive word is present" test to 400KB declared *"Start with clear
+  instructions"* taught in **36 sessions**, because `start`, `clear` and `instruction`
+  each occur somewhere in almost any large body of teaching prose. The body is indexed as
+  overlapping ~60-term windows and the terms must share one. That is what the summary rule
+  always meant; it was implicit only because 550 characters is one breath.
+
+Measured, and the number is the point:
+
+```
+coverage reads     39,144 chars  ->  7,559,206 chars   (193x)
+S11 findings            5        ->        3
+already taught          7        ->        9
+```
+
+**Two of the five gap findings were false positives** — *"Start with clear instructions"*
+and *"Break the task down"* are both taught in Building LLM Applications session 11
+(*Effective Prompting Techniques*), and the check could not see it. The three survivors
+(parallel function calling, compositional function calling, JSON schema support) are
+genuinely absent.
+
+A vector database was considered for this and is not warranted: the corpus is ~7.5MB and
+indexes in under five seconds, and `curriculum.py` uses IDF term overlap rather than
+embeddings *because the score has to be explainable in the finding* — a reviewer settling
+a placement needs "matched on: prompt, chain-of-thought", not a cosine distance.
+
+### B.3 The auditor was rebuilding the wrong subject
+
+Surfaced by the first S10 findings reaching an artifact. A finding carries claims about
+its candidate **replacements** so the digest can cite them, and those are about a
+different subject: the S10 on Murf.AI carries a pricing claim from `vozo.ai`, which is
+authoritative about **Vozo** and LEAD_ONLY about Murf.AI. `cmd_verify` re-classified every
+claim against the *dependency*, so it reported a violation that was not one.
+
+`Claim.subject_name` has recorded the true subject since the beginning, so the fix reads
+data that was already there. This is the same mistake `with_provider` exists to prevent
+one level up — the auditor reconstructing authority differently from the code it audits —
+and it had been silently wrong for every S10; there simply had not been one until now.
+
 ## G. What is not covered yet, stated plainly
 
 * **A newly released model or tool does not become a Change.** A new model is not a
@@ -383,11 +442,15 @@ python3 main.py run-weekly                 # all seven stages, unattended
   will not either. The mechanism exists — `probe/catalogue.py` already reads vendor model
   tables as enumerations, which is the same shape `probe/frontier.py` reads documentation
   headings in — so this is the `gaps` stage pointed at a model catalogue. Not built.
-* **S10 has never produced a finding.** Not because it is gated shut: six alternatives
-  are attached and all six verify. Discovery ran on dependencies that were already broken,
-  and when a dependency has an S1 or S4 its verified replacements attach to *that* finding
-  rather than raising a second one. The rotation path that would raise a standalone S10 on
-  a healthy dependency is wired and has not yet produced a verified candidate.
+* **S10 is the rarest signal, and its two paths are easy to confuse.** When a dependency
+  is already broken (`discovery_reason: breakage`) its verified replacements attach to the
+  existing S1 or S4 — "this is dead, here is a replacement" is one finding, not two — so
+  those never surface as S10. A standalone S10 comes only from the **rotation** path,
+  discovery on a *healthy* dependency, which is deliberately a small slice per run
+  (`ROTATION_SLICE`, `DISCOVERY_SLICE`). Both routes are live on the current artifact:
+  three dependencies carry `breakage` alternatives, two carry `rotation` ones, and those
+  two (Lovable, Murf.AI) are the S10 findings on file. I twice reported that S10 had never
+  fired; that was wrong, and the artifact says so.
 * **n8n is a deliberate hole in gap analysis.** Nine Intro to Gen AI sessions build n8n
   workflows, `docs.n8n.io` yields zero headings to a plain fetch, and no *independent*
   vendor documents n8n's node set, so no area can corroborate it. n8n drift is caught

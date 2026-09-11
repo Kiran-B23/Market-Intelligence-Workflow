@@ -29,7 +29,9 @@ from __future__ import annotations
 
 import math
 import re
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Iterable, Optional
 
 from miw.probe.frontier import normalise
@@ -54,6 +56,19 @@ _STOP = frozenset({
 # floor `ingest/sheets.py` applies to workbook keys, for the same reason. "cot"
 # appears inside "protocol"; "fewshot" appears inside nothing else.
 _MIN_SUBSTRING_KEY = 5
+
+# Which content records count as evidence that a session teaches something.
+#
+# Prose only. An MCQ that asks about chain-of-thought IS coverage — a student meets the
+# idea there — and so is a reading material or a worked explanation. Source files are
+# not: `import langchain` in a solution says the session uses a library, which the
+# dependency inventory already records far more precisely, and feeding code into a
+# natural-language coverage check mostly adds identifiers that collide with topic names.
+# `url_field` is a bare URL, not language.
+_PROSE_SOURCES = frozenset({
+    "markdown", "solution_prose", "title", "question_tag", "test_case_enum",
+})
+_CODE_SOURCES = frozenset({"solution_code", "url_field"})
 
 # Below this, `place()` declines to name a session. Calibrated on the four worked cases
 # in `tests/test_gaps.py`: self-consistency and tree-of-thoughts must reach session 8,
@@ -82,6 +97,31 @@ def _stem(word: str) -> str:
     return w
 
 
+# Body proximity. A window of ~60 terms is roughly a paragraph; the half-window stride
+# means any phrase is wholly inside at least one window rather than being split across
+# a boundary. Both are cheap to widen if coverage proves too strict — the measurement to
+# watch is how many corroborated topics come back as "already taught".
+_WINDOW, _STRIDE = 60, 30
+
+
+def _windows(body: str) -> dict:
+    """Body term -> the set of window ids it occurs in.
+
+    An inverted index rather than a scan, because coverage asks the same question for
+    every topic against every session: "do these terms share a window?" becomes a set
+    intersection, which is constant-ish per topic instead of re-reading 400KB.
+    """
+    toks = _tokens(body)
+    if not toks:
+        return {}
+    out: dict = {}
+    for start in range(0, max(1, len(toks) - _STRIDE), _STRIDE):
+        wid = start // _STRIDE
+        for t in toks[start:start + _WINDOW]:
+            out.setdefault(t, set()).add(wid)
+    return out
+
+
 def _tokens(text: str) -> list[str]:
     """Topical terms, with hyphenated compounds contributing their parts too.
 
@@ -99,9 +139,51 @@ def _tokens(text: str) -> list[str]:
     return out
 
 
+def session_bodies(path: str | Path = "out/content_records.jsonl",
+                   max_chars: int = 600_000) -> dict:
+    """Every session's own prose, keyed `(course, session_no)`.
+
+    Reads the artifact `ingest` already writes. No fetching, no new parsing, and no new
+    input: the records have carried `session_no` since session numbering moved to the
+    workbook, so the grouping is exact rather than inferred.
+
+    `max_chars` is a per-session guard, not a policy. The largest session today is
+    412,232 characters (AI for Finance session 7), so nothing truncates in normal
+    operation; the cap exists so one pathological record cannot make the index
+    unbuildable. A cap that fires routinely would be a silent sampling policy, which is
+    a different and much worse thing.
+    """
+    out: dict = {}
+    path = Path(path)
+    if not path.exists():
+        return out
+    with path.open() as fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            sess = r.get("session_no")
+            if not sess or r.get("evidence_source") not in _PROSE_SOURCES:
+                continue
+            # The deck summary is already in `outline`/`key_takeaways`; counting it
+            # twice inflates nothing but says the same thing in two places.
+            if r.get("object_type") == "SESSION_PPT":
+                continue
+            body = (r.get("body_text") or "").strip()
+            if not body:
+                continue
+            key = (r.get("course") or "", int(sess))
+            cur = out.get(key, "")
+            if len(cur) >= max_chars:
+                continue
+            out[key] = f"{cur}\n{body}" if cur else body
+    return out
+
+
 @dataclass
 class SessionDoc:
-    """One session, as a searchable description of its deck."""
+    """One session: the deck's summary, plus everything the session actually contains."""
     course: str
     session_no: int
     session_name: str
@@ -110,11 +192,25 @@ class SessionDoc:
     key_takeaways: str = ""
     row: int = 0
     workbook: str = ""
+    # Every prose record the session owns - reading material, question text, solution
+    # explanations. Joined from `out/content_records.jsonl`, which already carries a
+    # session number on every record, so this costs one pass over a file we already
+    # write and no fetching at all.
+    #
+    # Why this exists: the coverage check used to read only the four summary fields
+    # above - 39,144 characters across all 71 sessions, against 9,226,771 characters of
+    # course content already on disk. It was deciding "do we already teach this?" from
+    # 0.4% of the evidence, which is the likeliest reason a topic taught in a reading
+    # material or asked about in an MCQ was still reported as a gap.
+    body: str = ""
 
-    # Derived, filled by CurriculumIndex.
+    # Derived, filled by CurriculumIndex. Two token sets on purpose - `tokens` ranks
+    # sessions against each other (placement) and `all_tokens` answers whether this
+    # session mentions something at all (coverage). See `__init__`.
     taught: set = field(default_factory=set)      # normalised keys of taught items
-    tokens: list = field(default_factory=list)
-    blob: str = ""                                # whole description, normalised
+    tokens: list = field(default_factory=list)    # SUMMARY terms only
+    windows: dict = field(default_factory=dict)   # body term -> window ids it occurs in
+    blob: str = ""                                # summary + body, normalised
 
     @property
     def label(self) -> str:
@@ -153,8 +249,30 @@ class SessionDoc:
         words = [t for t in terms if t]
         if not words:
             return False
-        have = set(self.tokens)
-        return all(t in have for t in words)
+        # In the SUMMARY, "every distinctive word is present" is strong evidence,
+        # because the whole thing is ~550 characters — anything appearing in it appears
+        # in the same breath.
+        if all(t in set(self.tokens) for t in words):
+            return True
+        # In the BODY it is not, and this is the rule that has to scale. Applying the
+        # same "somewhere in the document" test to 400KB of reading material declared
+        # "Start with clear instructions" taught in 36 sessions, because `start`,
+        # `clear` and `instruction` each occur somewhere in almost any large body of
+        # teaching prose. Co-occurrence is only evidence when the words are NEAR each
+        # other, so the body is indexed as overlapping windows and the terms must share
+        # one. That is what the summary rule always meant; it was implicit only because
+        # the document was short enough for it not to matter.
+        if not self.windows:
+            return False
+        shared = None
+        for t in words:
+            ids = self.windows.get(t)
+            if not ids:
+                return False
+            shared = ids if shared is None else (shared & ids)
+            if not shared:
+                return False
+        return bool(shared)
 
 
 @dataclass
@@ -181,11 +299,26 @@ class CurriculumIndex:
     def __init__(self, docs: Iterable[SessionDoc]) -> None:
         self.docs = list(docs)
         for d in self.docs:
-            text = " ".join([d.session_name, d.topic_name, d.outline, d.key_takeaways])
-            d.tokens = _tokens(text)
-            d.blob = normalise(text)
-            d.taught = {normalise(f) for f in _fragments(text)}
+            summary = " ".join([d.session_name, d.topic_name, d.outline, d.key_takeaways])
+            full = f"{summary}\n{d.body}" if d.body else summary
+            # COVERAGE reads everything; PLACEMENT ranks on the summary alone.
+            #
+            # Not an oversight - the two questions want different evidence. "Do we
+            # already teach this?" is answered by any mention anywhere, so it reads the
+            # full text. "Which session does this belong in?" is a comparison BETWEEN
+            # sessions, and `place()` normalises by the query's weight rather than the
+            # document's length, so a session with 130KB of content would out-hit one
+            # with a 550-character outline on sheer surface area. That is exactly the
+            # failure that put "Tree of Thoughts" in a session about n8n merge nodes.
+            # The outline is a deliberate summary of what a session is *about*, which
+            # is the right basis for placement; the body is evidence of what it
+            # *contains*, which is the right basis for coverage.
+            d.tokens = _tokens(summary)
+            d.blob = normalise(full)
+            d.windows = _windows(d.body)
+            d.taught = {normalise(f) for f in _fragments(full)}
             d.taught |= {normalise(t) for t in d.tokens}
+            d.taught |= {normalise(t) for t in d.windows}
             d.taught.discard("")
         # Document frequency over the session corpus. A term appearing in 60 of 71
         # sessions ("model", "ai") must not decide placement; one appearing in two
@@ -198,8 +331,15 @@ class CurriculumIndex:
 
     # ------------------------------------------------------------------ build
     @classmethod
-    def from_outlines(cls, outlines: dict) -> "CurriculumIndex":
-        """Build from `main._outlines_by_course()` — {course title: Outline}."""
+    def from_outlines(cls, outlines: dict,
+                      bodies: Optional[dict] = None) -> "CurriculumIndex":
+        """Build from `main._outlines_by_course()` — {course title: Outline}.
+
+        `bodies` is `{(course, session_no): text}` from `session_bodies()`. Optional so
+        the index still builds from the workbook alone — every test that predates this
+        passes none, and a run before `ingest` has written any records still works.
+        """
+        bodies = bodies or {}
         docs = []
         for course, outline in (outlines or {}).items():
             book = getattr(getattr(outline, "stats", None), "workbook", "") or ""
@@ -208,7 +348,8 @@ class CurriculumIndex:
                     course=course, session_no=s.session_no,
                     session_name=s.session_name, topic_name=s.topic_name,
                     outline=s.outline, key_takeaways=s.key_takeaways,
-                    row=s.row, workbook=book))
+                    row=s.row, workbook=book,
+                    body=bodies.get((course, s.session_no), "")))
         return cls(docs)
 
     # ------------------------------------------------------------------ query
@@ -270,6 +411,10 @@ class CurriculumIndex:
         """
         return [t for t in dict.fromkeys(_tokens(name))
                 if self.df.get(t, 0) <= self.n / 2]
+
+    # `df` is built from `tokens` (the summaries), which is what `place()` scores
+    # against, so `idf` and `topic_terms` stay on the same footing they always were.
+    # Coverage does not use `df` at all.
 
     def place(self, name: str, context: str,
               candidates: Optional[Iterable[SessionDoc]] = None,
