@@ -46,6 +46,11 @@ WHY = {
     "S11": "Two independent vendors document this as part of the area, and no "
            "session's outline mentions it, so a student finishes the course without "
            "having met it.",
+    # Says only what a catalogue row establishes. Not "this is better" - nothing here
+    # measures that, and claiming it is how an opportunity signal loses its welcome.
+    "S12": "A vendor the curriculum already depends on has added this since the last "
+           "check, and a session teaches an older member of the same family. Worth a "
+           "decision, not an emergency.",
 }
 
 # Drift classes where merely naming the dependency dates a question. A dead docs link

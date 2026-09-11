@@ -11,6 +11,7 @@ Two jobs:
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -69,6 +70,20 @@ CREATE TABLE IF NOT EXISTS watch_state (
     evidence_url TEXT,
     observed_at  TEXT,
     first_seen   TEXT
+);
+-- What a vendor's catalogue contained the last time we looked, as the full id set.
+--
+-- Deliberately not a hash. `watch_state` already stores `row_set_hash`, which answers
+-- "did this change?" and is all the daily watch needs. Reporting what is NEW needs the
+-- set itself, because the answer is a difference, not a bit. It is the same rule for
+-- every enumerator - vendor model catalogues, n8n's node tree, documentation headings -
+-- so a set difference is mostly deliberate curriculum scoping rather than news, and
+-- only what APPEARED since the last look is worth a finding.
+CREATE TABLE IF NOT EXISTS catalogue_snapshot (
+    source_key  TEXT PRIMARY KEY,
+    ids         TEXT,        -- JSON array, sorted
+    observed_at TEXT,
+    first_seen  TEXT
 );
 CREATE TABLE IF NOT EXISTS watch_signal (
     signal_id    TEXT PRIMARY KEY,
@@ -263,6 +278,35 @@ class State:
             " value=excluded.value, evidence_url=excluded.evidence_url,"
             " observed_at=excluded.observed_at",
             (source_key, kind, value, evidence_url, now, first))
+        self.conn.commit()
+
+    def snapshot(self, source_key: str) -> Optional[set]:
+        """The id set we last saw for this source, or None if we have never looked.
+
+        None and the empty set are different answers and the caller must treat them so:
+        never looked means "seed a baseline and report nothing", while an empty
+        catalogue means the vendor lists nothing, which is a real (and alarming) state.
+        """
+        row = self.conn.execute(
+            "SELECT ids FROM catalogue_snapshot WHERE source_key = ?",
+            (source_key,)).fetchone()
+        if row is None:
+            return None
+        try:
+            return set(json.loads(row["ids"] or "[]"))
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+    def snapshot_save(self, *, source_key: str, ids, now: str) -> None:
+        row = self.conn.execute(
+            "SELECT first_seen FROM catalogue_snapshot WHERE source_key = ?",
+            (source_key,)).fetchone()
+        first = row["first_seen"] if row else now
+        self.conn.execute(
+            "INSERT INTO catalogue_snapshot (source_key, ids, observed_at, first_seen)"
+            " VALUES (?,?,?,?) ON CONFLICT(source_key) DO UPDATE SET"
+            " ids=excluded.ids, observed_at=excluded.observed_at",
+            (source_key, json.dumps(sorted(ids)), now, first))
         self.conn.commit()
 
     def signal_save(self, sig, status: str, now: str) -> bool:

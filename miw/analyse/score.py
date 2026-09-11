@@ -44,6 +44,10 @@ SIGNALS = {
     "S9":  ("n8n node / version update", "regression", "medium"),
     "S10": ("Better alternative available", "opportunity", "low"),
     "S11": ("Curriculum topic gap", "opportunity", "low"),
+    # Not S10. S10 means "we searched for alternatives and verified one could do the
+    # taught job" - a fit judgement. S12 asserts only what the vendor's own catalogue
+    # says: this exists, it is served, and we do not teach it.
+    "S12": ("Newer option from a vendor we already use", "opportunity", "low"),
 }
 
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]

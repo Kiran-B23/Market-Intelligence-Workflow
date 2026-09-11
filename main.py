@@ -619,6 +619,7 @@ def cmd_gaps(args) -> int:
     from miw.analyse.curriculum import (CurriculumIndex, deck_bodies, merge_bodies,
                                         session_bodies)
     from miw.analyse.gaps import area_coverage, find_gaps, load_areas
+    from miw.analyse.newer import find_newer
     from miw.analyse.score import fingerprint_of
     from miw.artifacts import merge_by_dep
     from miw.schema import dump, to_jsonable, utcnow
@@ -684,6 +685,34 @@ def cmd_gaps(args) -> int:
     # for `report` what to WRITE, never what a finding is allowed to say.
     rep = find_gaps(areas, index)
     st = rep.stats
+
+    # The other half of "is what we teach still complete?": what a vendor we already use
+    # has ADDED since we last looked. Same stage because it is the same question, but a
+    # different enumerator — a catalogue rather than a documentation page — and it needs
+    # neither the workbook nor the areas, so it works for a course with no workbook.
+    newer = find_newer(_load_inventory(), State(),
+                       persist=not getattr(args, "dry_run", False))
+    ns = newer.stats
+    print(f"  newer options: {ns.sources_read} catalogue(s) read, {ns.appeared} entry "
+          f"(entries) appeared since the last check -> {ns.findings} finding(s)")
+    if ns.seeded:
+        dry = getattr(args, "dry_run", False)
+        print(f"  FIRST LOOK at {', '.join(ns.seeded)} — nothing raised, because there "
+              f"is no earlier catalogue to compare against. "
+              + ("No baseline was written: this is a dry run."
+                 if dry else "A baseline was recorded; findings start from the next "
+                             "run.")
+              + " A quiet first look is the rule working, not a failure.")
+    for line in ns.unreadable:
+        print(f"  CATALOGUE UNREADABLE: {line}")
+    for line in ns.uncitable:
+        print(f"  NOT CITEABLE: {line}")
+    if ns.appeared:
+        print(f"    of those: {ns.already_taught} already taught, {ns.no_sibling} in no "
+              f"family we teach, {ns.not_offerable} quote-only pricing")
+    rep.findings += newer.findings
+    rep.rows += newer.rows
+    rep.considered |= newer.considered
     if courses:
         wanted = set(courses)
         kept = [f for f in rep.findings

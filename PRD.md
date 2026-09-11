@@ -498,6 +498,62 @@ data that was already there. This is the same mistake `with_provider` exists to 
 one level up — the auditor reconstructing authority differently from the code it audits —
 and it had been silently wrong for every S10; there simply had not been one until now.
 
+### B.4 S12 — a newer option from a vendor we already use
+
+The second enumerator feeding **Changes**, alongside the documentation headings that
+produce S11. Same question — what exists in an area we teach that we do not teach? —
+against a different source: the vendor model tables `probe/catalogue.py` already reads,
+and n8n's own repository tree, which `probe/n8n_upstream.py` has been downloading daily
+and until now only ever consulted in reverse, to check that a node we teach still exists.
+
+**A set difference is not news, and that is the whole design.** Diffed raw against the
+inventory the vendors list **45 models** we do not teach and n8n ships **527 nodes** we
+do not teach — and almost all of it is deliberate curriculum scoping rather than change.
+n8n has always shipped `chainSummarization`; not teaching it is a decision, not something
+that happened this week. So every enumerator goes through a stored id set
+(`State.snapshot`) and reports only what **appeared since the last look**.
+
+The consequence is stated wherever this surfaces: **the first run raises nothing.** It
+has no baseline, so it records one. A quiet first look is the rule working, and a stage
+that printed a bare zero would invite the opposite conclusion — so `cmd_gaps` prints
+`FIRST LOOK at groq (14 entries), google_ai (37 entries), n8n_nodes (565 nodes)` and says
+findings start next run.
+
+Not S10. S10 means "we searched for alternatives and verified one could do the taught
+job" — a fit judgement. S12 asserts only what the vendor's own table says: this exists,
+it is served, we do not teach it. The recommendation says *consider whether*, never
+*replace with*, because nothing here measures which is better.
+
+Four filters, each a property of the row rather than a guess about the product: not
+already taught (exact case-folded, the `vendors.Catalogue.get` rule); not `retired`
+(never suggest adopting something already being sunset); not `quoted_only` (`Contact
+Sales` is not a path a student on a free key can take); and **in a family we already
+teach** — `family()` drops the version segments, so a new `gemini-*-flash` is interesting
+precisely because a session teaches `gemini-2.0-flash`, while a Saudi-Arabic TTS voice is
+a real Groq row with nothing to do with any session. For n8n the relevance test is the
+package, and version variants collapse: `agentV1`/`agentV2`/`agentToolV3` are one node,
+which is most of the difference between 692 shipped types and 565 distinct ones.
+
+Placement is **exact**, unlike S11's: the sessions come from the sibling's own inventory
+locations, so the finding states them as fact.
+
+Three things the build got wrong first and fixed:
+
+* **`--dry-run` wrote the baseline.** It is documented as writing nothing, and it
+  silently consumed the one first look it was supposed to preview — after which a real
+  run would find nothing new and report nothing, with no error anywhere. `persist=False`
+  now, and a test asserts a dry run leaves the snapshot absent.
+* **A recommendation listing 37 session numbers.** A taught model id is referenced across
+  most of a course; the sentence is now `Building LLM Applications (20 sessions, first is
+  3)` above three sessions and enumerated below it.
+* **One "no repo path to quote" line per node** when the cached n8n tree predated node
+  paths being kept. One cause, one fix, so it says so once.
+
+The evidence for an n8n node is the repository path — `packages/@n8n/nodes-langchain/
+nodes/chains/ChainSummarization/ChainSummarization.node.ts` — because the node *type* is
+our derivation from a filename while the path is a line n8n's own tree contains, and
+`github.com` is authoritative for EXISTENCE under `REGISTRY_AUTHORITY`.
+
 ## G. What is not covered yet, stated plainly
 
 * **A newly released model or tool does not become a Change.** A new model is not a

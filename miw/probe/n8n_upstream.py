@@ -52,22 +52,33 @@ def _lower_first(s: str) -> str:
     return s[:1].lower() + s[1:] if s else s
 
 
-def node_types_from_tree(paths: list[str]) -> set[str]:
-    """Derive every shipped node type from the repo's file paths.
+def node_paths_from_tree(paths: list[str]) -> dict:
+    """`{node type: the repo path it was derived from}`.
 
-    `packages/nodes-base/nodes/Schedule/ScheduleTrigger.node.ts`
-        -> `n8n-nodes-base.scheduleTrigger`
+    The path is kept, not just the type, because it is the only quotable evidence that
+    n8n ships a node. The type is *our* derivation from a filename; the path is a line
+    n8n's own repository tree contains, which is what `Claim.build` can be handed for an
+    EXISTENCE claim about a node we do not teach yet.
     """
-    out: set[str] = set()
+    out: dict = {}
     for p in paths:
         m = _NODE_FILE.search(p)
         if not m:
             continue
         for prefix, pkg in PACKAGE_PREFIXES.items():
             if p.startswith(prefix):
-                out.add(f"{pkg}.{_lower_first(m.group(1))}")
+                out.setdefault(f"{pkg}.{_lower_first(m.group(1))}", p)
                 break
     return out
+
+
+def node_types_from_tree(paths: list[str]) -> set[str]:
+    """Derive every shipped node type from the repo's file paths.
+
+    `packages/nodes-base/nodes/Schedule/ScheduleTrigger.node.ts`
+        -> `n8n-nodes-base.scheduleTrigger`
+    """
+    return set(node_paths_from_tree(paths))
 
 
 # --- rule parsing -----------------------------------------------------------
@@ -180,7 +191,8 @@ def upstream(refresh: bool = False, max_rules: int = 60) -> dict:
         return {"ok": False, "error": "tree: unparseable", "nodes": [], "rules": []}
 
     paths = [e.get("path", "") for e in tree.get("tree", [])]
-    nodes = sorted(node_types_from_tree(paths))
+    node_paths = node_paths_from_tree(paths)
+    nodes = sorted(node_paths)
 
     rule_paths = [p for p in paths
                   if p.startswith(RULES_DIR) and p.endswith(".ts")
@@ -195,8 +207,8 @@ def upstream(refresh: bool = False, max_rules: int = 60) -> dict:
         if r:
             rules.append(r.__dict__)
 
-    out = {"nodes": nodes, "rules": rules, "truncated": bool(tree.get("truncated")),
-           "errors": errors}
+    out = {"nodes": nodes, "node_paths": node_paths, "rules": rules,
+           "truncated": bool(tree.get("truncated")), "errors": errors}
     _save_cache(out)
     return {**out, "ok": True, "cached": False}
 
