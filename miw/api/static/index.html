@@ -1136,6 +1136,22 @@
     <div id="held"></div>
   </section>
 
+  <!-- The browsable half of "is what we teach complete?". Explicitly not findings:
+       no severity, no due date, never in the digest. A long-standing coverage hole did
+       not HAPPEN, so it is not news — but somebody is still entitled to look at it. -->
+  <section id="tab-uncovered" hidden>
+    <p class="hint">Everything the vendors we already use currently list, that no session
+      teaches. These are <b>not issues</b> — most of them are deliberate curriculum
+      scoping, and nothing here has a severity or a deadline. What <em>appeared</em>
+      since the last check is reported under <b>Changes</b>; this is the standing
+      picture.</p>
+    <div class="filters">
+      <input class="q" id="ucq" placeholder="search a model or node…">
+      <span class="note" id="uccount"></span>
+    </div>
+    <div class="scroll"><table id="uctable"></table></div>
+  </section>
+
   <section id="tab-inventory" hidden>
     <p class="hint">Every outside tool, model, package and service the courses point
       students at. A row with no official source cannot produce a "deprecated",
@@ -1212,7 +1228,8 @@ let SUMMARY = {}, FINDINGS = [];
      #/watch                  vendor signal timeline (a signal has no course)
      #/global/<view>          runs | trust | digest, across every course
 */
-const VIEWS = ['overview','watch','run','findings','inventory','trust','digest','add'];
+const VIEWS = ['overview','watch','run','findings','uncovered',
+               'inventory','trust','digest','add'];
 let CURRENT_COURSE = null;      // slug, or null for a global view
 let COURSE_TITLE = '';
 
@@ -1254,6 +1271,7 @@ const qs = (extra) => {
    named like a content category, sitting next to one. That is what made the two read as
    the same thing. Actions are verbs here now, and lists are nouns. */
 const COURSE_TABS = [['findings','Fixes'], ['changes','Changes'],
+                     ['uncovered','Never covered'],
                      ['inventory','Tools & models used'],
                      ['run','Run a check'], ['runs','Past checks'],
                      ['digest','Weekly report']];
@@ -1319,7 +1337,8 @@ const word = (group, key) => (WORDS[group] || {})[key] || key || '';
    route cannot drift apart, and a view with no entry here simply renders without one
    rather than showing a broken reference. */
 const VIEW_ICON = {
-  findings: 'fix', changes: 'change', inventory: 'inventory', run: 'run',
+  findings: 'fix', changes: 'change', uncovered: 'inventory', inventory: 'inventory',
+  run: 'run',
   runs: 'history', digest: 'report', trust: 'trust', watch: 'vendor', home: 'home',
   course: 'course', add: 'add',
 };
@@ -1497,6 +1516,7 @@ async function route() {
     show('run'); $('#runform').hidden = false; $('#newrun').hidden = true;
     loadRuns();
   }
+  else if (view === 'uncovered') { show('uncovered'); loadUncovered(); }
   else if (view === 'inventory') { show('inventory'); loadInventory(); }
   else if (view === 'digest') { show('digest');
     $('#digest').textContent = await text('/api/digest' + qs()); }
@@ -2521,6 +2541,41 @@ $('#runverify').onclick = async () => {
   $('#verify').textContent = 'running…';
   $('#verify').textContent = await text('/api/verify');
 };
+
+/* ---------- never covered ----------
+   A table, not cards: there are hundreds of rows and the question asked of them is
+   "does anything here belong in a session", which is a scan, not a read. */
+let ucTimer = null;
+
+async function loadUncovered() {
+  const q = ($('#ucq').value || '').trim();
+  const d = await get('/api/never-covered' + qs(q ? {q} : {}));
+  const vendors = Object.entries(d.by_vendor || {})
+    .map(([v, n]) => `${esc(v)} ${n}`).join(' · ');
+  $('#uccount').textContent = d.total
+    ? `${d.total} not taught${vendors ? ' — ' + vendors : ''}`
+      + (d.truncated ? ` (showing the first ${d.rows.length})` : '')
+    : 'nothing to show yet — run the gaps step';
+  $('#uctable').innerHTML = d.rows.length
+    ? `<thead><tr><th>what</th><th>from</th><th>price</th>
+         <th>related to what we teach</th><th>courses</th></tr></thead><tbody>`
+      + d.rows.map(r => `<tr>
+          <td class="mono">${r.source_url
+            ? `<a href="${esc(r.source_url)}" target="_blank" rel="noopener">${
+                esc(r.identifier)}</a>` : esc(r.identifier)}</td>
+          <td>${esc(r.vendor)}</td>
+          <td class="mono">${esc(r.price || '—')}${
+            r.quoted_only ? ' <span class="chip n">quote only</span>' : ''}</td>
+          <td class="mono">${esc(r.sibling || '—')}${
+            r.relation ? `<span class="note"> · ${esc(r.relation)}</span>` : ''}</td>
+          <td>${esc((r.courses || []).join(', ') || '—')}</td></tr>`).join('')
+      + '</tbody>'
+    : '<tbody><tr><td>No rows.</td></tr></tbody>';
+}
+
+$('#ucq').addEventListener('input', () => {
+  clearTimeout(ucTimer); ucTimer = setTimeout(loadUncovered, 220);
+});
 
 /* ---------- run audit ---------- */
 let COURSES = [], POLL = null, CURRENT_RUN = null;

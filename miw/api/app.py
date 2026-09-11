@@ -472,6 +472,39 @@ def _topic_block(row: dict) -> dict:
             "placements": topic.get("placements") or []}
 
 
+@app.get("/api/never-covered")
+def never_covered(course: str = "", q: str = "", limit: int = 800) -> dict:
+    """Everything the vendors list that no session teaches.
+
+    Explicitly NOT findings. A long-standing coverage hole did not *happen*, so it is
+    not news and must never enter the digest — n8n has always shipped
+    `chainSummarization`, and not teaching it is a curriculum decision. But it is the
+    half a watermark can never surface, and a curriculum lead is entitled to look at it,
+    so it is served as a browsable list with no severity, no due date and no diff.
+
+    `course` filters to rows whose sibling is taught in that course, which is the only
+    sense in which one of these belongs to a course at all.
+    """
+    data = _read("gaps_*.json")
+    rows = data.get("never_covered") or []
+    title = _resolve_course(course)
+    if title:
+        rows = [r for r in rows if title in (r.get("courses") or [])]
+    needle = (q or "").strip().casefold()
+    if needle:
+        rows = [r for r in rows
+                if needle in (r.get("identifier") or "").casefold()
+                or needle in (r.get("vendor") or "").casefold()]
+    total = len(rows)
+    by_vendor: dict = {}
+    for r in rows:
+        by_vendor[r.get("vendor", "?")] = by_vendor.get(r.get("vendor", "?"), 0) + 1
+    return {"generated_at": data.get("generated_at", ""), "course": title,
+            "total": total, "by_vendor": by_vendor,
+            "rows": rows[:max(1, min(limit, 2000))],
+            "truncated": total > limit}
+
+
 @app.get("/api/finding/{finding_id}")
 def finding_detail(finding_id: str, course: str = "", session: str = "",
                    offset: int = 0) -> dict:

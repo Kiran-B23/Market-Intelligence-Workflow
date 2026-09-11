@@ -554,6 +554,43 @@ nodes/chains/ChainSummarization/ChainSummarization.node.ts` — because the node
 our derivation from a filename while the path is a line n8n's own tree contains, and
 `github.com` is authoritative for EXISTENCE under `REGISTRY_AUTHORITY`.
 
+### B.5 The browsable half, and the guard that had to be added
+
+"New this week" and "never covered" are both real questions and only one of them is
+news, so they are answered in different places. `gaps` now writes
+`never_covered` into its sidecar — **600 rows** today (n8n 554, Google 34, Groq 12) —
+served at `/api/never-covered` and rendered as a searchable table under **Never covered**.
+No severity, no due date, no diff, never in the digest. A row carries the nearest thing
+we do teach *and says how it is related*, because the two enumerators mean different
+things by it: `same family` for a model (a newer `gemini-*-flash` beside the taught
+`gemini-2.5-flash`) and `same package` for an n8n node (we build workflows with these,
+which is not the same as "this is a newer version of that"). A column headed "closest
+thing we teach" implied a closeness that was not there.
+
+Two ordering bugs, both found by running it rather than reading it. The browsable list
+was computed *after* the first-look return, so it came back empty on precisely the run
+where someone is most likely to go looking — it needs no baseline, so it now runs before
+the snapshot. And for n8n it also sat behind the citation guard, though it is never
+cited.
+
+**And then the signal emitted 554 findings in one run.** A run reported 564 of 565 n8n
+nodes as having appeared since the last check and wrote all of them into the artifact —
+the digest crying wolf 554 times, which is the exact failure the design was supposed to
+prevent. n8n did not ship 554 nodes in a week; the stored baseline was wrong, and the
+signal had no way to notice.
+
+The fix is a refusal, not a root-cause hunt: if a diff is both **large** (more than ten)
+and **most of the catalogue** (over a quarter), the honest reading is that our snapshot is
+untrustworthy, not that the vendor rewrote everything. The run reseeds, raises nothing,
+and says so. Both conditions are needed — a share alone misfires on small catalogues,
+where one new model out of two is 50% and perfectly ordinary, and a count alone would
+punish a genuinely busy vendor. This is the same discipline as `supported=False` in the
+extractors: an answer we cannot trust must never be dressed as a finding.
+
+The 554 rows were purged from the artifact and from the finding-state ledger, and the
+retirement rule that already covered S11 now covers S12 too — a topic that stops being a
+gap and a catalogue row that stops being new go stale for the same reason.
+
 ## G. What is not covered yet, stated plainly
 
 * **A newly released model or tool does not become a Change.** A new model is not a

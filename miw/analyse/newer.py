@@ -42,6 +42,28 @@ from miw.trust import ClaimKind, Subject
 # node types and 565 distinct ones.
 _VERSION_SUFFIX = re.compile(r"(V\d+)+$")
 
+# If more than this share of a vendor's live catalogue looks new in one run, do not
+# believe it.
+#
+# This is not a tuning knob, it is a safety rule, and it exists because the alternative
+# actually happened: a run reported 564 of 565 n8n nodes as having appeared since the
+# last check and wrote 554 findings into the artifact. n8n did not ship 554 nodes in a
+# week. The snapshot was wrong — a partially written cache, a schema change, a restored
+# database — and the signal had no way to say so.
+#
+# The honest reading of "almost everything is new" is that our baseline is untrustworthy,
+# not that the vendor rewrote its entire catalogue. So the run reseeds from what it can
+# see now, raises nothing, and says loudly why. This is the same discipline as
+# `supported=False` in the extractors: an answer we cannot trust must never be dressed as
+# a finding.
+# Both conditions, because either alone is wrong. A share on its own misfires on small
+# catalogues — one new model out of Groq's fourteen is 7%, but one out of two is 50% and
+# perfectly ordinary. A count on its own would let a genuinely busy vendor trip it. The
+# pair only fires on the shape that actually means "our baseline is wrong": a large
+# number that is also most of the catalogue.
+MAX_APPEARED_SHARE = 0.25
+MAX_APPEARED_COUNT = 10
+
 # The catalogue is a machine list, and some of what it lists is not a teaching option.
 # Each of these is a property of the ROW, never a guess about the product.
 #   retired      - never suggest adopting something the vendor is already sunsetting
@@ -72,6 +94,7 @@ def family(identifier: str) -> str:
 class NewerStats:
     sources_read: int = 0
     unreadable: list = field(default_factory=list)
+    distrusted: list = field(default_factory=list)   # baseline looked wrong; reseeded
     seeded: list = field(default_factory=list)     # first look: baseline only
     appeared: int = 0
     already_taught: int = 0
@@ -86,7 +109,20 @@ class NewerReport:
     findings: list = field(default_factory=list)
     rows: list = field(default_factory=list)
     considered: set = field(default_factory=set)
+    # Everything a vendor lists that no session teaches — not only what appeared this
+    # week. This is the half a watermark can never surface: a long-standing coverage
+    # hole did not "happen", so it is not news and must not be a finding, but a
+    # curriculum lead still wants to be able to look at it. It is browsable, never
+    # scored, never in the digest, and carries no severity or due date.
+    never_covered: list = field(default_factory=list)
     stats: NewerStats = field(default_factory=NewerStats)
+
+
+def _implausible(fresh: set, live: set) -> bool:
+    """Does this diff say more about our baseline than about the vendor?"""
+    if not live or len(fresh) <= MAX_APPEARED_COUNT:
+        return False
+    return (len(fresh) / len(live)) > MAX_APPEARED_SHARE
 
 
 def _taught_index(deps: Iterable[Dependency], kinds: tuple) -> dict:
@@ -182,14 +218,45 @@ def _models(deps, state, rep, *, adapters=None, now: str, persist: bool = True) 
             continue
         rep.stats.sources_read += 1
         live = {e.entry_id for e in cat.entries.values() if not e.retired}
+
+        # The browsable half FIRST, and deliberately independent of the snapshot: "what
+        # does this vendor list that we do not teach?" is answerable on the very first
+        # look, when there is no baseline and therefore no finding. Computing it after
+        # the seed return left the list empty on exactly the run where someone is most
+        # likely to go looking.
+        for ident in sorted(live):
+            if ident.strip().casefold() in taught:
+                continue
+            entry = cat.get(ident)
+            sib = _sibling(ident, taught, family)
+            rep.never_covered.append({
+                "vendor": adapter.vendor, "source": "catalogue",
+                "identifier": ident, "family": family(ident),
+                "price": getattr(entry, "price", "") or "",
+                "quoted_only": bool(getattr(entry, "quoted_only", False)),
+                "sibling": sib.canonical_name if sib else "",
+                # How the sibling is related, because the two enumerators mean
+                # different things by it and the table would otherwise imply a
+                # closeness that is not there.
+                "relation": "same family" if sib else "",
+                "courses": sorted({l.course for l in sib.locations}) if sib else [],
+                "source_url": (cat.sources or [""])[0]})
+
         seen = state.snapshot(key)
         if persist:
             state.snapshot_save(source_key=key, ids=live, now=now)
         if seen is None:
             rep.stats.seeded.append(f"{adapter.key} ({len(live)} entries)")
             continue
+        fresh = live - seen
+        if _implausible(fresh, live):
+            rep.stats.distrusted.append(
+                f"{adapter.key}: {len(fresh)} of {len(live)} entries look new, which "
+                f"is not a week of vendor releases — the stored baseline is not "
+                f"trustworthy. Reseeded; nothing raised.")
+            continue
 
-        for ident in sorted(live - seen):
+        for ident in sorted(fresh):
             rep.stats.appeared += 1
             entry = cat.get(ident)
             if entry is None:
@@ -258,21 +325,30 @@ def _n8n_nodes(deps, state, rep, *, upstream=None, now: str,
     if not nodes:
         rep.stats.unreadable.append("n8n: tree carried no node types")
         return
-    if not paths:
-        # A cache written before node paths were kept. Every node would fail to cite,
-        # so this would otherwise print one "no repo path" line per node — hundreds of
-        # them — for a condition with a single cause and a single fix. Say it once.
-        rep.stats.unreadable.append(
-            "n8n: the cached tree predates node paths, so nothing can be cited yet — "
-            "run `python3 main.py watch` or wait for the 7-day cache to expire")
-        return
-    rep.stats.sources_read += 1
-
     taught = _taught_index(deps, ("n8n_node",))
     # One entry per node, not per version variant: `agentV2` appearing is not a new node
     # when `agent` is already taught, and treating it as one is 692 rows pretending to
     # be 565.
     live = {base_node(n) for n in nodes}
+    taught_bases = {base_node(k): d for k, d in taught.items()}
+    # The browsable list first, and deliberately before the citation guard below: it is
+    # never cited, so a cache with no node paths still answers "what does n8n ship that
+    # we do not teach?" perfectly well. Blocking it on evidence it does not need was a
+    # real bug — the whole list came back empty.
+    for node in sorted(live):
+        if node in taught_bases:
+            continue
+        sib = _sibling(node, taught, lambda k: base_node(k).rpartition(".")[0])
+        rep.never_covered.append({
+            "vendor": "n8n", "source": "n8n_tree", "identifier": node,
+            "family": node.rpartition(".")[0], "price": "", "quoted_only": False,
+            "sibling": sib.canonical_name if sib else "",
+            # For a node the relation is the PACKAGE, not a product family: it says "we
+            # build workflows with these", not "this is a newer version of that".
+            "relation": "same package" if sib else "",
+            "courses": sorted({l.course for l in sib.locations}) if sib else [],
+            "source_url": f"https://github.com/n8n-io/n8n/blob/master/{paths.get(node, '')}"})
+
     key = "catalogue:n8n_nodes"
     seen = state.snapshot(key)
     if persist:
@@ -280,9 +356,26 @@ def _n8n_nodes(deps, state, rep, *, upstream=None, now: str,
     if seen is None:
         rep.stats.seeded.append(f"n8n_nodes ({len(live)} nodes)")
         return
+    fresh = live - seen
+    if _implausible(fresh, live):
+        rep.stats.distrusted.append(
+            f"n8n: {len(fresh)} of {len(live)} nodes look new, which is not a week of "
+            f"n8n releases — the stored baseline is not trustworthy. Reseeded; nothing "
+            f"raised.")
+        return
 
-    taught_bases = {base_node(k): d for k, d in taught.items()}
-    for node in sorted(live - seen):
+    if not paths:
+        # A cache written before node paths were kept. Every node would fail to cite, so
+        # this would otherwise print one "no repo path" line per node — hundreds of them
+        # — for a condition with one cause and one fix. Say it once, and only about the
+        # findings, which are the only part that needs a quote.
+        rep.stats.unreadable.append(
+            "n8n: the cached tree predates node paths, so no node can be cited yet — "
+            "run `python3 main.py watch` or wait for the 7-day cache to expire")
+        return
+    rep.stats.sources_read += 1
+
+    for node in sorted(fresh):
         rep.stats.appeared += 1
         if node in taught_bases:
             rep.stats.already_taught += 1

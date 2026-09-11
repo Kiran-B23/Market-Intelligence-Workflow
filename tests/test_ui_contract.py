@@ -550,3 +550,25 @@ def test_a_topic_gap_is_not_described_as_a_stale_dependency():
     warning would be advice that changes nothing."""
     assert "f.projection === 'topic'" in PAGE
     assert "Where it belongs" in PAGE
+
+
+def test_the_never_covered_view_is_not_a_findings_list():
+    """A long-standing coverage hole did not HAPPEN, so it is not news.
+
+    n8n has always shipped `chainSummarization`; not teaching it is a curriculum
+    decision, not a change. It is browsable — 600 rows of it — and must carry no
+    severity, no due date and no place in the digest, or the digest cries wolf 600 times.
+    """
+    assert "['uncovered','Never covered']" in PAGE
+    body = PAGE[PAGE.index("async function loadUncovered()"):]
+    body = body[:body.index("\n}\n")]
+    for word in ("severity", "due_by", "diff_class"):
+        assert word not in body, f"the browsable list must not carry {word}"
+    assert "not issues" in PAGE, "the page says so in words too"
+
+
+def test_the_never_covered_table_says_how_a_row_is_related():
+    """Every n8n row's sibling is a package-mate, not a newer version of it. A column
+    headed "closest thing we teach" implied a closeness that was not there."""
+    assert "related to what we teach" in PAGE
+    assert "r.relation" in PAGE

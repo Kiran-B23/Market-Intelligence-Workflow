@@ -705,11 +705,15 @@ def cmd_gaps(args) -> int:
               + " A quiet first look is the rule working, not a failure.")
     for line in ns.unreadable:
         print(f"  CATALOGUE UNREADABLE: {line}")
+    for line in ns.distrusted:
+        print(f"  BASELINE DISTRUSTED: {line}")
     for line in ns.uncitable:
         print(f"  NOT CITEABLE: {line}")
     if ns.appeared:
         print(f"    of those: {ns.already_taught} already taught, {ns.no_sibling} in no "
               f"family we teach, {ns.not_offerable} quote-only pricing")
+    print(f"  never covered: {len(newer.never_covered)} catalogue entr(ies) no session "
+          f"teaches — browsable, never a finding, never in the digest")
     rep.findings += newer.findings
     rep.rows += newer.rows
     rep.considered |= newer.considered
@@ -765,8 +769,14 @@ def cmd_gaps(args) -> int:
         # has looked at the whole declared area space, so it is entitled to retire any
         # topic finding it did not just re-raise.
         on_file = json.load(open(findings_path)) if findings_path.exists() else {}
+        # Every signal this stage produces, not just S11. A topic stops being a gap and
+        # a catalogue row stops being new for the same reason — the run no longer
+        # raises it — and in both cases `considered` will not contain it, so the row
+        # would stand for ever and `verify` would later fail on evidence the sidecar no
+        # longer carries.
+        owned = {"S11", "S12"}
         examined |= {f.get("dep_id") for f in (on_file.get("findings") or [])
-                     if f.get("signal") == "S11" and f.get("dep_id")}
+                     if f.get("signal") in owned and f.get("dep_id")}
     raised, held = [], []
     for f in rep.findings:
         fp = fingerprint_of(f)
@@ -785,6 +795,11 @@ def cmd_gaps(args) -> int:
     side = OUT / f"gaps_{_today()}.json"
     dump(side, {"generated_at": now, "areas": [a.area_id for a in areas],
                 "scope": scope.to_dict(), "topics": rep.rows,
+                # The browsable half. In the sidecar rather than the findings artifact
+                # because it is explicitly NOT news: no severity, no due date, never
+                # diffed, never reported. A curriculum lead can still look at it.
+                "never_covered": newer.never_covered,
+                "newer_stats": to_jsonable(ns),
                 "coverage": cov, "stats": to_jsonable(st)})
     merge_by_dep(
         findings_path, new_rows=[to_jsonable(f) for f in raised], examined=examined,

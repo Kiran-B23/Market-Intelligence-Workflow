@@ -252,9 +252,72 @@ def test_a_cache_without_node_paths_says_so_once(st):
     single cause and a single fix, and 565 identical complaints would bury the other
     sources' real errors.
     """
+    taught = [_dep("a.one", kind="n8n_node")]
+    seed = {"ok": True, "nodes": ["a.one"], "node_paths": {"a.one": "x/One.node.ts"}}
+    find_newer(taught, st, adapters=[], upstream=seed)          # baseline
+
     stale = {"ok": True, "nodes": ["a.one", "a.two", "a.three"], "node_paths": {}}
-    rep = find_newer([_dep("a.one", kind="n8n_node")], st, adapters=[], upstream=stale)
+    rep = find_newer(taught, st, adapters=[], upstream=stale)
     assert rep.findings == []
     assert len(rep.stats.unreadable) == 1
     assert "predates node paths" in rep.stats.unreadable[0]
     assert rep.stats.uncitable == []
+    # And the browsable list is unaffected — it needs no citation, so a cache that
+    # cannot be quoted still answers "what ships that we do not teach?".
+    assert {r["identifier"] for r in rep.never_covered} == {"a.two", "a.three"}
+
+
+def test_the_browsable_list_exists_on_the_very_first_look(st):
+    """The run where someone is most likely to go looking is the one that raises nothing.
+
+    "What does this vendor list that we do not teach?" needs no baseline to answer, so
+    computing it after the seed return left the list empty on exactly that run.
+    """
+    ents = {"m-1": _entry("m-1"), "m-2": _entry("m-2"), "other-9": _entry("other-9")}
+    rep = _run(st, ents, [_dep("m-1")])
+    assert rep.stats.seeded, "this is the first look"
+    assert rep.findings == []
+    assert {r["identifier"] for r in rep.never_covered} == {"m-2", "other-9"}
+    # It carries the sibling where there is one, so the list can say why a row matters.
+    by_id = {r["identifier"]: r for r in rep.never_covered}
+    assert by_id["m-2"]["sibling"] == "m-1"
+    assert by_id["other-9"]["sibling"] == ""
+
+
+def test_the_browsable_list_never_becomes_a_finding(st):
+    """It is a coverage view, not news: no severity, no due date, never in the digest."""
+    ents = {"m-1": _entry("m-1"), "m-2": _entry("m-2")}
+    _run(st, ents, [_dep("m-1")])
+    again = _run(st, ents, [_dep("m-1")])
+    assert again.never_covered and again.findings == []
+    assert all("severity" not in r and "due_by" not in r for r in again.never_covered)
+
+
+def test_an_implausible_diff_is_distrusted_rather_than_reported(st):
+    """A run once reported 564 of 565 n8n nodes as new and wrote 554 findings.
+
+    n8n did not ship 554 nodes in a week. The snapshot was wrong — a half-written cache,
+    a schema change, a restored database — and the signal had no way to say so. The
+    honest reading of "almost everything is new" is that our baseline is untrustworthy,
+    so the run reseeds, raises nothing, and says why. Same discipline as `supported=False`
+    in the extractors: an answer we cannot trust must never be dressed as a finding.
+    """
+    taught = _dep("acme-1.0-flash")
+    _run(st, {"acme-1.0-flash": _entry("acme-1.0-flash")}, [taught])      # tiny baseline
+    flood = {f"acme-{i}.0-flash": _entry(f"acme-{i}.0-flash") for i in range(1, 40)}
+    rep = _run(st, flood, [taught])
+    assert rep.findings == []
+    assert rep.stats.distrusted and "not trustworthy" in rep.stats.distrusted[0]
+    # And it reseeded, so the next run compares against reality rather than tripping again.
+    assert st.snapshot("catalogue:acme") == set(flood)
+
+
+def test_a_handful_of_new_rows_in_a_small_catalogue_still_reports(st):
+    """The guard must not swallow ordinary weeks. One new model out of Groq's fourteen
+    is 7%; one out of two is 50% and just as ordinary — so a share alone is not enough."""
+    taught = _dep("acme-1.0-flash")
+    _run(st, {"acme-1.0-flash": _entry("acme-1.0-flash")}, [taught])
+    rep = _run(st, {"acme-1.0-flash": _entry("acme-1.0-flash"),
+                    "acme-2.0-flash": _entry("acme-2.0-flash")}, [taught])
+    assert not rep.stats.distrusted
+    assert [f.canonical_name for f in rep.findings] == ["acme-2.0-flash"]
