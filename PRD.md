@@ -664,6 +664,45 @@ under two capabilities, and last-write-wins made the result arbitrary. The speci
 category wins — a chroma binding is a vector-db integration that happens to ship as a
 langchain package.
 
+### B.8 Launch nominations, and why they stop at nomination
+
+The third thing that could feed Changes: a tool that exists in the wider market and might
+belong in a session. Unlike models and n8n nodes there is no authoritative enumeration of
+"tools that exist", so it can only ever be a nomination problem — a feed proposes a NAME
+and may never substantiate anything, which is the rule `research/nominate.py` already runs
+on.
+
+**It was built to the point of measurement before being scoped down, and the measurement
+is the reason.** Against the live Hacker News feed:
+
+```
+feed items fetched                100
+  with a product URL               86
+  keyword-matching a capability    42
+  not already taught               42
+```
+
+Forty-two findings a run, and the content was *"Hebbian Robotics — scalable robotics data
+pipelines"* filed under `market-data`, *"Discovered Materials — AI agents to discover new
+materials"* under `agent-framework`, and twenty-two more under `agent-framework` solely
+because the word "agent" appears in an AI launch feed. That is not a precision problem to
+tune. It is the wall §29 already recorded: relevance cannot be inferred from
+co-occurrence, and a keyword is co-occurrence with extra steps.
+
+Judging it properly means asking whether a product serves a session's purpose, from its
+own marketing copy — an opinion about a LEAD_ONLY source, which this system never lets
+become evidence. So it could not raise a finding even if the precision were good.
+
+What it honestly is: **31 nominations a run, browsable, ranked by interest, never scored,
+never in the digest**, each showing *the phrase that matched* so a wrong guess takes a
+second to dismiss rather than looking like a conclusion. Same treatment as "never
+covered", for the same reason. `Launch` deliberately carries no `severity`, `due_by`,
+`signal` or `claims` field, and a test asserts it cannot acquire one by accident.
+
+Product Hunt's RSS returned an empty body to a plain fetch and is not used; Hacker News
+through Algolia is JSON, needs no key, and carries the product URL beside the title, which
+is what makes a name checkable at all.
+
 ## G. What is not covered yet, stated plainly
 
 * **A newly released model or tool does not become a Change.** A new model is not a

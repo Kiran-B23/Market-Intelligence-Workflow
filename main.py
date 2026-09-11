@@ -620,6 +620,7 @@ def cmd_gaps(args) -> int:
                                         session_bodies)
     from miw.analyse.gaps import area_coverage, find_gaps, load_areas
     from miw.analyse.newer import find_newer
+    from miw.research.launch import read_launches
     from miw.analyse.score import fingerprint_of
     from miw.artifacts import merge_by_dep
     from miw.schema import dump, to_jsonable, utcnow
@@ -717,6 +718,21 @@ def cmd_gaps(args) -> int:
               f"family we teach, {ns.not_offerable} quote-only pricing")
     print(f"  never covered: {len(newer.never_covered)} catalogue entr(ies) no session "
           f"teaches — browsable, never a finding, never in the digest")
+
+    # Nominated tools. Two cheap JSON requests, and the output is a list somebody scans
+    # rather than anything scored — see `miw/research/launch.py` for the measurement
+    # that settled that. A feed being down must not fail the stage.
+    from miw.registry import Registry
+    reg = Registry.load()
+    launches = read_launches(
+        capabilities={e.capability for e in reg.entries.values() if e.capability},
+        taught={e.canonical_name for e in reg.entries.values()})
+    print(f"  new launches: {len(launches.launches)} nomination(s) in capabilities we "
+          f"teach, from {launches.fetched} feed item(s) "
+          f"({launches.off_topic} off-topic, {launches.no_url} with no product URL) "
+          f"— browsable, never a finding")
+    for err in launches.errors:
+        print(f"  FEED UNREADABLE: {err}")
     rep.findings += newer.findings
     rep.rows += newer.rows
     rep.considered |= newer.considered
@@ -802,6 +818,15 @@ def cmd_gaps(args) -> int:
                 # because it is explicitly NOT news: no severity, no due date, never
                 # diffed, never reported. A curriculum lead can still look at it.
                 "never_covered": newer.never_covered,
+                # Nominated, never verified, never scored. In the sidecar with the other
+                # browsable half for the same reason: a launch is not something that
+                # happened to the curriculum.
+                "launches": [to_jsonable(l) for l in launches.launches],
+                "launch_stats": {"fetched": launches.fetched,
+                                 "off_topic": launches.off_topic,
+                                 "no_url": launches.no_url,
+                                 "already_taught": launches.already_taught,
+                                 "errors": launches.errors},
                 "newer_stats": to_jsonable(ns),
                 "coverage": cov, "stats": to_jsonable(st)})
     merge_by_dep(

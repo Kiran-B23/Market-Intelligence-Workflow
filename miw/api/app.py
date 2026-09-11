@@ -505,6 +505,28 @@ def never_covered(course: str = "", q: str = "", limit: int = 800) -> dict:
             "truncated": total > limit}
 
 
+@app.get("/api/launches")
+def launches() -> dict:
+    """Tools nominated by a launch feed, in capabilities the curriculum teaches.
+
+    Nominations, not findings. A launch feed is LEAD_ONLY by construction: it may
+    propose a name and can never substantiate anything about it, and judging whether a
+    product serves a session's purpose from its own marketing copy is an opinion, which
+    this system does not let become evidence. Measured before shipping — the same filters
+    applied as findings would have produced 42 a run, most of them irrelevant — so this
+    is a list somebody scans, with the phrase that matched shown so a wrong guess is
+    dismissed in a second rather than trusted.
+    """
+    data = _read("gaps_*.json")
+    rows = data.get("launches") or []
+    by_cap: dict = {}
+    for r in rows:
+        by_cap[r.get("capability", "?")] = by_cap.get(r.get("capability", "?"), 0) + 1
+    return {"generated_at": data.get("generated_at", ""), "total": len(rows),
+            "by_capability": by_cap, "rows": rows,
+            "stats": data.get("launch_stats") or {}}
+
+
 @app.get("/api/finding/{finding_id}")
 def finding_detail(finding_id: str, course: str = "", session: str = "",
                    offset: int = 0) -> dict:

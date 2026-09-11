@@ -544,6 +544,13 @@
     overflow:auto; max-height:min(70vh,720px);
     border:1px solid var(--rule); border-radius:var(--r-sm);
     overscroll-behavior:contain;
+    /* A row cut through the middle at the boundary reads as a rendering fault rather
+       than as "there is more below", which is what a scroll box is supposed to say.
+       The gradient makes the cut deliberate, and the margin keeps the next heading off
+       the edge of the box. */
+    margin-bottom:var(--s5);
+    -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+            mask-image:linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
   }
   table{border-collapse:collapse; width:100%; font-size:12.5px}
   thead th{
@@ -1150,6 +1157,14 @@
       <span class="note" id="uccount"></span>
     </div>
     <div class="scroll"><table id="uctable"></table></div>
+
+    <h2>New launches worth a look</h2>
+    <p class="hint">Tools a launch feed proposed, in categories the curriculum already
+      teaches. <b>Nominations, not findings</b> — a launch feed can suggest a name and
+      can never establish anything about it, so nothing here is verified, scored or
+      scheduled. The phrase that matched is shown, because a wrong guess should take you
+      a second to dismiss rather than looking like a conclusion.</p>
+    <div id="launches"></div>
   </section>
 
   <section id="tab-inventory" hidden>
@@ -2548,6 +2563,7 @@ $('#runverify').onclick = async () => {
 let ucTimer = null;
 
 async function loadUncovered() {
+  loadLaunches();
   const q = ($('#ucq').value || '').trim();
   const d = await get('/api/never-covered' + qs(q ? {q} : {}));
   const vendors = Object.entries(d.by_vendor || {})
@@ -2571,6 +2587,33 @@ async function loadUncovered() {
           <td>${esc((r.courses || []).join(', ') || '—')}</td></tr>`).join('')
       + '</tbody>'
     : '<tbody><tr><td>No rows.</td></tr></tbody>';
+}
+
+async function loadLaunches() {
+  const d = await get('/api/launches');
+  if (!d.total) {
+    $('#launches').innerHTML = `<div class="empty">No nominations on file.
+      ${d.stats && d.stats.errors && d.stats.errors.length
+        ? 'A feed was unreadable: ' + esc(d.stats.errors.join('; '))
+        : 'Run the gaps step to fetch them.'}</div>`;
+    return;
+  }
+  const caps = Object.entries(d.by_capability || {})
+    .sort((a, b) => b[1] - a[1]).map(([c, n]) => `${esc(c)} ${n}`).join(' · ');
+  $('#launches').innerHTML =
+    `<p class="note">${d.total} nomination(s) — ${caps}. Of ${
+      (d.stats || {}).fetched || 0} feed items, ${(d.stats || {}).off_topic || 0} were in
+      no category we teach.</p>`
+    + `<div class="scroll"><table><thead><tr><th>what</th><th>category</th>
+         <th>matched on</th><th>interest</th></tr></thead><tbody>`
+    + d.rows.map(r => `<tr>
+        <td><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>
+          <div class="note">${esc(r.title)}</div></td>
+        <td><span class="chip n">${esc(r.capability)}</span></td>
+        <td class="mono">${esc(r.matched_on)}</td>
+        <td class="mono">${esc(String(r.points))} pts · ${esc(r.source)}</td>
+      </tr>`).join('')
+    + '</tbody></table></div>';
 }
 
 $('#ucq').addEventListener('input', () => {
