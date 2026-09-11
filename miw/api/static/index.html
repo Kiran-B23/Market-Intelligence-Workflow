@@ -908,6 +908,9 @@
     </div>
   </section>
   <section id="tab-run" hidden>
+    <a class="act primary" id="newrun" href="#/global/run" hidden
+       style="display:inline-block;margin-bottom:var(--s4);text-decoration:none">
+       + New run — pick scope, stages and model</a>
     <div class="panel" id="runform">
       <div class="grid2">
         <fieldset>
@@ -1085,10 +1088,15 @@ const qs = (extra) => {
   return q ? '?' + q : '';
 };
 
-const COURSE_TABS = [['findings','Findings'], ['runs','Runs'],
-                     ['inventory','Inventory'], ['digest','Digest'], ['run','Run audit']];
-const GLOBAL_TABS = [['runs','All runs'], ['trust','Trust & feedback'],
-                     ['digest','Roll-up digest']];
+/* `runs` is the HISTORY view; `run` is the form that starts one. They were previously
+   labelled "Runs" and "Run audit", which is a distinction nobody should have to guess
+   at — and when the form was dropped from the sidebar entirely, "Runs" became a dead
+   end that hides the form and with it the model chooser. */
+const COURSE_TABS = [['findings','Findings'], ['inventory','Inventory'],
+                     ['run','New run'], ['runs','Run history'],
+                     ['digest','Digest']];
+const GLOBAL_TABS = [['run','New run (any scope)'], ['runs','All runs'],
+                     ['trust','Trust & feedback'], ['digest','Roll-up digest']];
 
 /* The sidebar replaces the top tab bar. Same COURSE_TABS/GLOBAL_TABS, same hash
    routes — only the presentation changed, so nothing about routing moved. */
@@ -1118,7 +1126,6 @@ function renderNav(r) {
     cn.hidden = false;
     $('#sidecoursename').textContent = COURSE_TITLE || 'This course';
     $('#sidecoursetabs').innerHTML = COURSE_TABS
-      .filter(([v]) => v !== 'run')          // the run action lives in the header now
       .map(([v, l]) => item(`#/c/${r.slug}/${v}`, l, r.view === v)).join('');
   } else {
     cn.hidden = true;
@@ -1223,9 +1230,16 @@ async function route() {
     renderFindings(f);
     renderAgentRuns(a);
   }
-  else if (view === 'runs') { show('run'); $('#runform').hidden = true; loadRuns(); }
-  else if (view === 'run')  { show('run'); $('#runform').hidden = false;
-                              loadRuns(); loadLLM(); }
+  else if (view === 'runs') {
+    show('run'); $('#runform').hidden = true; loadRuns();
+    /* Not a dead end: the form (and the model chooser) is one click away. */
+    $('#newrun').hidden = false;
+    $('#newrun').href = CURRENT_COURSE ? `#/c/${CURRENT_COURSE}/run` : '#/global/run';
+  }
+  else if (view === 'run')  {
+    show('run'); $('#runform').hidden = false; $('#newrun').hidden = true;
+    loadRuns(); loadLLM();
+  }
   else if (view === 'inventory') { show('inventory'); loadInventory(); }
   else if (view === 'digest') { show('digest');
     $('#digest').textContent = await text('/api/digest' + qs()); }
@@ -1412,10 +1426,18 @@ function renderHeader() {
     // Precision and the LLM provider have no course dimension; labelled so, rather
     // than left to look as though they had been filtered.
     ['precision (all courses)', prec],
-    ['llm', SUMMARY.llm_provider],
   ];
+  const llm = SUMMARY.llm || {};
+  const model = llm.model_logical || '';
+  /* The active model, everywhere. It used to be a dead label in this strip, which is
+     no help when the thing you want is to CHANGE it — so it links to the form that
+     does, and says where that is. */
+  const llmBit = `<span>llm <a href="${CURRENT_COURSE
+      ? `#/c/${esc(CURRENT_COURSE)}/run` : '#/global/run'}"
+      title="Change the provider or model for the next run"><b>${
+      esc(SUMMARY.llm_provider || 'none')}${model ? ' · ' + esc(model) : ''}</b></a></span>`;
   $('#meta').innerHTML = bits.map(([k,v]) =>
-    `<span>${k} <b>${esc(v)}</b></span>`).join('');
+    `<span>${k} <b>${esc(v)}</b></span>`).join('') + llmBit;
 }
 
 /* ---------- charts ----------

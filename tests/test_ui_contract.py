@@ -295,3 +295,34 @@ def test_the_form_says_research_spends_tavily_searches():
 
 def test_unchecking_research_updates_that_note():
     assert "addEventListener('change', tavilyNote)" in PAGE
+
+
+# ------------------------------- the run form has to be findable
+
+def test_the_run_form_is_in_the_sidebar_not_only_the_header_button():
+    """It was filtered out on the reasoning that the header button replaced it, which
+    left "Run history" — the obvious-looking entry — as a dead end that hides the form,
+    and with it the model chooser. Nothing should be reachable by one route only."""
+    assert "'New run'" in PAGE
+    assert "v !== 'run'" not in PAGE, "the sidebar must not filter the form out"
+
+
+def test_the_form_and_the_history_are_named_distinguishably():
+    """"Runs" vs "Run audit" asked the reader to guess which started one."""
+    assert "'Run history'" in PAGE
+    assert "'Run audit'" not in PAGE
+
+
+def test_the_unscoped_form_is_linked_rather_than_only_typeable():
+    assert "'New run (any scope)'" in PAGE
+
+
+def test_the_history_view_offers_a_way_to_start_one():
+    assert 'id="newrun"' in PAGE
+    assert "$('#newrun').hidden = false" in PAGE
+
+
+def test_the_active_model_is_shown_everywhere_and_links_to_the_chooser():
+    """A dead label is no help when the thing you want is to change it."""
+    assert "Change the provider or model for the next run" in PAGE
+    assert "SUMMARY.llm_provider" in PAGE
