@@ -435,7 +435,7 @@ def find_gaps(areas: Iterable[Area], index: CurriculumIndex, *,
             # same technique differently, and "Zero-shot vs few-shot prompts" matches
             # session 8's Key Takeaways where "Few-shot learning" does not.
             if any(index.teaches_anywhere(k, index.topic_terms(n))
-                   for n, k in cluster.names_and_keys()):
+                   for n, k in cluster.names_and_keys()):  # any vendor's name settles it
                 st.already_taught += 1
                 continue
             missing.append(cluster)

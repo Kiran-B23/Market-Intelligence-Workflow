@@ -78,11 +78,45 @@ def test_list_items_are_off_by_default():
 
 @pytest.mark.parametrize("a,b", [
     ("Chain-of-Thought", "chain of thought"),
-    ("Few-shot prompting", "few shot"),
     ("Self-Consistency (majority vote)", "self consistency"),
+    ("Few-shot technique", "few shot"),
 ])
 def test_naming_variants_fold_together(a, b):
+    """Case, hyphens, parentheses and category words are noise in any area."""
     assert normalise(a) == normalise(b)
+
+
+@pytest.mark.parametrize("a,b", [
+    ("Chain-of-thought technique", "Chain of thought"),
+    ("Image editing mode", "Image editing"),
+    ("Agentic patterns", "Agentic"),
+    ("Prompt iteration strategies", "Prompt iteration"),
+])
+def test_category_words_fold_out_in_every_area(a, b):
+    """The old list read "prompting, prompts, technique, ..." — tuned to one area.
+
+    It folded the padding off prompting topics and did nothing at all for the other
+    nine. `_CATEGORY_WORDS` names the category rather than the thing wherever you are,
+    so every area gets the same treatment from the same list.
+    """
+    assert normalise(a) == normalise(b)
+
+
+def test_an_area_s_own_vocabulary_is_not_folded_out():
+    """Measured, and rejected: it reduces a name that is mostly area vocabulary to a
+    stub, and the stub matches the wrong thing.
+
+    "Other image generation modes" becomes `other`, which the coverage check found in
+    three unrelated sessions; "Parallel function calling" becomes `parallel`. The
+    capability is kept on the function for a caller that wants it, and production does
+    not pass it.
+    """
+    assert normalise("Other image generation modes") == "otherimagegeneration"
+    assert normalise("Other image generation modes",
+                     ["image generation", "image"]) == "other"
+    import inspect
+    from miw.analyse import gaps
+    assert "drop=area.scope_terms" not in inspect.getsource(gaps)
 
 
 # --------------------------------------------------------------------- the curriculum

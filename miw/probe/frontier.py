@@ -89,7 +89,11 @@ STOP_ITEMS = frozenset({
     # role removes them. Anthropic's prompt-engineering page contributes
     # "Cookie settings" as an h3 and it would otherwise be reported as a curriculum gap.
     "cookie settings", "cookies settings", "manage cookies", "privacy settings",
-    "what's next", "whats next", "start building", "topic-specific prompt guides",
+    # Generic calls to action. A heading naming ONE area's furniture
+    # ("Topic-specific prompt guides") belongs in that source's `exclude` list in
+    # `registry/topics.yaml`, where a human can see it, not in a global list that every
+    # other area then carries around.
+    "what's next", "whats next", "start building",
 })
 
 # An item name has to look like the name of a thing: long enough to be more than a
@@ -100,20 +104,45 @@ _HAS_LETTER = re.compile(r"[A-Za-z]")
 _MIN_CONTEXT = 40
 
 
-def normalise(name: str) -> str:
+# Words that name the CATEGORY rather than the thing, in any area. "Chain-of-thought
+# technique" and "chain of thought" are one topic wherever you are.
+_CATEGORY_WORDS = ("technique", "techniques", "method", "methods", "approach",
+                   "approaches", "pattern", "patterns", "strategy", "strategies",
+                   "mode", "modes", "feature", "features", "capability", "capabilities")
+
+
+def normalise(name: str, drop: Iterable[str] = ()) -> str:
     """Fold a topic name to a comparison key.
 
     Hyphens, spaces and case are noise in this domain and nothing else: the workbook
     writes "Chain-of-Thought", a vendor writes "Chain of thought prompting", and a
     paper writes "chain-of-thought". All three are the same technique, and any
     comparison that treats them as three distinct items reports two false gaps.
-    Trailing "prompting"/"technique" wording is dropped for the same reason.
+
+    What is folded out is `_CATEGORY_WORDS`: words that name the category rather than
+    the thing, in ANY area. This list used to read "prompting, prompts, technique,
+    method, approach, pattern" - tuned to the first area anyone looked at, and doing
+    nothing at all for the other nine.
+
+    `drop` exists for a caller that wants to fold out more, and production deliberately
+    does not use it. Passing each area's own `scope_terms` was tried and measured: it
+    reduces a name that is MOSTLY area vocabulary to a stub, and the stub then matches
+    the wrong thing. "Other image generation modes" became `other`, which the coverage
+    check found in three unrelated sessions and reported as already taught; "Parallel
+    function calling" became `parallel` and matched a session about multi-agent systems.
+    Vendor padding is handled instead by the term rule in `analyse/curriculum.py`, which
+    asks whether every distinctive word of the name is already in one session - and
+    that rule cannot produce a stub, because it never shortens anything.
     """
     s = _WS.sub(" ", (name or "").lower()).strip()
     s = re.sub(r"^(?:the|a|an)\s+", "", s)
     s = re.sub(r"\s*\((?:[^)]*)\)\s*$", "", s)          # "Few-shot (in-context)"
-    s = re.sub(r"\b(?:prompting|prompts?|technique|techniques|method|methods|"
-               r"approach|approaches|pattern|patterns)\b", " ", s)
+    words = [re.escape(w) for w in {*_CATEGORY_WORDS,
+                                    *(w.lower() for t in drop
+                                      for w in re.findall(r"[a-z]+", t.lower()))}]
+    if words:
+        s = re.sub(r"\b(?:" + "|".join(sorted(words, key=len, reverse=True))
+                   + r")s?\b", " ", s)
     return re.sub(r"[^a-z0-9]+", "", s)
 
 
@@ -135,10 +164,14 @@ class FrontierItem:
     context: str                # becomes the Claim quote; never empty
     source_url: str = ""
     found_as: str = ""          # heading:h2 | list_item — how it was bound
+    # The area's own vocabulary, folded out of `key`. Carried on the item rather than
+    # applied by the caller so that an item's key means the same thing everywhere it is
+    # compared — coverage, corroboration and the registry's `exclude` list.
+    drop: tuple = ()
 
     @property
     def key(self) -> str:
-        return normalise(self.name)
+        return normalise(self.name, self.drop)
 
 
 @dataclass
@@ -188,8 +221,8 @@ def _prose(body: str, limit: int = 320) -> str:
 
 
 def enumerate_page(html_text: str, *, source_url: str = "", under: str = "",
-                   levels: Iterable[int] = (2,),
-                   list_items: bool = False) -> FrontierList:
+                   levels: Iterable[int] = (2,), list_items: bool = False,
+                   drop: Iterable[str] = ()) -> FrontierList:
     """Read `html_text` as a list of named things.
 
     `under` binds the enumeration to one section by its heading text — the structural
@@ -206,6 +239,7 @@ def enumerate_page(html_text: str, *, source_url: str = "", under: str = "",
     `registry/topics.yaml`, per source, where a human can see the choice.
     """
     res = FrontierList(source_url=source_url)
+    drop = tuple(drop)
     clean = strip_furniture(html_text or "")
     spans = _spans(clean)
     res.headings_seen = len(spans)
@@ -216,8 +250,8 @@ def enumerate_page(html_text: str, *, source_url: str = "", under: str = "",
     want = set(levels)
     scope_body, scope_level = clean, 0
     if under:
-        key = normalise(under)
-        hit = next((s for s in spans if key and key in normalise(s[2])), None)
+        key = normalise(under, drop)
+        hit = next((s for s in spans if key and key in normalise(s[2], drop)), None)
         if hit is None:
             res.reason = f"section {under!r} not found on page"
             return res
@@ -234,7 +268,7 @@ def enumerate_page(html_text: str, *, source_url: str = "", under: str = "",
         name = name.strip(" .:·—-")
         if not _is_item(name):
             return
-        key = normalise(name)
+        key = normalise(name, drop)
         # A bare label cannot be cited, so it cannot become a finding. Dropping it here
         # rather than at `Claim.build` keeps the count honest: `items` is what we could
         # actually evidence, not what we could see.
@@ -242,7 +276,8 @@ def enumerate_page(html_text: str, *, source_url: str = "", under: str = "",
             return
         seen.add(key)
         res.items.append(FrontierItem(name=name, context=context,
-                                      source_url=source_url, found_as=found_as))
+                                      source_url=source_url, found_as=found_as,
+                                      drop=drop))
 
     for level, _start, text, body_start, body_end in spans:
         if level not in want:

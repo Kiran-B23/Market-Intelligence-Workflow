@@ -2296,6 +2296,32 @@ real gaps is read; one reporting thirty of which nine are real is not read twice
   asserts the same invariant from outside: an S11 must carry two substantiating claims
   on two different hosts.
 
+### The mechanism is the deliverable, not the prompting case
+
+The worked example throughout — a new prompting technique belonging in Advanced Prompt
+Engineering — is an illustration of the mechanism, not its subject. Nothing in
+`probe/frontier.py`, `analyse/curriculum.py` or `analyse/gaps.py` knows what a prompt
+is. Adding an area is a YAML entry: an id, the terms that identify its sessions, and two
+official pages on disjoint domains. Ten areas ship; the first one needed the code, the
+other nine needed nine YAML blocks.
+
+One constant was tuned to the example and has been generalised. `normalise()` folded out
+"prompting, prompts, technique, method, approach, pattern" — right for the first area
+and doing nothing for the rest. It now folds `_CATEGORY_WORDS`: words naming the
+*category* rather than the thing, in any area (technique, method, strategy, mode,
+feature, capability, pattern). The obvious next step, folding out each area's own
+`scope_terms`, was implemented, measured and reverted: it reduces a name that is mostly
+area vocabulary to a stub, and the stub matches the wrong thing. "Other image generation
+modes" became `other`, which the coverage check then found in three unrelated sessions
+and reported as already taught. Vendor padding is handled instead by the term rule in
+`analyse/curriculum.py`, which asks whether every distinctive word of a name is already
+in one session — a rule that cannot produce a stub, because it never shortens anything.
+The capability stays on the function, unused, with the measurement recorded beside it.
+
+Similarly, a heading that is one vendor's page furniture ("Topic-specific prompt guides")
+belongs in that source's `exclude` list in the registry, where a human can see it, and
+not in the extractor's global stop list where every other area would carry it.
+
 ### Generality, as a reported number rather than a claim
 
 The code is course-agnostic — it indexes every workbook it can map and loops every
