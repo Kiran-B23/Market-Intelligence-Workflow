@@ -273,5 +273,25 @@ def test_an_unpriced_model_warns_that_the_spend_cap_stops_applying():
     assert "only the" in PAGE and "call limit does" in PAGE
 
 
-def test_it_says_which_stages_actually_cost_anything():
-    assert "probe, analyse and report cost nothing" in PAGE
+def test_it_says_which_stages_make_model_calls():
+    """Worded as "no MODEL calls", not "cost nothing".
+
+    The looser wording was wrong by omission: `research` is checked by default and
+    spends Tavily searches with no model involved, so a run with every model call
+    disabled is still not free. `test_the_form_says_research_spends_tavily_searches`
+    covers the other half.
+    """
+    assert "probe, analyse and report make no model calls at all" in PAGE
+
+
+def test_the_form_says_research_spends_tavily_searches():
+    """`research` is checked by default and calls Tavily even with no model involved —
+    `verify_on_official` runs per unanswered claim kind and is not gated behind
+    `--nominate`. Measured: ~73 searches for a scoped Intro to Gen AI run."""
+    assert "tavilyNote" in PAGE
+    assert "spends <b>Tavily</b> searches" in PAGE
+    assert "official pages + Tavily" in PAGE, "the stage label says so too"
+
+
+def test_unchecking_research_updates_that_note():
+    assert "addEventListener('change', tavilyNote)" in PAGE

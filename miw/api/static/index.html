@@ -934,7 +934,7 @@
             <label><input type="checkbox" value="probe" checked> probe
               <span class="cnt">deterministic</span></label>
             <label><input type="checkbox" value="research" checked> research
-              <span class="cnt">official pages</span></label>
+              <span class="cnt">official pages + Tavily</span></label>
             <label><input type="checkbox" value="analyse" checked> analyse</label>
             <label><input type="checkbox" value="report" checked> report</label>
           </div>
@@ -953,6 +953,8 @@
         <div><span class="note" id="pvtime"></span></div>
         <div><span class="note" id="pvtier"></span></div>
       </div>
+
+      <div class="note" id="tavilynote"></div>
 
       <fieldset id="llmbox">
         <legend>Model</legend>
@@ -2268,6 +2270,28 @@ async function loadLLM() {
 
   provSel.onchange = modSel.onchange = llmNote;
   llmNote();
+  tavilyNote();
+}
+
+/* The other meter, and the one easy to miss: `research` is checked by default and
+   spends Tavily searches even when no model is involved at all. Measured on this repo,
+   a scoped Intro to Gen AI research run issues ~73 searches — 64 domain-restricted
+   verifications plus 9 open alternative queries — because `verify_on_official` runs per
+   unanswered claim kind and is not gated behind `--nominate`. */
+function tavilyNote() {
+  const el = $('#tavilynote');
+  if (!el) return;
+  const on = Array.from(document.querySelectorAll('#stages input'))
+    .some(i => i.value === 'research' && i.checked);
+  const cap = (SUMMARY && SUMMARY.capabilities) || '';
+  const searchOn = /search discovery: on/.test(cap);
+  if (!on) { el.innerHTML = ''; return; }
+  el.innerHTML = searchOn
+    ? `<b>research</b> also spends <b>Tavily</b> searches — roughly <b>70-80</b> for a
+       full course, on top of any model calls. Uncheck it to use only vendors' own
+       pages, which needs no key.`
+    : `<b>research</b> will read vendors' own pages only: no <code>TAVILY_API_KEY</code>
+       is set, so nothing is searched and nothing is billed.`;
 }
 
 function llmNote() {
@@ -2304,8 +2328,8 @@ function llmNote() {
         + `the $${Number(caps.usd).toFixed(2)} spend cap does not apply to it — only the `
         + `${caps.calls}-call limit does.`);
     }
-    bits.push('Only <b>--refine</b>, <b>research --nominate</b> and the agent call a '
-      + 'model. probe, analyse and report cost nothing.');
+    bits.push('Only <b>refine</b>, <b>nominate</b> and the agent call a model — '
+      + 'probe, analyse and report make no model calls at all.');
   }
   $('#llmnote').innerHTML = bits.join(' ');
 }
@@ -2423,6 +2447,11 @@ $('#hrun').onclick = () => {
 
 initTheme();
 initSidebar();
+
+/* Recompute the Tavily note when the stage boxes move, so unchecking `research`
+   visibly removes the only cost a keyless run would otherwise still incur. */
+document.querySelectorAll('#stages input').forEach(
+  i => i.addEventListener('change', tavilyNote));
 
 $('#runbtn').onclick = startRun;
 $('#cancelbtn').onclick = async () => {
