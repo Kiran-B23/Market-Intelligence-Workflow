@@ -809,6 +809,20 @@
   #llmnote b{color:var(--ink); font-variant-numeric:tabular-nums}
   #llmnote .unpriced{color:var(--high-ink); font-weight:600}
 
+
+  /* ---------- the model chooser, in the sidebar ---------- */
+  #sidellm select{
+    width:100%; margin-bottom:var(--s1); font-size:var(--t-sm);
+    padding:5px var(--s2); border:1px solid var(--rule2); border-radius:var(--r-sm);
+    background:var(--surface); color:var(--ink);
+  }
+  #sidellm #llmnote{
+    font-size:var(--t-xs); line-height:1.45; color:var(--muted);
+    margin-top:var(--s1);
+  }
+  #sidellm #llmnote b{color:var(--soft); font-variant-numeric:tabular-nums}
+  #sidellm #llmnote .unpriced{color:var(--high-ink); font-weight:600}
+
 </style>
 </head>
 <body>
@@ -837,6 +851,15 @@
     <div class="sgroup">
       <div class="slabel">Across the curriculum</div>
       <div id="sideglobal"></div>
+    </div>
+    <!-- The model, where the active one was already being reported. It applies to the
+         next run from anywhere, so it belongs in the persistent chrome rather than
+         inside one form. -->
+    <div class="sgroup" id="sidellm">
+      <div class="slabel">Model</div>
+      <select id="llmprov" aria-label="LLM provider"><option value="">auto</option></select>
+      <select id="llmmodel" aria-label="LLM model"><option value="">default</option></select>
+      <div class="note" id="llmnote"></div>
     </div>
   </div>
   <div class="sidefoot" id="meta">loading…</div>
@@ -959,16 +982,8 @@
 
       <div class="note" id="tavilynote"></div>
 
-      <fieldset id="llmbox">
-        <legend>Model</legend>
-        <label>provider
-          <select id="llmprov"><option value="">auto</option></select>
-        </label>
-        <label>model
-          <select id="llmmodel"><option value="">default (haiku)</option></select>
-        </label>
-        <div class="note" id="llmnote"></div>
-      </fieldset>
+      <div class="note">Provider and model are chosen in the <b>Model</b> section of the
+        sidebar, and apply to this run.</div>
 
       <div class="runbar">
         <button class="act primary" id="runbtn">Run audit</button>
@@ -1238,7 +1253,7 @@ async function route() {
   }
   else if (view === 'run')  {
     show('run'); $('#runform').hidden = false; $('#newrun').hidden = true;
-    loadRuns(); loadLLM();
+    loadRuns();
   }
   else if (view === 'inventory') { show('inventory'); loadInventory(); }
   else if (view === 'digest') { show('digest');
@@ -1427,17 +1442,11 @@ function renderHeader() {
     // than left to look as though they had been filtered.
     ['precision (all courses)', prec],
   ];
-  const llm = SUMMARY.llm || {};
-  const model = llm.model_logical || '';
-  /* The active model, everywhere. It used to be a dead label in this strip, which is
-     no help when the thing you want is to CHANGE it — so it links to the form that
-     does, and says where that is. */
-  const llmBit = `<span>llm <a href="${CURRENT_COURSE
-      ? `#/c/${esc(CURRENT_COURSE)}/run` : '#/global/run'}"
-      title="Change the provider or model for the next run"><b>${
-      esc(SUMMARY.llm_provider || 'none')}${model ? ' · ' + esc(model) : ''}</b></a></span>`;
-  $('#meta').innerHTML = bits.map(([k,v]) =>
-    `<span>${k} <b>${esc(v)}</b></span>`).join('') + llmBit;
+  /* The llm cell used to live here as a dead label, then as a link to the run form.
+     Both are redundant now that the sidebar carries the control itself — two places
+     reporting the same fact is how they come to disagree. */
+  $('#meta').innerHTML = bits.map(([k, v]) =>
+    `<span>${k} <b>${esc(v)}</b></span>`).join('');
 }
 
 /* ---------- charts ----------
@@ -2263,21 +2272,37 @@ function renderLog(events, reset) {
 }
 
 /* ---------- the model chooser ----------
-   The choice reaches the stage subprocesses as MIW_LLM_PROVIDER / MIW_LLM_MODEL, which
-   is the interface miw/llm.py already reads — no new CLI flag, so there is only ever
-   one way to say this.
+   It lives in the sidebar because it applies to the NEXT RUN FROM ANYWHERE, not to one
+   form — and because the sidebar was already reporting the active provider, so the
+   readout and the control belong in the same place rather than two.
 
-   It states the cost implication at the point of choosing. That matters most for the
-   thing a bill would otherwise teach you: for a model outside the price table the daily
-   SPEND cap stops applying and only the call cap is left. */
+   The choice reaches the stage subprocesses as MIW_LLM_PROVIDER / MIW_LLM_MODEL, which
+   is the interface miw/llm.py already reads, so there is no new CLI flag.
+
+   Persisted per browser: the rail survives navigation but not a reload, and a choice
+   that silently reverted to `auto` between page loads would be worse than no control. */
+const LLM_KEY = 'miw-llm';
 let LLM = null;
 
+function llmSaved() {
+  try { return JSON.parse(localStorage.getItem(LLM_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+
+function llmSave() {
+  const v = {provider: $('#llmprov').value, model: $('#llmmodel').value};
+  try {
+    if (v.provider || v.model) localStorage.setItem(LLM_KEY, JSON.stringify(v));
+    else localStorage.removeItem(LLM_KEY);
+  } catch (e) { /* private mode: the selects still hold it for this session */ }
+}
+
 async function loadLLM() {
+  const provSel = $('#llmprov'), modSel = $('#llmmodel');
+  if (!provSel || LLM) return;                 // populate once; it does not change
   try {
     LLM = await get('/api/llm');
   } catch (e) { return; }
-  const provSel = $('#llmprov'), modSel = $('#llmmodel');
-  if (!provSel) return;
 
   provSel.innerHTML = `<option value="">auto — ${
     esc(LLM.active.provider === 'none' ? 'none available' : LLM.active.provider)}</option>`
@@ -2290,11 +2315,17 @@ async function loadLLM() {
     + LLM.models.map(m => `<option value="${esc(m.logical)}">${esc(m.logical)}${
         m.priced ? '' : ' (unpriced)'}</option>`).join('');
 
-  provSel.onchange = modSel.onchange = llmNote;
+  const saved = llmSaved();
+  if (saved.provider) provSel.value = saved.provider;
+  if (saved.model) modSel.value = saved.model;
+
+  provSel.onchange = modSel.onchange = () => { llmSave(); llmNote(); };
   llmNote();
-  tavilyNote();
 }
 
+/* Compact enough for a 232px rail: the choice, its price, and the one warning that
+   matters — for a model outside the price table the daily SPEND cap stops applying and
+   only the call cap is left. */
 /* The other meter, and the one easy to miss: `research` is checked by default and
    spends Tavily searches even when no model is involved at all. Measured on this repo,
    a scoped Intro to Gen AI research run issues ~73 searches — 64 domain-restricted
@@ -2306,9 +2337,8 @@ function tavilyNote() {
   const on = Array.from(document.querySelectorAll('#stages input'))
     .some(i => i.value === 'research' && i.checked);
   const cap = (SUMMARY && SUMMARY.capabilities) || '';
-  const searchOn = /search discovery: on/.test(cap);
   if (!on) { el.innerHTML = ''; return; }
-  el.innerHTML = searchOn
+  el.innerHTML = /search discovery: on/.test(cap)
     ? `<b>research</b> also spends <b>Tavily</b> searches — roughly <b>70-80</b> for a
        full course, on top of any model calls. Uncheck it to use only vendors' own
        pages, which needs no key.`
@@ -2317,44 +2347,44 @@ function tavilyNote() {
 }
 
 function llmNote() {
-  if (!LLM) return;
-  const prov = $('#llmprov').value, logical = $('#llmmodel').value || LLM.active.model;
+  const el = $('#llmnote');
+  if (!el || !LLM) return;
+  const prov = $('#llmprov').value;
+  const logical = $('#llmmodel').value || LLM.active.model;
   const m = LLM.models.find(x => x.logical === logical);
   const b = LLM.budget || {}, caps = LLM.caps || {};
-  const bits = [];
 
   if (prov === 'none') {
-    bits.push('No model calls at all — the act/why/when note stays the deterministic '
-      + 'template. Every finding is still produced and still cited.');
-  } else {
-    const effective = prov || LLM.active.provider;
-    if (effective === 'none') {
-      bits.push('<span class="unpriced">No provider is available</span>, so a run will '
-        + 'fall back to template prose.');
-    } else {
-      const id = m && m.ids ? m.ids[effective] : logical;
-      bits.push(`<b>${esc(effective)}</b> will be asked for <b>${esc(id || logical)}</b>.`);
-    }
-    /* The estimate uses the prompt sizes actually measured on this repo: ~860 input
-       and ~250 output tokens per refined note, ~750/200 per nomination, ~480/120 per
-       agent planning call. */
-    if (m && m.priced) {
-      const perNote = (860 * m.usd_per_mtok_in + 250 * m.usd_per_mtok_out) / 1e6;
-      bits.push(`About <b>$${perNote.toFixed(4)}</b> per refined note, so
-        <b>$${(perNote * 29).toFixed(2)}</b> for a full Intro to Gen AI refine (29
-        findings). Caps: <b>${caps.calls}</b> calls and <b>$${
-        Number(caps.usd).toFixed(2)}</b> a day; <b>${b.calls_today ?? 0}</b> calls and
-        <b>$${Number(b.spent_usd_today ?? 0).toFixed(4)}</b> used so far today.`);
-    } else if (m) {
-      bits.push('<span class="unpriced">This model has no price in the table</span>, so '
-        + `the $${Number(caps.usd).toFixed(2)} spend cap does not apply to it — only the `
-        + `${caps.calls}-call limit does.`);
-    }
-    bits.push('Only <b>refine</b>, <b>nominate</b> and the agent call a model — '
-      + 'probe, analyse and report make no model calls at all.');
+    el.innerHTML = 'No model calls. Notes stay the deterministic template; every '
+      + 'finding is still produced and still cited.';
+    return;
   }
-  $('#llmnote').innerHTML = bits.join(' ');
+  const effective = prov || LLM.active.provider;
+  if (effective === 'none') {
+    el.innerHTML = '<span class="unpriced">No provider available</span> — runs will '
+      + 'fall back to template prose.';
+    return;
+  }
+  const bits = [`<b>${esc(effective)}</b> · <b>${esc(
+    (m && m.ids && m.ids[effective]) || logical)}</b>`];
+  if (m && m.priced) {
+    /* From prompt sizes measured on this repo: ~860 in / ~250 out per refined note. */
+    const per = (860 * m.usd_per_mtok_in + 250 * m.usd_per_mtok_out) / 1e6;
+    bits.push(`~$${per.toFixed(4)}/note · ~$${(per * 29).toFixed(2)} to refine a whole
+      course`);
+  } else if (m) {
+    bits.push('<span class="unpriced">no price in the table</span> — the $'
+      + `${Number(caps.usd).toFixed(2)} spend cap does not apply to it, only the
+      ${caps.calls}-call limit does`);
+  }
+  bits.push(`today: <b>${b.calls_today ?? 0}</b>/${caps.calls} calls,
+    <b>$${Number(b.spent_usd_today ?? 0).toFixed(4)}</b>/$${
+    Number(caps.usd).toFixed(2)}`);
+  bits.push('Applies to the next run. Only refine, nominate and the agent call a '
+    + 'model — probe, analyse and report make no model calls at all.');
+  el.innerHTML = bits.join('<br>');
 }
+
 
 async function startRun() {
   const body = {
@@ -2469,6 +2499,7 @@ $('#hrun').onclick = () => {
 
 initTheme();
 initSidebar();
+loadLLM();      // the rail is always visible, so populate it once at startup
 
 /* Recompute the Tavily note when the stage boxes move, so unchecking `research`
    visibly removes the only cost a keyless run would otherwise still incur. */

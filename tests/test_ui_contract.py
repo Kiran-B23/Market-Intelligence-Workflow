@@ -245,10 +245,40 @@ def test_adding_a_course_is_reachable_and_explains_the_slug():
 
 # ------------------------------- the model chooser
 
-def test_the_run_form_offers_a_provider_and_model_choice():
-    assert 'id="llmprov"' in PAGE and 'id="llmmodel"' in PAGE
+def test_the_model_chooser_lives_in_the_sidebar():
+    """It applies to the next run from anywhere, not to one form — and the sidebar was
+    already reporting the active provider, so the readout and the control belong
+    together rather than in two places that can disagree."""
+    assert 'id="sidellm"' in PAGE
+    side = PAGE[PAGE.index('<aside class="side"'):PAGE.index("</aside>")]
+    assert 'id="llmprov"' in side and 'id="llmmodel"' in side
     assert "/api/llm" in PAGE
     assert "llm_provider:" in PAGE and "llm_model:" in PAGE, "and sends them with the run"
+
+
+def test_the_chooser_is_not_duplicated():
+    """Two controls for one setting is how they come to disagree."""
+    assert PAGE.count('id="llmprov"') == 1 and PAGE.count('id="llmmodel"') == 1
+    assert 'id="llmbox"' not in PAGE, "the run-form copy is gone"
+
+
+def test_the_choice_survives_a_reload():
+    """The rail survives navigation but not a reload, and a setting that silently
+    reverted to `auto` between page loads would be worse than no control."""
+    assert "LLM_KEY" in PAGE and "localStorage" in PAGE
+    assert "function llmSave()" in PAGE
+
+
+def test_the_chooser_is_populated_at_startup_not_on_one_view():
+    """The rail is always visible, so it cannot wait for the run view."""
+    assert "initSidebar();" in PAGE
+    i = PAGE.index("initSidebar();")
+    assert "loadLLM();" in PAGE[i:i + 200]
+
+
+def test_the_run_form_says_where_the_control_is():
+    assert "section of the" in PAGE and "sidebar, and apply to this run" in PAGE
+
 
 
 def test_an_unavailable_provider_is_disabled_and_says_why():
@@ -322,7 +352,9 @@ def test_the_history_view_offers_a_way_to_start_one():
     assert "$('#newrun').hidden = false" in PAGE
 
 
-def test_the_active_model_is_shown_everywhere_and_links_to_the_chooser():
-    """A dead label is no help when the thing you want is to change it."""
-    assert "Change the provider or model for the next run" in PAGE
-    assert "SUMMARY.llm_provider" in PAGE
+def test_the_active_provider_is_readable_beside_the_control():
+    """It was a dead label in the meta strip, then a link to the run form. Both are
+    redundant now the control itself sits in the sidebar, and two places reporting one
+    fact is how they come to disagree."""
+    assert "LLM.active.provider" in PAGE, "the rail names what `auto` resolves to"
+    assert "Change the provider or model" not in PAGE, "the old link is gone"
