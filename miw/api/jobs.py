@@ -93,7 +93,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     started_at TEXT,
     ended_at   TEXT,
     exit_code  INTEGER,
-    label      TEXT
+    label      TEXT,
+    llm        TEXT        -- {"provider": ..., "model": ...}, chosen per run
 );
 CREATE TABLE IF NOT EXISTS job_events (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,6 +172,12 @@ class JobRunner:
         self.conn = _conn()
         with closing(self.conn.cursor()) as cur:
             cur.executescript(SCHEMA)
+            # `CREATE TABLE IF NOT EXISTS` does not add a column to a table that
+            # already exists, and this DB predates `llm`. Same shape as
+            # `_backfill_job_courses`: idempotent, no migration script.
+            cols = {r[1] for r in cur.execute("PRAGMA table_info(jobs)")}
+            if "llm" not in cols:
+                cur.execute("ALTER TABLE jobs ADD COLUMN llm TEXT")
         self.conn.commit()
         self._current: Optional[subprocess.Popen] = None
         self._current_run: Optional[str] = None
@@ -221,13 +228,14 @@ class JobRunner:
     # --- public API ---------------------------------------------------------
 
     def submit(self, *, scope: dict, stages: list[str], refine: bool = False,
-               label: str = "") -> str:
+               label: str = "", llm: Optional[dict] = None) -> str:
         stages = [s for s in stages if s in STAGES] or ["probe", "analyse", "report"]
         run_id = uuid.uuid4().hex[:12]
         self._exec(
-            "INSERT INTO jobs (run_id, scope, stages, refine, status, created_at, label)"
-            " VALUES (?,?,?,?, 'queued', ?, ?)",
-            (run_id, json.dumps(scope), json.dumps(stages), int(refine), _now(), label))
+            "INSERT INTO jobs (run_id, scope, stages, refine, status, created_at, "
+            "label, llm) VALUES (?,?,?,?, 'queued', ?, ?, ?)",
+            (run_id, json.dumps(scope), json.dumps(stages), int(refine), _now(), label,
+             json.dumps(llm) if llm else None))
         for slug in _slugs_for_scope(scope):
             self._exec("INSERT OR IGNORE INTO job_courses (run_id, course_slug) "
                        "VALUES (?,?)", (run_id, slug))
@@ -309,6 +317,17 @@ class JobRunner:
         scope = json.loads(row["scope"] or "{}")
         stages = json.loads(row["stages"] or "[]")
         refine = bool(row["refine"])
+        # The provider/model choice reaches the stages as environment, because that is
+        # the interface `miw/llm.py` already reads — there is no CLI flag for it, and
+        # inventing one would give two ways to say the same thing.
+        llm = {}
+        try:
+            llm = json.loads(row["llm"] or "{}") or {}
+        except (json.JSONDecodeError, IndexError, KeyError):
+            llm = {}
+        self._llm_env = {k: v for k, v in (
+            ("MIW_LLM_PROVIDER", llm.get("provider")),
+            ("MIW_LLM_MODEL", llm.get("model"))) if v}
         self._current_run = run_id
         self._exec("UPDATE jobs SET status='running', started_at=? WHERE run_id=?",
                    (_now(), run_id))
@@ -318,6 +337,10 @@ class JobRunner:
         self.event(run_id, "", f"scope: {sc.describe()}")
         self.event(run_id, "", f"stages: {', '.join(stages)}"
                                f"{' (+refine)' if refine else ''}")
+        if self._llm_env:
+            self.event(run_id, "", "llm: " + ", ".join(
+                f"{k.replace('MIW_LLM_', '').lower()}={v}"
+                for k, v in sorted(self._llm_env.items())))
 
         code = 0
         try:
@@ -349,7 +372,8 @@ class JobRunner:
         self._current_run, self._current = None, None
 
     def _stream(self, run_id: str, stage: str, cmd: list[str]) -> int:
-        env = dict(os.environ, PYTHONUNBUFFERED="1")
+        env = dict(os.environ, PYTHONUNBUFFERED="1",
+                   **getattr(self, "_llm_env", {}) or {})
         proc = subprocess.Popen(cmd, cwd=str(ROOT), stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, bufsize=1, env=env)
         self._current = proc

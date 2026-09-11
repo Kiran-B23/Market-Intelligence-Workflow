@@ -800,6 +800,15 @@
   .statgrid dd{margin:2px 0 0; font:600 var(--t-lg)/1 var(--sans); color:var(--ink);
                font-variant-numeric:tabular-nums}
 
+
+  /* ---------- model chooser ---------- */
+  #llmbox{display:flex; flex-direction:column; gap:var(--s2)}
+  #llmbox label{display:flex; align-items:center; gap:var(--s2); font-size:var(--t-md)}
+  #llmbox select{flex:1 1 auto; min-width:0}
+  #llmnote{line-height:1.5}
+  #llmnote b{color:var(--ink); font-variant-numeric:tabular-nums}
+  #llmnote .unpriced{color:var(--high-ink); font-weight:600}
+
 </style>
 </head>
 <body>
@@ -944,6 +953,17 @@
         <div><span class="note" id="pvtime"></span></div>
         <div><span class="note" id="pvtier"></span></div>
       </div>
+
+      <fieldset id="llmbox">
+        <legend>Model</legend>
+        <label>provider
+          <select id="llmprov"><option value="">auto</option></select>
+        </label>
+        <label>model
+          <select id="llmmodel"><option value="">default (haiku)</option></select>
+        </label>
+        <div class="note" id="llmnote"></div>
+      </fieldset>
 
       <div class="runbar">
         <button class="act primary" id="runbtn">Run audit</button>
@@ -1202,7 +1222,8 @@ async function route() {
     renderAgentRuns(a);
   }
   else if (view === 'runs') { show('run'); $('#runform').hidden = true; loadRuns(); }
-  else if (view === 'run')  { show('run'); $('#runform').hidden = false; loadRuns(); }
+  else if (view === 'run')  { show('run'); $('#runform').hidden = false;
+                              loadRuns(); loadLLM(); }
   else if (view === 'inventory') { show('inventory'); loadInventory(); }
   else if (view === 'digest') { show('digest');
     $('#digest').textContent = await text('/api/digest' + qs()); }
@@ -2217,6 +2238,78 @@ function renderLog(events, reset) {
   if (atBottom) el.scrollTop = el.scrollHeight;
 }
 
+/* ---------- the model chooser ----------
+   The choice reaches the stage subprocesses as MIW_LLM_PROVIDER / MIW_LLM_MODEL, which
+   is the interface miw/llm.py already reads — no new CLI flag, so there is only ever
+   one way to say this.
+
+   It states the cost implication at the point of choosing. That matters most for the
+   thing a bill would otherwise teach you: for a model outside the price table the daily
+   SPEND cap stops applying and only the call cap is left. */
+let LLM = null;
+
+async function loadLLM() {
+  try {
+    LLM = await get('/api/llm');
+  } catch (e) { return; }
+  const provSel = $('#llmprov'), modSel = $('#llmmodel');
+  if (!provSel) return;
+
+  provSel.innerHTML = `<option value="">auto — ${
+    esc(LLM.active.provider === 'none' ? 'none available' : LLM.active.provider)}</option>`
+    + LLM.providers.map(p => `<option value="${esc(p.name)}"${
+        p.available ? '' : ' disabled'}>${esc(p.name)}${
+        p.available ? '' : ' — ' + esc(p.why)}</option>`).join('')
+    + '<option value="none">none — template prose only, no calls</option>';
+
+  modSel.innerHTML = `<option value="">default (${esc(LLM.active.model || 'haiku')})</option>`
+    + LLM.models.map(m => `<option value="${esc(m.logical)}">${esc(m.logical)}${
+        m.priced ? '' : ' (unpriced)'}</option>`).join('');
+
+  provSel.onchange = modSel.onchange = llmNote;
+  llmNote();
+}
+
+function llmNote() {
+  if (!LLM) return;
+  const prov = $('#llmprov').value, logical = $('#llmmodel').value || LLM.active.model;
+  const m = LLM.models.find(x => x.logical === logical);
+  const b = LLM.budget || {}, caps = LLM.caps || {};
+  const bits = [];
+
+  if (prov === 'none') {
+    bits.push('No model calls at all — the act/why/when note stays the deterministic '
+      + 'template. Every finding is still produced and still cited.');
+  } else {
+    const effective = prov || LLM.active.provider;
+    if (effective === 'none') {
+      bits.push('<span class="unpriced">No provider is available</span>, so a run will '
+        + 'fall back to template prose.');
+    } else {
+      const id = m && m.ids ? m.ids[effective] : logical;
+      bits.push(`<b>${esc(effective)}</b> will be asked for <b>${esc(id || logical)}</b>.`);
+    }
+    /* The estimate uses the prompt sizes actually measured on this repo: ~860 input
+       and ~250 output tokens per refined note, ~750/200 per nomination, ~480/120 per
+       agent planning call. */
+    if (m && m.priced) {
+      const perNote = (860 * m.usd_per_mtok_in + 250 * m.usd_per_mtok_out) / 1e6;
+      bits.push(`About <b>$${perNote.toFixed(4)}</b> per refined note, so
+        <b>$${(perNote * 29).toFixed(2)}</b> for a full Intro to Gen AI refine (29
+        findings). Caps: <b>${caps.calls}</b> calls and <b>$${
+        Number(caps.usd).toFixed(2)}</b> a day; <b>${b.calls_today ?? 0}</b> calls and
+        <b>$${Number(b.spent_usd_today ?? 0).toFixed(4)}</b> used so far today.`);
+    } else if (m) {
+      bits.push('<span class="unpriced">This model has no price in the table</span>, so '
+        + `the $${Number(caps.usd).toFixed(2)} spend cap does not apply to it — only the `
+        + `${caps.calls}-call limit does.`);
+    }
+    bits.push('Only <b>--refine</b>, <b>research --nominate</b> and the agent call a '
+      + 'model. probe, analyse and report cost nothing.');
+  }
+  $('#llmnote').innerHTML = bits.join(' ');
+}
+
 async function startRun() {
   const body = {
     courses: picked('.course'),
@@ -2224,6 +2317,8 @@ async function startRun() {
     tiers: picked('.tier'),
     stages: picked('#stages input'),
     refine: $('#refine').checked,
+    llm_provider: $('#llmprov') ? $('#llmprov').value : '',
+    llm_model: $('#llmmodel') ? $('#llmmodel').value : '',
     label: $('#label').value.trim(),
     limit: $('#limit').value ? Number($('#limit').value) : null,
   };

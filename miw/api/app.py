@@ -804,6 +804,43 @@ def feedback() -> str:
 
 # ------------------------------------------------------------------ verify
 
+@app.get("/api/llm")
+def llm_options() -> dict:
+    """What the run form's model chooser can offer, and what each choice costs.
+
+    The price table is deliberately short — three Anthropic ids — and anything outside
+    it reports `priced: false`, because for an unpriced model the daily SPEND cap stops
+    applying and only the call cap remains. The UI says that at the point of choosing
+    rather than leaving it to be discovered in a bill.
+    """
+    from miw.llm import (AUTO_ORDER, LOGICAL_MODELS, MAX_CALLS, MAX_SPEND_USD,
+                         PRICE_USD_PER_MTOK, budget_state, provider_status,
+                         resolve_model)
+
+    st = provider_status()
+    avail = {c["name"]: c for c in st.get("candidates", [])}
+    providers = [{"name": n,
+                  "available": bool(avail.get(n, {}).get("available")),
+                  "why": avail.get(n, {}).get("why", "")}
+                 for n in AUTO_ORDER]
+    models = []
+    for logical in LOGICAL_MODELS:
+        ids = {p: resolve_model(logical, p) for p in AUTO_ORDER}
+        # Priced per logical name: the three logical names map onto the three priced
+        # ids, so "priced" is a property of the choice a user can actually make here.
+        anth = ids["anthropic"]
+        price = PRICE_USD_PER_MTOK.get(anth)
+        models.append({"logical": logical, "ids": ids,
+                       "priced": price is not None,
+                       "usd_per_mtok_in": price[0] if price else None,
+                       "usd_per_mtok_out": price[1] if price else None})
+    return {"providers": providers, "models": models,
+            "active": {"provider": st["provider"], "forced": st["forced"],
+                       "model": st.get("model_logical", "")},
+            "caps": {"calls": MAX_CALLS, "usd": MAX_SPEND_USD},
+            "budget": budget_state()}
+
+
 @app.get("/api/verify", response_class=PlainTextResponse)
 def verify() -> str:
     """Run the trust-invariant audit and stream back exactly what the CLI prints."""
@@ -1007,6 +1044,10 @@ class RunIn(BaseModel):
     stages: list[str] = ["probe", "research", "analyse", "report"]
     refine: bool = False
     label: str = ""
+    # Per-run LLM choice. Empty means "whatever the environment already says", which is
+    # `auto` unless MIW_LLM_PROVIDER is set — so the default behaviour is unchanged.
+    llm_provider: str = ""
+    llm_model: str = ""
 
 
 @app.post("/api/runs")
@@ -1024,8 +1065,10 @@ def start_run(body: RunIn) -> dict:
     scope = {"courses": sorted(resolve_courses(body.courses)), "sessions": sessions,
              "tiers": body.tiers, "kinds": body.kinds, "limit": body.limit}
     r = runner()
+    llm = ({"provider": body.llm_provider, "model": body.llm_model}
+           if (body.llm_provider or body.llm_model) else None)
     run_id = r.submit(scope=scope, stages=body.stages, refine=body.refine,
-                      label=body.label)
+                      label=body.label, llm=llm)
     return {"run_id": run_id, "queued_behind": 1 if r.active() else 0}
 
 

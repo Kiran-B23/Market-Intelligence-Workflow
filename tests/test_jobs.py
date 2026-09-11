@@ -1,6 +1,9 @@
 """The job runner. Its one hard requirement: never present a partial audit as done."""
+import contextlib
 import json
+import queue
 import sys
+import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -117,3 +120,98 @@ def test_unscoped_stages_get_no_flags_at_all():
     sc = Scope(courses={"PSE"}, tiers=("critical",))
     assert _stage_args("ingest", sc) == []
     assert _stage_args("extract", sc) == []
+
+
+# ------------------------------------------- the per-run LLM choice
+
+@contextlib.contextmanager
+def _bare_runner(tmp):
+    """A JobRunner over a throwaway DB with no worker thread.
+
+    Same shape as `tests/test_course_isolation.py::_runner`: `jobs._conn()` reads the
+    module-level `DB`, so the constant has to move or reads land on the real
+    `state/jobs.db`.
+    """
+    from miw.api import jobs as J
+    original = J.DB
+    J.DB = Path(tmp) / "jobs.db"
+    r = J.JobRunner.__new__(J.JobRunner)
+    r.conn = J._conn()
+    r.conn.executescript(J.SCHEMA)
+    r.conn.commit()
+    r.lock = threading.Lock()
+    r.q = queue.Queue()
+    try:
+        yield r
+    finally:
+        r.conn.close()
+        J.DB = original
+
+
+def _no_stream(monkeypatch, seen):
+    from miw.api.jobs import JobRunner
+    monkeypatch.setattr(
+        JobRunner, "_stream",
+        lambda self, rid, st, cmd: (seen.update(
+            env=dict(getattr(self, "_llm_env", {}))), 0)[1], raising=True)
+
+
+def test_the_llm_choice_reaches_the_stage_subprocess_as_environment(tmp_path, monkeypatch):
+    """`MIW_LLM_PROVIDER`/`MIW_LLM_MODEL` is the interface `miw/llm.py` already reads,
+    so the choice travels as env rather than as a new CLI flag — one way to say it."""
+    with _bare_runner(tmp_path) as r:
+        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"],
+                       llm={"provider": "openrouter", "model": "sonnet"})
+        row = r.get(rid)
+        assert json.loads(row["llm"]) == {"provider": "openrouter", "model": "sonnet"}
+        seen = {}
+        _no_stream(monkeypatch, seen)
+        r._run(rid, row)
+        assert seen["env"] == {"MIW_LLM_PROVIDER": "openrouter",
+                               "MIW_LLM_MODEL": "sonnet"}
+
+
+def test_no_choice_means_no_env_so_the_default_is_untouched(tmp_path, monkeypatch):
+    """An empty choice must not export `MIW_LLM_PROVIDER=''` — that is not the same as
+    absent, and `available_provider()` would read it as a typo and use no LLM at all."""
+    with _bare_runner(tmp_path) as r:
+        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"])
+        assert r.get(rid)["llm"] is None
+        seen = {}
+        _no_stream(monkeypatch, seen)
+        r._run(rid, r.get(rid))
+        assert seen["env"] == {}
+
+
+def test_a_partial_choice_exports_only_what_was_chosen(tmp_path, monkeypatch):
+    with _bare_runner(tmp_path) as r:
+        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"],
+                       llm={"provider": "", "model": "opus"})
+        seen = {}
+        _no_stream(monkeypatch, seen)
+        r._run(rid, r.get(rid))
+        assert seen["env"] == {"MIW_LLM_MODEL": "opus"}
+
+
+def test_an_existing_jobs_db_gains_the_llm_column(tmp_path, monkeypatch):
+    """`CREATE TABLE IF NOT EXISTS` does not add a column to a table that exists, and
+    every already-deployed jobs.db predates `llm`."""
+    import sqlite3
+
+    from miw.api import jobs as J
+    db = tmp_path / "old.db"
+    c = sqlite3.connect(db)
+    c.executescript("""CREATE TABLE jobs (run_id TEXT PRIMARY KEY, scope TEXT,
+        stages TEXT, refine INTEGER, status TEXT, stage_now TEXT, created_at TEXT,
+        started_at TEXT, ended_at TEXT, exit_code INTEGER, label TEXT);""")
+    c.commit(); c.close()
+
+    monkeypatch.setattr(J, "DB", db)
+    monkeypatch.setattr(J.JobRunner, "_loop", lambda self: None, raising=True)
+    r = J.JobRunner()                        # must migrate, not crash
+    try:
+        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"],
+                       llm={"provider": "anthropic"})
+        assert json.loads(r.get(rid)["llm"]) == {"provider": "anthropic"}
+    finally:
+        r.conn.close()

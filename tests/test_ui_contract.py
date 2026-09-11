@@ -241,3 +241,37 @@ def test_adding_a_course_is_reachable_and_explains_the_slug():
     assert 'href="#/add"' in PAGE and 'id="tab-add"' in PAGE
     assert "slug will be" in PAGE, "the derived slug is shown before committing"
     assert "/api/courses/validate" in PAGE, "it checks before it writes"
+
+
+# ------------------------------- the model chooser
+
+def test_the_run_form_offers_a_provider_and_model_choice():
+    assert 'id="llmprov"' in PAGE and 'id="llmmodel"' in PAGE
+    assert "/api/llm" in PAGE
+    assert "llm_provider:" in PAGE and "llm_model:" in PAGE, "and sends them with the run"
+
+
+def test_an_unavailable_provider_is_disabled_and_says_why():
+    """`auto` will never reach OpenRouter while the CLI is on PATH, and a key that is
+    simply absent should say so rather than fail at run time."""
+    assert "disabled" in PAGE and "esc(p.why)" in PAGE
+
+
+def test_choosing_none_is_offered_as_a_real_option():
+    """Template prose is the product; the model is an enhancement to it."""
+    assert "template prose only, no calls" in PAGE
+
+
+def test_the_chooser_states_the_cost_of_the_choice():
+    assert "per refined note" in PAGE
+    assert "spent_usd_today" in PAGE and "calls_today" in PAGE
+
+
+def test_an_unpriced_model_warns_that_the_spend_cap_stops_applying():
+    """This is the one a bill would otherwise teach you."""
+    assert "no price in the table" in PAGE
+    assert "only the" in PAGE and "call limit does" in PAGE
+
+
+def test_it_says_which_stages_actually_cost_anything():
+    assert "probe, analyse and report cost nothing" in PAGE
