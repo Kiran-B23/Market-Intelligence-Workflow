@@ -1152,11 +1152,28 @@ const qs = (extra) => {
    labelled "Runs" and "Run audit", which is a distinction nobody should have to guess
    at — and when the form was dropped from the sidebar entirely, "Runs" became a dead
    end that hides the form and with it the model chooser. */
-const COURSE_TABS = [['findings','What to fix'], ['inventory','Tools & models used'],
-                     ['run','Check for changes'], ['runs','Past checks'],
+/* Two questions, two lists, because they are two different pieces of work.
+
+   FIXES is "something we teach is now wrong" — a dead link, a retired model id, a free
+   tier that closed. Someone has to change published material, and the clock is running.
+   CHANGES is "something exists that we could teach" — a newly released model, a tool
+   that fits a session, a technique the decks do not cover. Nobody is blocked; it is a
+   decision for the next curriculum cycle.
+
+   The scorer has recorded which is which since the beginning (`kind_of_signal`, and the
+   digest has always printed them under separate headings). The page was showing them in
+   one list, and the entry that started a RUN was called "Check for changes" — an action
+   named like a content category, sitting next to one. That is what made the two read as
+   the same thing. Actions are verbs here now, and lists are nouns. */
+const COURSE_TABS = [['findings','Fixes'], ['changes','Changes'],
+                     ['inventory','Tools & models used'],
+                     ['run','Run a check'], ['runs','Past checks'],
                      ['digest','Weekly report']];
-const GLOBAL_TABS = [['run','Check for changes'], ['runs','Past checks'],
+const GLOBAL_TABS = [['run','Run a check'], ['runs','Past checks'],
                      ['trust','Sources & decisions'], ['digest','Weekly report']];
+/* Which `kind_of_signal` each list shows. One map, so the nav count and the list can
+   never disagree about what belongs where. */
+const VIEW_KIND = {findings: 'regression', changes: 'opportunity'};
 
 /* The sidebar replaces the top tab bar. Same COURSE_TABS/GLOBAL_TABS, same hash
    routes — only the presentation changed, so nothing about routing moved. */
@@ -1227,8 +1244,15 @@ function renderNav(r) {
   if (r.scope === 'course') {
     cn.hidden = false;
     $('#sidecoursename').textContent = COURSE_TITLE || 'This course';
+    const kinds = (SUMMARY && SUMMARY.findings_by_kind) || {};
     $('#sidecoursetabs').innerHTML = COURSE_TABS
-      .map(([v, l]) => item(`#/c/${r.slug}/${v}`, l, r.view === v)).join('');
+      .map(([v, l]) => {
+        /* The count is the point of the split: "3 fixes, 12 changes" is a plan for the
+           week, and one number over both is not. */
+        const n = VIEW_KIND[v] ? (kinds[VIEW_KIND[v]] || 0) : null;
+        return item(`#/c/${r.slug}/${v}`, l, r.view === v,
+                    n === null ? '' : `<span class="scount">${n}</span>`);
+      }).join('');
   } else {
     cn.hidden = true;
   }
@@ -1323,14 +1347,18 @@ async function route() {
   renderPageHead(r);          // the header sub-line needs the fresh summary
 
   const view = r.view || 'findings';
-  if (view === 'findings') {
+  renderNav(r);          // again, now SUMMARY is fresh, so the nav counts are this
+                         // course's rather than the previously viewed one's
+  if (view === 'findings' || view === 'changes') {
     show('findings');
     const [f, a] = await Promise.all([
       get('/api/findings' + qs()),
       get('/api/agent-findings' + qs()).catch(() => ({runs: []})),
     ]);
-    renderFindings(f);
-    renderAgentRuns(a);
+    renderFindings(f, VIEW_KIND[view]);
+    /* Agent runs propose replacements for things that broke, so they belong with the
+       fixes, not with the additions. */
+    renderAgentRuns(view === 'findings' ? a : {runs: []});
   }
   else if (view === 'runs') {
     show('run'); $('#runform').hidden = true; loadRuns();
@@ -2234,17 +2262,44 @@ function findingRow(r) {
   </div>`;
 }
 
-function renderFindings(data) {
-  FINDINGS = data.findings || [];
-  $('#findings').innerHTML = FINDINGS.length
-    ? FINDINGS.map(card).join('')
-    : `<div class="empty">No new or worsened findings this week.<br>
-       <span class="note">${esc(SUMMARY.suppressed_unchanged||0)} unchanged finding(s) suppressed.</span></div>`;
+/* What each list is, in the words of someone who has to act on it. Shown above the
+   list rather than assumed, because the difference between them is the difference
+   between "drop what you are doing" and "consider this next cycle", and a reader who
+   guesses wrong does the wrong work. */
+const KIND_INTRO = {
+  regression: {
+    title: 'Fixes',
+    blurb: `Something a course teaches is now wrong — a dead link, a retired model id,
+            a free tier that closed, a version that moved past what we pin. Published
+            material has to change, and students are hitting these today.`,
+    empty: 'Nothing we teach is currently broken.',
+  },
+  opportunity: {
+    title: 'Changes',
+    blurb: `Something exists that we could teach — a newly released model, a tool that
+            fits a session, a technique the decks do not cover. Nothing is broken and
+            nobody is blocked; these are decisions for the next curriculum cycle.`,
+    empty: 'Nothing new to consider adding right now.',
+  },
+};
+
+function renderFindings(data, kind) {
+  kind = kind || 'regression';
+  const mine = r => (r.kind_of_signal || 'regression') === kind;
+  const intro = KIND_INTRO[kind];
+  FINDINGS = (data.findings || []).filter(mine);
+  $('#findings').innerHTML =
+    `<h2>${esc(intro.title)}</h2><p class="hint">${intro.blurb}</p>`
+    + (FINDINGS.length
+       ? FINDINGS.map(card).join('')
+       : `<div class="empty">No new or changed ones this week.<br>
+          <span class="note">${esc(SUMMARY.suppressed_unchanged||0)} unchanged
+          finding(s) suppressed; anything still open is listed below.</span></div>`);
 
   /* Findings that are still open but unchanged are held in the store and kept out of
      the report. Saying so is the point: hiding them silently is the same dishonesty as
      the artifact-clobbering bug this replaced. */
-  const standing = data.standing || [];
+  const standing = (data.standing || []).filter(mine);
   $('#standing').innerHTML = standing.length
     ? `<h2>Still open, unchanged since the last run (${standing.length})</h2>
        <p class="hint">Not repeated above because nothing about them changed. They are

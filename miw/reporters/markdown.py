@@ -142,14 +142,16 @@ def render(findings: Iterable[Finding], *, resolved: list[dict] | None = None,
         # the first and meaningless about the second.
         gaps = [f for f in opportunities if f.signal == "S11"]
         better = [f for f in opportunities if f.signal != "S11"]
-        bits = [f"**{len(regressions)} regression(s)** — something we teach is now "
-                f"wrong."]
+        bits = [f"**{len(regressions)} fix(es)** — something we teach is now wrong."]
         if better:
             bits.append(f"**{len(better)} better option(s)** — still right, no longer "
                         f"best.")
         if gaps:
             bits.append(f"**{len(gaps)} topic gap(s)** — documented by two independent "
                         f"vendors and in no session's outline.")
+        if better or gaps:
+            bits.append("The second group is a decision for the next cycle; nobody is "
+                        "blocked by it.")
         L += [" ".join(bits), ""]
     L += [f"_{inventory_size} dependencies{' in this course' if course else ''} "
           f"inventoried · {probed} probed · "
@@ -178,11 +180,11 @@ def render(findings: Iterable[Finding], *, resolved: list[dict] | None = None,
     L += ["---", ""]
 
     if regressions:
-        L += ["## Regressions", ""]
+        L += ["## Fixes — something we teach is now wrong", ""]
         for f in regressions:
             L += _finding_block(f)
     if opportunities:
-        L += ["## Opportunities", ""]
+        L += ["## Changes — something exists that we could teach", ""]
         for f in opportunities:
             L += _finding_block(f)
     if improved:

@@ -2416,7 +2416,64 @@ retiring it exposed that a topic which stops being a candidate for *any* reason 
 row forever: `examined` is now the union of what this run considered and every topic row
 already on file, so an unscoped run repairs orphans as well as resolving fixed gaps.
 
-## 33. The UI reads without a glossary
+## 33. Fixes and Changes are different work
+
+> "Why both what to fix and check for changes are showing same.
+>  Fixes - Issues found in curriculum
+>  Changes - New additions like recently release model which is free, tool for specific
+>  purpose which can be used in the curriculum, new update on the concept etc"
+
+The split is right, it is the one the system has always used internally, and the page
+was not showing it. `kind_of_signal` has been on every finding since the scorer was
+written — S1–S9 are `regression`, S10–S11 are `opportunity` — and the digest has printed
+them under separate headings all along. The findings page merged them into one list.
+
+What made it unreadable was a naming mistake of mine: the sidebar entry that *starts a
+run* was called **"Check for changes"**, sitting directly beneath **"What to fix"**. One
+is a button and one is a list, and named like that they read as two categories of
+finding. The rule now is that actions are verbs and lists are nouns:
+
+| | |
+|---|---|
+| **Fixes** | Something a course teaches is now wrong — a dead link, a retired model id, a closed free tier, a version past what we pin. Published material has to change and students are hitting it today. |
+| **Changes** | Something exists that we could teach — a newly released model, a tool that fits a session, a technique the decks do not cover. Nothing is broken; it is a decision for the next cycle. |
+| **Run a check** | The button. |
+
+Each list carries its own count in the sidebar, which is the point of splitting them:
+"3 fixes, 12 changes" is a plan for the week and one number over both is not. `VIEW_KIND`
+is the single map deciding what belongs where, read by both the count and the list, so
+they cannot disagree. The digest's two headings were renamed to the same two words —
+a reader who moves between the page and the report should not have to translate.
+
+Two counting bugs fell out. `/api/summary` was still filtering by inventory membership,
+so a course page's header said **0 opportunities** while its own list showed two — the
+same bug already fixed in `/api/findings` and missed here. And the `standing` payload did
+not carry `kind_of_signal`, which would have emptied one of the two lists with no error
+on any re-run with no news, when the standing list *is* the page.
+
+### What is actually in each pile today, and a correction
+
+Fixes: 34. Changes: 5, all of them topic gaps (S11).
+
+I previously wrote that S10 has no producer because `verified_alts` is always empty.
+That was wrong, and the artifact says so: six alternatives are attached and **all six
+verify**. S10 has not fired for a different and better reason — discovery ran on
+dependencies that were already broken (`discovery_reason: breakage`), and when a
+dependency has an S1 or S4 the verified alternatives attach to *that* finding rather
+than raising a separate one. "This is dead, here is a replacement" is one finding, not
+two. The rotation path that would raise a standalone S10 on a *healthy* dependency is
+wired (`agent.py`'s opportunity slice) and has simply not produced a verified candidate
+in these runs.
+
+So the "newly released model which is free" case is not yet covered by anything. A new
+model is not a topic, so `gaps` will not see it, and it is not a replacement for
+something broken, so S10 will not either. The mechanism for it already exists —
+`probe/catalogue.py` reads vendor model tables as enumerations, which is the same shape
+`probe/frontier.py` reads documentation headings in — so it is the gaps stage pointed at
+a model catalogue rather than a docs page. That is the next thing worth building, not
+something already built.
+
+## 34. The UI reads without a glossary
 
 > "the naming in the UI is a bit confusing and I'm not able to make others understand"
 

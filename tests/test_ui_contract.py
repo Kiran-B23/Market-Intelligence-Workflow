@@ -360,7 +360,7 @@ def test_the_run_form_is_in_the_sidebar_not_only_the_header_button():
     """It was filtered out on the reasoning that the header button replaced it, which
     left "Past checks" — the obvious-looking entry — as a dead end that hides the form,
     and with it the model chooser. Nothing should be reachable by one route only."""
-    assert "'Check for changes'" in PAGE
+    assert "'Run a check'" in PAGE
     assert "v !== 'run'" not in PAGE, "the sidebar must not filter the form out"
 
 
@@ -372,17 +372,55 @@ def test_the_form_and_the_history_are_named_distinguishably():
     a check and the entry that lists past ones must not read as the same thing, and the
     verb-phrase names must be the ones on the page.
     """
-    form, history = "'Check for changes'", "'Past checks'"
+    form, history = "'Run a check'", "'Past checks'"
     assert form in PAGE and history in PAGE
     assert form != history
     assert "'Run audit'" not in PAGE, "the old ambiguous label is gone"
     assert "'Run history'" not in PAGE
+    # And the form's name must not read as a CONTENT category. "Check for changes" sat
+    # in the nav beside "What to fix" and the two read as two kinds of finding, when
+    # one of them was a button. Actions are verbs here; lists are nouns.
+    assert "'Check for changes'" not in PAGE
 
 
 def test_the_unscoped_form_is_linked_rather_than_only_typeable():
     """`#/global/run` was reachable but unlinked. It now shares the course form's name,
     so the assertion is that the global nav carries an entry pointing at it."""
-    assert "['run','Check for changes']" in PAGE
+    assert "['run','Run a check']" in PAGE
+
+
+# ------------------------------- fixes and changes are different work
+
+def test_the_two_kinds_of_finding_have_their_own_lists():
+    """"Something we teach is now wrong" and "something exists we could teach" are not
+    one backlog. The scorer has always recorded which is which and the digest has always
+    printed them under separate headings; only the page merged them."""
+    assert "['findings','Fixes']" in PAGE
+    assert "['changes','Changes']" in PAGE
+    assert "const VIEW_KIND = {findings: 'regression', changes: 'opportunity'}" in PAGE
+
+
+def test_one_map_decides_what_belongs_in_which_list():
+    """The nav count and the list it labels must not be able to disagree."""
+    assert PAGE.count("VIEW_KIND[v]") >= 1, "the nav count reads it"
+    assert "renderFindings(f, VIEW_KIND[view])" in PAGE, "and so does the list"
+
+
+def test_each_list_says_what_it_is_for():
+    """A reader who guesses wrong does the wrong work, so neither list is unlabelled."""
+    assert "const KIND_INTRO = {" in PAGE
+    for phrase in ("is now wrong", "could teach", "next curriculum cycle"):
+        assert phrase in PAGE, phrase
+
+
+def test_the_standing_list_carries_the_kind_it_is_split_on():
+    """On a re-run with no news EVERY finding is standing, so that list IS the page.
+    Splitting it on a field the payload does not carry empties it with no error."""
+    import json
+    import miw.api.app as app
+    src = (app.__file__ or "")
+    assert '"kind_of_signal": r.get("kind_of_signal", "regression")' in \
+        open(src).read()
 
 
 def test_the_history_view_offers_a_way_to_start_one():

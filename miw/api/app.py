@@ -182,7 +182,11 @@ def summary(course: str = "") -> dict:
         deps = [d for d in deps
                 if any(l.get("course") == title for l in d.get("locations", []))]
         ids = {d["dep_id"] for d in deps}
-        rows = _project_rows([r for r in rows if r.get("dep_id") in ids], title)
+        # `_touches_course`, not plain inventory membership: a topic gap has no
+        # inventory entry by design and carries its own courses, so filtering on `ids`
+        # alone told a course page it had zero of them while the findings list below
+        # showed two. Two counts of the same thing that disagree is worse than either.
+        rows = _project_rows([r for r in rows if _touches_course(r, title, ids)], title)
         # `coverage` must be narrowed BEFORE any freshness figure is derived, or a PSE
         # page reports Intro's staleness.
         coverage = {k: v for k, v in coverage.items() if k in ids}
@@ -215,6 +219,17 @@ def summary(course: str = "") -> dict:
         "watch_tiers": _tiers(deps),
         "findings_total": len(rows),
         "findings_by_severity": by_sev,
+        # The two questions are different work and the page splits on them, so the
+        # counts have to be available before the findings list is fetched — they sit on
+        # the navigation. `regression` is "something we teach is now wrong";
+        # `opportunity` is "something exists that we could teach". The scorer has
+        # always recorded which is which; the page had been showing them in one list.
+        "findings_by_kind": {
+            "regression": sum(1 for r in rows
+                              if r.get("kind_of_signal", "regression") == "regression"),
+            "opportunity": sum(1 for r in rows
+                               if r.get("kind_of_signal") == "opportunity"),
+        },
         # Per course this must be recounted: the artifact's own figure is the global
         # one, and a page listing 3 standing findings that claims 5 were suppressed is
         # a contradiction the reader has to resolve for us.
@@ -293,6 +308,10 @@ def findings(course: str = "") -> dict:
             "standing": [{"finding_id": r["finding_id"], "dep_id": r.get("dep_id", ""),
                           "canonical_name": r["canonical_name"], "signal": r["signal"],
                           "severity": r["severity"], "summary": r.get("summary", ""),
+                          # The page splits both lists on this. Omitting it from the
+                          # standing payload would empty one of them without an error,
+                          # and on a re-run with no news the standing list IS the page.
+                          "kind_of_signal": r.get("kind_of_signal", "regression"),
                           "local_severity": r.get("local_severity", ""),
                           "signal_label": r.get("signal_label", ""),
                           "graded_locations": r.get("graded_locations", 0),
