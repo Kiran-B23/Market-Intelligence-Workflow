@@ -136,22 +136,31 @@ def render(findings: Iterable[Finding], *, resolved: list[dict] | None = None,
     if not findings:
         L += ["**No new or worsened findings this week.**", ""]
     else:
-        # The two kinds of opportunity are not the same claim and must not share one
-        # sentence: S10 says a tool we teach has been overtaken, S11 says a topic is
-        # missing from the outline altogether. "Still right, no longer best" is true of
-        # the first and meaningless about the second.
-        gaps = [f for f in opportunities if f.signal == "S11"]
-        better = [f for f in opportunities if f.signal != "S11"]
+        # The three kinds of opportunity are three different claims and must not share
+        # a sentence. S10 says a tool we teach has been overtaken — a fit judgement.
+        # S11 says a topic is missing from the outline altogether. S12 says only that a
+        # vendor we already use has added something; it deliberately never claims the
+        # new thing is better, because nothing in it measures that.
+        #
+        # Counting S12 under S10's wording was a real defect: the header asserted "still
+        # right, no longer best" about a finding whose own recommendation says "consider
+        # whether". A summary line must not claim more than the findings it summarises.
+        by_signal = {"S10": [], "S11": [], "S12": []}
+        for f in opportunities:
+            by_signal.setdefault(f.signal, []).append(f)
         bits = [f"**{len(regressions)} fix(es)** — something we teach is now wrong."]
-        if better:
-            bits.append(f"**{len(better)} better option(s)** — still right, no longer "
-                        f"best.")
-        if gaps:
-            bits.append(f"**{len(gaps)} topic gap(s)** — documented by two independent "
-                        f"vendors and in no session's outline.")
-        if better or gaps:
-            bits.append("The second group is a decision for the next cycle; nobody is "
-                        "blocked by it.")
+        if by_signal["S10"]:
+            bits.append(f"**{len(by_signal['S10'])} better option(s)** — still right, "
+                        f"no longer best.")
+        if by_signal["S11"]:
+            bits.append(f"**{len(by_signal['S11'])} topic gap(s)** — documented by two "
+                        f"independent vendors and in no session's outline.")
+        if by_signal["S12"]:
+            bits.append(f"**{len(by_signal['S12'])} newer option(s)** — a vendor we "
+                        f"already use has added something since the last check.")
+        if opportunities:
+            bits.append("Those are decisions for the next cycle; nobody is blocked by "
+                        "them.")
         L += [" ".join(bits), ""]
     L += [f"_{inventory_size} dependencies{' in this course' if course else ''} "
           f"inventoried · {probed} probed · "

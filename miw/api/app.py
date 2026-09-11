@@ -159,6 +159,7 @@ def summary(course: str = "") -> dict:
     say so rather than implying it was filtered.
     """
     from config import settings
+    from config.constants import CAPABILITIES
     from miw.llm import available_provider, budget_state, provider_status
     from miw.state import State
 
@@ -217,6 +218,12 @@ def summary(course: str = "") -> dict:
         "without_authority": len(deps) - with_authority,
         "by_kind": by_kind if title else inv.get("stats", {}).get("by_kind", {}),
         "watch_tiers": _tiers(deps),
+        # The closed capability vocabulary, so the UI's filter cannot drift from it.
+        # NOT `capabilities` — that key is already taken by the prose line the digest
+        # footer prints, and a duplicate key in a dict literal is legal, silent, and
+        # last-one-wins. This one collided, the UI called `.forEach` on a string, and
+        # the boot block died taking the whole page with it.
+        "capability_vocabulary": list(CAPABILITIES),
         "findings_total": len(rows),
         "findings_by_severity": by_sev,
         # The two questions are different work and the page splits on them, so the
@@ -820,6 +827,7 @@ def digest(course: str = "") -> str:
 @app.get("/api/inventory")
 def inventory(q: str = "", kind: str = "", tier: str = "", authority: str = "",
               course: str = "", sessions: str = "", tiers: str = "",
+              capability: str = "",
               limit: int = 100, offset: int = 0, count_only: bool = False) -> dict:
     """Browse the inventory, and preview what a run scope would select.
 
@@ -830,6 +838,23 @@ def inventory(q: str = "", kind: str = "", tier: str = "", authority: str = "",
     from miw.scope import parse_sessions
 
     deps = _read("inventory.json").get("dependencies", [])
+    # `capability` is hand-owned and lives on the REGISTRY entry, not on the extracted
+    # dependency — nothing derives it, which is the whole point. Joined here rather than
+    # copied into the inventory so `extract` has nothing new to preserve, and so a tag
+    # edited by hand shows up without a rebuild. A field nobody can see is a field
+    # nobody maintains.
+    caps: dict = {}
+    try:
+        from miw.registry import Registry
+        for e in Registry.load().entries.values():
+            if e.capability:
+                caps[(e.kind, e.canonical_name.strip().casefold())] = e.capability
+    except Exception:          # a missing or malformed registry must not 500 the page
+        caps = {}
+
+    def cap_of(d: dict) -> str:
+        return caps.get((d.get("kind", ""),
+                         (d.get("canonical_name") or "").strip().casefold()), "")
     ql = q.strip().lower()
     from miw.scope import resolve_courses
     # Lenient: `?course=x` and `?course=X` both work, so a URL can carry the slug
@@ -866,6 +891,8 @@ def inventory(q: str = "", kind: str = "", tier: str = "", authority: str = "",
             return False
         if authority == "no" and has_auth:
             return False
+        if capability and cap_of(d) != capability:
+            return False
         if ql:
             blob = " ".join([d.get("canonical_name", ""), *(d.get("aliases") or []),
                              *(d.get("official_domains") or [])]).lower()
@@ -894,6 +921,7 @@ def inventory(q: str = "", kind: str = "", tier: str = "", authority: str = "",
             "locations": len(locs),
             "courses": sorted({l["course"] for l in locs}),
             "referenced_urls": (d.get("referenced_urls") or [])[:3],
+            "capability": cap_of(d),
             "notes": d.get("notes") or "",
         })
     return {"total": len(rows), "offset": offset, "limit": limit, "rows": slim}

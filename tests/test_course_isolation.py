@@ -293,3 +293,27 @@ def test_courses_expose_slugs_and_flag_the_uningested():
     assert rows and all("slug" in r and "ingested" in r for r in rows)
     from config.constants import COURSES
     assert {r["slug"] for r in rows} >= set(COURSES)
+
+
+def test_the_summary_payload_has_no_duplicate_keys():
+    """A duplicate key in a dict literal is legal, silent, and last-one-wins.
+
+    `summary()` already returned `capabilities` as a PROSE line for the digest footer.
+    Adding a second `capabilities` holding the capability vocabulary silently kept the
+    string, the UI called `.forEach` on it, and the boot block died taking the whole
+    page with it. Python cannot warn about this, so the source has to be checked.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    import miw.api.app as app
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(app.summary)))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict):
+            continue
+        keys = [k.value for k in node.keys
+                if isinstance(k, ast.Constant) and isinstance(k.value, str)]
+        dupes = {k for k in keys if keys.count(k) > 1}
+        assert not dupes, f"summary() returns duplicate key(s): {sorted(dupes)}"

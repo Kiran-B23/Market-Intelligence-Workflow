@@ -691,7 +691,12 @@ def cmd_gaps(args) -> int:
     # has ADDED since we last looked. Same stage because it is the same question, but a
     # different enumerator — a catalogue rather than a documentation page — and it needs
     # neither the workbook nor the areas, so it works for a course with no workbook.
-    newer = find_newer(_load_inventory(), State(),
+    # One connection for the whole stage, closed at the end. This used to open an
+    # anonymous `State()` here and another below, leaving the first unclosed — every
+    # other call site in this file binds and closes, and a leaked SQLite handle under
+    # WAL is the kind of thing that only shows up when something else needs the lock.
+    state, now = State(), utcnow()
+    newer = find_newer(_load_inventory(), state,
                        persist=not getattr(args, "dry_run", False))
     ns = newer.stats
     print(f"  newer options: {ns.sources_read} catalogue(s) read, {ns.appeared} entry "
@@ -760,12 +765,12 @@ def cmd_gaps(args) -> int:
         for f in rep.findings:
             print(f"\n  [{f.severity}] {f.canonical_name}\n      {f.recommendation}")
         print(f"\n  dry run: {len(rep.findings)} finding(s), nothing written")
+        state.close()
         return 0
 
     # Same diff and triage discipline as the analyser, for the same reason: a gap that
     # was reported last week and not acted on is not this week's news, and a reviewer
     # who rejected one must not be shown it again while the evidence is unchanged.
-    state, now = State(), utcnow()
     findings_path = OUT / f"findings_{_today()}.json"
     # What this run is entitled to REMOVE from the artifact. An unscoped run examined
     # every corroborated topic, so one that no longer holds - because the session's

@@ -786,3 +786,30 @@ def test_one_topic_is_never_reported_twice_under_the_same_name():
     assert len(names) == len(set(normalise(n) for n in names)), names
     # And the survivor is the widest one, because more members is more corroboration.
     assert max(len(c.members) for c in clusters) == len(clusters[0].members)
+
+
+def test_the_digest_header_never_claims_more_than_its_findings():
+    """S12 says a vendor ADDED something; it never says the new thing is better.
+
+    The header used to count S12 under S10's wording — "still right, no longer best" —
+    which asserts a judgement the finding itself refuses to make. A summary line must
+    not claim more than the findings it summarises.
+    """
+    from miw.reporters.markdown import render
+    from miw.schema import Claim, Finding, Location
+    from miw.trust import ClaimKind, Tier
+
+    f = Finding(dep_id="newer:x:m-2", canonical_name="m-2", signal="S12",
+                signal_label="Newer option from a vendor we already use",
+                kind_of_signal="opportunity", severity="low", diff_class="new",
+                summary="Vendor now lists m-2.")
+    f.locations = [Location(course="C", topic_name="T", unit_id="u", unit_name="U",
+                            content_id="c", field_path="p", evidence_source="model_id",
+                            object_type="CODING_QUESTIONS", session_no=3)]
+    f.claims = [Claim(kind=ClaimKind.EXISTENCE, statement="listed",
+                      source_url="https://v.test/models", quote="m-2 | available | ok",
+                      tier=Tier.AUTHORITATIVE)]
+    f.what_to_act = f.recommendation = "Consider whether C session 3 should move."
+    md = render([f], run_date="2026-09-11", inventory_size=1, probed=1, researched=1)
+    assert "newer option(s)" in md
+    assert "no longer best" not in md, "S12 must not borrow S10's claim"

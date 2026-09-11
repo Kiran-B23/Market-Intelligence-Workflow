@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Iterable, Optional
 
 from miw.analyse import notes
-from miw.schema import Claim, Dependency, Finding, Location, UncitedClaim, utcnow
+from miw.schema import Claim, Dependency, Finding, UncitedClaim, utcnow
 from miw.trust import ClaimKind, Subject
 
 # n8n ships a node and its version variants as separate files — `agent`, `agentV1`,

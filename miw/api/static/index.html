@@ -1184,6 +1184,9 @@
       <select id="authority"><option value="">official source: either</option>
         <option value="yes">has an official source</option>
         <option value="no">no official source (unwatched)</option></select>
+      <!-- Hand-owned, and the only way anyone sees whether a tag is right or missing.
+           `kind` says what a thing IS; this says what it is FOR. -->
+      <select id="capability"><option value="">any purpose</option></select>
       <span class="note" id="invcount"></span>
     </div>
     <div class="scroll"><table id="invtable"></table></div>
@@ -2531,14 +2534,16 @@ async function loadInventory() {
     tier:$('#tier').value, authority:$('#authority').value, limit:200}));
   $('#invcount').textContent = `${d.rows.length} of ${d.total} shown`;
   $('#invtable').innerHTML = `<thead><tr>
-      <th>name</th><th>what it is</th><th>how closely we watch</th>
-      <th>version taught</th><th>official source</th><th>courses</th>
-      <th>times used</th></tr></thead><tbody>` +
+      <th>name</th><th>what it is</th><th>what it is for</th>
+      <th>how closely we watch</th><th>version taught</th><th>official source</th>
+      <th>courses</th><th>times used</th></tr></thead><tbody>` +
     d.rows.map(r => {
       const auth = r.official_domains.length ? r.official_domains.slice(0,2).join(', ')
         : (r.registry ? r.registry + ' registry' : '<span class="chip n">none</span>');
       return `<tr><td><b>${esc(r.canonical_name)}</b></td>
         <td><span class="chip n">${esc(r.kind)}</span></td>
+        <td>${r.capability ? `<span class="chip n">${esc(r.capability)}</span>`
+                           : '<span class="note">—</span>'}</td>
         <td>${esc(word('tier', r.watch_tier))}</td>
         <td class="mono">${esc(r.taught_version || '—')}</td>
         <td class="mono">${auth}</td>
@@ -2546,7 +2551,7 @@ async function loadInventory() {
         <td>${esc(r.locations)}</td></tr>`;
     }).join('') + '</tbody>';
 }
-['q','kind','tier','authority'].forEach(id => {
+['q','kind','tier','authority','capability'].forEach(id => {
   const el = $('#'+id);
   el.addEventListener(id === 'q' ? 'input' : 'change', () => {
     clearTimeout(invTimer); invTimer = setTimeout(loadInventory, 220);
@@ -3017,6 +3022,11 @@ async function loadRuns() {
   SUMMARY = await get('/api/summary');
   Object.keys(SUMMARY.by_kind || {}).forEach(k =>
     $('#kind').insertAdjacentHTML('beforeend', `<option value="${esc(k)}">${esc(k)}</option>`));
+  /* The purpose filter is populated from the capability vocabulary the API reports, so
+     the dropdown cannot drift from `config/constants.CAPABILITIES`. */
+  (SUMMARY.capability_vocabulary || []).forEach(c =>
+    $('#capability').insertAdjacentHTML('beforeend',
+      `<option value="${esc(c)}">${esc(c)}</option>`));
   await loadCourses();       // must precede route(): it validates the slug in the URL
   await route();             // and the URL, not a default tab, decides what is shown
 })();
