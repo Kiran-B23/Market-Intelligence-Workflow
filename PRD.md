@@ -2362,6 +2362,60 @@ The synthetic `kind="topic"` dependency it builds is **never written to the inve
 The inventory records what the curriculum uses, and a topic we do not teach is precisely
 not that; adding it would corrupt the one count the whole system reports on.
 
+### A finding has to be readable on its own
+
+> "I just checked the 3 new findings ... honestly I could not understand what mentioned
+> there, what suggestion given and where it needs to be implemented or added."
+
+Every part of the answer was already on the finding, and every part was in the wrong
+place. The card read:
+
+```
+MEDIUM · S11 Curriculum topic gap — Break the task down
+Break the task down is documented by Google Gemini API and Microsoft Azure AI
+Foundry under Prompting techniques, and appears in no session's outline
+```
+
+The title is a vendor's imperative heading, which reads as advice to the reviewer
+rather than the name of a missing topic. The summary is entirely provenance — it says
+how we found it and never what it is. And the sentence that makes it comprehensible was
+on the finding all along, as the `Claim` quote, rendered at the very bottom of the panel
+under "evidence": the right place for provenance and the wrong place for a definition.
+Four changes, each answering one of the three questions a reader actually asks.
+
+**What is it.** The summary now leads with the vendor's own defining sentence, attributed.
+Choosing that sentence by length does not work — it picked *"Now we demonstrate another
+toy function calling example"* over the one that explains the feature. A definition
+restates its subject, so candidates are ranked by how much of the topic's own name they
+contain, length only breaks ties, and sentences that announce an example are refused.
+Two extraction bugs surfaced doing this, both fixed at the source in `probe/frontier.py`:
+code blocks and tables are stripped from a section's prose, and so are nested headings —
+a page that labels each code sample with its language contributed *"Call multiple
+functions at once when they are independent: Python JavaScript Java REST"*.
+
+**Where.** The row carries the course *and the session number*. It had neither, because
+`project_all` rebuilds locations from the dependency and a topic has none — right for a
+stale dependency, wrong for a gap, whose locations are the whole point.
+
+**What to do.** The action names **every** session the topic belongs in, not the first.
+A finding is written once and read from any course's page, so naming one placement made
+the Building LLM Applications page say "Add this to AI for Finance session 9" — true,
+and not something that reader can act on. Where there is exactly one placement it also
+names what that session currently teaches, which is what turns a placement from an
+assertion into something checkable in five seconds.
+
+**One row, two lists.** The run view and the "still open, unchanged" list had separate
+markup and had drifted; the copy people actually read was the one showing a bare name.
+They now share `findingRow()`, and the run record carries `summary`, `action` and
+`sessions` (idempotent `ALTER TABLE`, same shape as the `llm` column).
+
+Two bugs fell out of this. A catch-all heading ("Other image generation modes") is a
+leftover, not a subject — there is nothing to add to an outline — and is now rejected
+structurally, since every documentation set has one and they all start the same way. And
+retiring it exposed that a topic which stops being a candidate for *any* reason kept its
+row forever: `examined` is now the union of what this run considered and every topic row
+already on file, so an unscoped run repairs orphans as well as resolving fixed gaps.
+
 ## 33. The UI reads without a glossary
 
 > "the naming in the UI is a bit confusing and I'm not able to make others understand"

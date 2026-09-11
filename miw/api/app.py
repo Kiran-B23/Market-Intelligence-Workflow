@@ -130,10 +130,20 @@ def _project_rows(rows: list, course: str) -> list:
     out = []
     for p in project_all(objs, deps, course):
         raw = dict(next((o._raw for o in objs if o.finding_id == p.finding_id), {}))
+        # Captured before the update, which overwrites it with the emptied list.
+        original = [l for l in (raw.get("locations") or [])
+                    if not course or l.get("course") == course]
         raw.update(to_jsonable(p))
         # `locations`/`claims`/`alternatives` were emptied to rebuild cheaply, so take
         # the projected locations from the projection and keep the original evidence.
-        raw["locations"] = to_jsonable(p.locations)
+        #
+        # A finding with no inventory entry projects to no locations at all, because
+        # `project_all` rebuilds them from the dependency. That is right for a stale
+        # dependency and wrong for a topic gap, whose locations live on the finding
+        # itself and are the only thing saying WHICH SESSION it belongs in - so the
+        # row rendered "Intro to Gen AI" with no session number, which is most of
+        # what the reader needed.
+        raw["locations"] = to_jsonable(p.locations) or original
         out.append(raw)
     return out
 
@@ -288,6 +298,19 @@ def findings(course: str = "") -> dict:
                           "graded_locations": r.get("graded_locations", 0),
                           "questions_executing": r.get("questions_executing", 0),
                           "local_locations": r.get("local_locations", 0),
+                          # The one thing to do about it. On a run with no news EVERY
+                          # finding is standing, so this list is the whole page — and a
+                          # row that names a thing without saying what to do about it
+                          # is not actionable, which is the complaint that produced
+                          # this. `what_to_act` is the refined wording where a model
+                          # rewrote it; `recommendation` is always the deterministic
+                          # line, so it is the fallback rather than a second opinion.
+                          "action": (r.get("what_to_act")
+                                     or r.get("recommendation", "")),
+                          "sessions": sorted({l.get("session_no")
+                                              for l in (r.get("locations") or [])
+                                              if l.get("session_no")}),
+                          "courses": r.get("courses", []),
                           "blast_radius": r.get("blast_radius", 0)}
                          for r in standing],
             "resolved": data.get("resolved", []),

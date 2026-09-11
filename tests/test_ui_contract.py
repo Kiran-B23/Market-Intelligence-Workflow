@@ -112,9 +112,36 @@ def test_the_detail_panel_is_a_real_dialog_and_can_be_closed_three_ways():
 
 def test_the_standing_list_is_keyboard_reachable():
     """Standing rows are the only list on a no-news re-run, and a div with role=button
-    does not get Enter/Space for free."""
+    does not get Enter/Space for free.
+
+    The class is named here as well as the attributes: the click handler is delegated
+    on `[data-detail]` and picks up any new row class for free, while this one is not,
+    so a new row class is reachable by mouse and invisible to the keyboard until it is
+    added. That happened.
+    """
     assert 'role="button" tabindex="0"' in PAGE
     assert "e.key !== 'Enter' && e.key !== ' '" in PAGE
+    assert ".srow[data-detail], .frow[data-detail]" in PAGE
+
+
+def test_both_finding_lists_share_one_row():
+    """They had separate markup and drifted, and the copy people actually read was the
+    one showing a bare name with no action."""
+    assert PAGE.count("function findingRow(r)") == 1
+    assert PAGE.count("standing.map(findingRow)") == 1
+    assert PAGE.count("rows.map(findingRow)") == 1
+
+
+def test_a_finding_row_says_what_it_is_and_what_to_do():
+    """The complaint: "I could not understand what mentioned there, what suggestion
+    given and where it needs to be implemented or added." A row that carries only a
+    name answers none of the three."""
+    body = PAGE[PAGE.index("function findingRow(r)"):]
+    body = body[:body.index("\n}\n")]
+    assert "r.summary" in body, "what it is"
+    assert "r.action" in body, "what to do"
+    assert "Do this" in body
+    assert "r.sessions" in body, "where"
 
 
 def test_an_unresolvable_location_explains_itself_rather_than_rendering_blank():
@@ -381,10 +408,11 @@ def test_the_run_view_shows_what_it_found_not_only_its_log():
 
 
 def test_each_finding_from_a_run_opens_the_detail_panel():
-    body = PAGE[PAGE.index("function renderRunFindings"):]
+    body = PAGE[PAGE.index("function findingRow(r)"):]
     body = body[:body.index("\n}\n")]
     assert "data-detail=" in body, "reuses the existing slide-over"
     assert 'role="button" tabindex="0"' in body, "and stays keyboard reachable"
+    assert "rows.map(findingRow)" in PAGE, "and the run view uses that row"
 
 
 def test_carried_forward_findings_are_not_passed_off_as_new():

@@ -433,6 +433,32 @@
   }
   .srow b{font-family:var(--mono); font-size:12.5px; font-weight:600}
   .srow .note{font-size:12px}
+
+  /* A finding row that carries its own meaning. `.srow` is a one-line index and is
+     right where the reader already knows what the thing is; this is for the run view,
+     where the list IS the answer and a bare name is not one. Two lines under the head:
+     what it is, in the source's words, and the single thing to do about it. */
+  .frow{
+    display:block; padding:11px 14px; border-top:1px solid var(--rule);
+    cursor:pointer; font-size:13px;
+  }
+  .frow:first-child{border-top:0}
+  .frow:hover{background:color-mix(in srgb,var(--accent-wash) 45%,transparent)}
+  .frow:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  .fhead{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
+  .fhead b{font-size:13.5px; font-weight:650}
+  .fhead .note{font-size:12px}
+  .fwhat{margin-top:5px; color:var(--soft); line-height:1.5; max-width:78ch}
+  /* The action is the point of the row, so it gets the only fill on it. */
+  .fdo{
+    margin-top:7px; padding:7px 10px; border-radius:6px; line-height:1.5;
+    background:var(--accent-wash); border-left:2px solid var(--accent);
+    max-width:78ch;
+  }
+  .fdo .lab{
+    display:block; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:2px;
+  }
   @media (max-width:720px){
     .srow{grid-template-columns:96px 62px; row-gap:2px}
     .srow>span:last-child{grid-column:1/-1; white-space:normal}
@@ -2032,10 +2058,15 @@ $('#scrim').onclick = closeDetail;
 $('#slide-x').onclick = closeDetail;
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#slide').hidden) { closeDetail(); return; }
-  /* A standing row is a div with role=button, so it does not get Enter/Space for
-     free - without this the whole standing list is mouse-only. */
+  /* A finding row is a div with role=button, so it does not get Enter/Space for
+     free - without this the standing list and the run's own list are mouse-only.
+     Both row classes are named: `.frow` was added and inherited the click handler,
+     which is delegated on `[data-detail]`, but not this one, so it was reachable by
+     mouse and invisible to the keyboard. A real <button> is excluded because it
+     already fires on Enter and would fire twice. */
   if (e.key !== 'Enter' && e.key !== ' ') return;
-  const t = e.target.closest && e.target.closest('.srow[data-detail]');
+  const t = e.target.closest
+    && e.target.closest('.srow[data-detail], .frow[data-detail]');
   if (!t) return;
   e.preventDefault();
   openDetail(t.dataset.detail, t);
@@ -2176,6 +2207,33 @@ function wireAgentReview() {
   });
 }
 
+/* One row, used by both lists that show findings without opening them: the run view
+   and the "still open, unchanged" list. They had separate markup and drifted, and the
+   copy people actually read was the one that showed a bare name.
+
+   Three lines, answering the three questions asked of every row in order: what is it
+   (name + where), what does that mean (the source's own words), and what do I do. */
+function findingRow(r) {
+  const sev = r.local_severity || r.severity;
+  const wheres = [(r.courses || []).join(', ') || 'no course'];
+  if ((r.sessions || []).length) {
+    wheres.push('session' + (r.sessions.length === 1 ? ' ' : 's ') + r.sessions.join(', '));
+  }
+  if (r.diff_class) wheres.push(word('diff', r.diff_class));
+  return `<div class="frow" data-detail="${esc(r.finding_id)}"
+          role="button" tabindex="0" title="Open the full detail">
+    <div class="fhead">
+      <span class="chip ${esc(sev)}">${esc(sev)}</span>
+      <span class="chip sig" title="${esc(r.signal)}">${esc(word('signal', r.signal))}</span>
+      <b>${esc(r.canonical_name || r.name || '')}</b>
+      ${r.graded_locations ? `<span class="chip high">${r.graded_locations} graded</span>` : ''}
+      <span class="note">${esc(wheres.join(' · '))}</span>
+    </div>
+    ${r.summary ? `<div class="fwhat">${esc(r.summary)}</div>` : ''}
+    ${r.action ? `<div class="fdo"><span class="lab">Do this</span>${esc(r.action)}</div>` : ''}
+  </div>`;
+}
+
 function renderFindings(data) {
   FINDINGS = data.findings || [];
   $('#findings').innerHTML = FINDINGS.length
@@ -2191,19 +2249,7 @@ function renderFindings(data) {
     ? `<h2>Still open, unchanged since the last run (${standing.length})</h2>
        <p class="hint">Not repeated above because nothing about them changed. They are
        still on file and still unresolved.</p>
-       <div class="panel" style="padding:0">` + standing.map(s =>
-        /* Openable, because on a re-run with no news EVERY finding is unchanged and
-           this is the only list on the page - a standing row that could not be opened
-           would put the detail panel out of reach precisely when it is needed. */
-        `<div class="srow" data-detail="${esc(s.finding_id)}" role="button" tabindex="0"
-              title="Where this is, and what to change">
-           <span class="chip ${esc(s.local_severity || s.severity)}">${
-             esc(s.local_severity || s.severity)}</span>
-           <span class="chip sig" title="${esc(s.signal)}">${esc(word('signal', s.signal))}</span>
-           <span><b>${esc(s.canonical_name)}</b>
-             <span class="note"> · ${esc(s.summary)}</span>
-             ${s.graded_locations ? `<span class="chip n">${s.graded_locations} graded</span>` : ''}
-             </span></div>`).join('')
+       <div class="panel" style="padding:0">` + standing.map(findingRow).join('')
        + '</div>'
     : '';
 
@@ -2653,15 +2699,8 @@ function renderRunFindings(rows, run) {
       : `All ${rows.length} were already open and unchanged — this run confirmed them
          rather than finding anything new.`} Click one to see where it is, what proves
       it, and what to change.</p>
-    <div class="panel" style="padding:0">` + rows.map(r => `
-      <div class="srow" data-detail="${esc(r.finding_id)}" role="button" tabindex="0"
-           title="Where this is, and what to change">
-        <span class="chip ${esc(r.severity)}">${esc(r.severity)}</span>
-        <span class="chip sig" title="${esc(r.signal)}">${esc(word('signal', r.signal))}</span>
-        <span><b>${esc(r.name)}</b>
-          <span class="note"> · ${esc((r.courses || []).join(', ') || 'no course')}${
-            ' · ' + esc(word('diff', r.diff_class))}</span>
-        </span></div>`).join('') + '</div>';
+    <div class="panel" style="padding:0">`
+    + rows.map(findingRow).join('') + '</div>';
 }
 
 async function loadRuns() {

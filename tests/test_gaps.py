@@ -523,3 +523,103 @@ def test_a_topic_that_is_now_taught_is_resolvable():
     # The already-taught topics are the difference, and there is at least one.
     assert rep.considered - raised, "nothing was examined-but-not-raised"
     assert len(rep.considered) == rep.stats.candidates
+
+
+# ------------------------------------------------- a finding has to be readable on its own
+#
+# "I could not understand what mentioned there, what suggestion given and where it needs
+# to be implemented or added." Every assertion below is one of those three questions.
+
+def _prompting_gaps():
+    g, m = _sources()
+    return find_gaps([_area([g, m])], _index(), fetcher=_fetcher({
+        GOOGLE: _Fetch(_fixture("google_prompting_strategies.html")),
+        MSFT: _Fetch(_fixture("msft_prompt_engineering.html")),
+    })).findings
+
+
+def test_the_summary_says_what_the_topic_is():
+    """It used to say how we found it, never what it was.
+
+    "Break the task down is documented by Google and Microsoft under Prompting
+    techniques" is all provenance. The sentence that makes it comprehensible was on the
+    finding all along, as the Claim quote, shown at the very bottom under "evidence".
+    """
+    for f in _prompting_gaps():
+        assert "“" in f.summary and "”" in f.summary, f.canonical_name
+        quote = f.summary.split("“", 1)[1].split("”", 1)[0]
+        assert len(quote) > 25, f.canonical_name
+        # Attributed, because a quote with no speaker is not evidence of anything.
+        assert f.summary.split(":")[0] in {c.subject_name for c in f.claims}
+
+
+def test_the_definition_is_not_an_example_lead_in():
+    """Ranking candidates by length picked "Now we demonstrate another toy function
+    calling example" over the sentence that explains the feature."""
+    for f in _prompting_gaps():
+        quote = f.summary.split("“", 1)[1].split("”", 1)[0].lower()
+        assert not quote.startswith(("now ", "here ", "the following", "let's",
+                                     "this example", "in this")), f.canonical_name
+
+
+def test_the_action_names_every_session_it_belongs_in():
+    """A finding is written once and read from any course's page.
+
+    Naming one placement meant the Building LLM Applications page said "Add this to AI
+    for Finance session 9" — true, and not something that reader can act on.
+    """
+    from miw.analyse.gaps import _recommend
+    placements = [
+        {"course": "AI for Finance", "session_no": 9, "session_name": "Trading Agent"},
+        {"course": "Building LLM Applications", "session_no": 10,
+         "session_name": "Tool Use"},
+    ]
+    line = _recommend("Parallel function calling", _area([]), placements)
+    assert "AI for Finance session 9" in line
+    assert "Building LLM Applications session 10" in line
+
+
+def test_a_single_placement_says_what_that_session_already_covers():
+    """That line is what makes a placement checkable in five seconds instead of a
+    lookup: "session 5 already does frameworks and templates, so yes, this belongs"."""
+    from miw.analyse.gaps import _recommend
+    doc = _session_5()
+    line = _recommend("Self-consistency", _area([]),
+                      [{"course": doc.course, "session_no": doc.session_no,
+                        "session_name": doc.session_name}],
+                      {(doc.course, doc.session_no): doc})
+    assert "currently covers" in line
+    assert "Prompt Engineering" in line
+
+
+@pytest.mark.parametrize("name", [
+    "Other image generation modes", "Additional options", "Advanced features",
+    "Miscellaneous settings",
+])
+def test_a_catch_all_heading_is_not_a_teachable_topic(name):
+    """It names the leftovers, not a subject — there is nothing to add to an outline."""
+    from miw.probe.frontier import _is_item
+    assert not _is_item(name)
+
+
+@pytest.mark.parametrize("name", [
+    "Other image generation", "Advanced prompt engineering", "Parallel function calling",
+])
+def test_a_real_topic_that_merely_starts_with_those_words_survives(name):
+    from miw.probe.frontier import _is_item
+    assert _is_item(name)
+
+
+def test_code_and_sub_headings_never_enter_a_quote():
+    """A section's explanatory sentence often runs straight into its example, and a
+    page that labels each sample with a language heading contributed
+    "...when they are independent: Python JavaScript Java REST"."""
+    html = ('<h2>Parallel function calling</h2>'
+            '<p>Call multiple functions at once when they are independent, which is a '
+            'useful thing to know about.</p>'
+            '<h3>Python</h3><pre><code>power = {"type": "function"}</code></pre>'
+            '<h3>JavaScript</h3><pre><code>const power = 1;</code></pre>')
+    got = enumerate_page(html)
+    assert [i.name for i in got.items] == ["Parallel function calling"]
+    ctx = got.items[0].context
+    assert "Python" not in ctx and "JavaScript" not in ctx and "{" not in ctx

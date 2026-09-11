@@ -134,6 +134,13 @@ CREATE TABLE IF NOT EXISTS job_findings (
     name       TEXT,
     diff_class TEXT,
     courses    TEXT,
+    -- What it says and what to do about it. Without these the run page could show only
+    -- a name, a severity and a drift code, which is not enough to understand a finding
+    -- without opening it — and for a topic gap the name alone ("Break the task down")
+    -- is a vendor's heading that means nothing on its own.
+    summary    TEXT,
+    action     TEXT,
+    sessions   TEXT,
     PRIMARY KEY (run_id, finding_id)
 );
 
@@ -205,6 +212,10 @@ class JobRunner:
             cols = {r[1] for r in cur.execute("PRAGMA table_info(jobs)")}
             if "llm" not in cols:
                 cur.execute("ALTER TABLE jobs ADD COLUMN llm TEXT")
+            fcols = {r[1] for r in cur.execute("PRAGMA table_info(job_findings)")}
+            for col in ("summary", "action", "sessions"):
+                if col not in fcols:
+                    cur.execute(f"ALTER TABLE job_findings ADD COLUMN {col} TEXT")
         self.conn.commit()
         self._current: Optional[subprocess.Popen] = None
         self._current_run: Optional[str] = None
@@ -292,14 +303,22 @@ class JobRunner:
                 if not examined or f.get("dep_id") in examined]
         with self.lock:
             for f in rows:
+                # `what_to_act` is the refined wording when a model rewrote the note
+                # and the deterministic one otherwise; `recommendation` is always the
+                # deterministic line. Prefer the first, fall back to the second, so the
+                # row says the same thing the digest and the panel say.
+                action = f.get("what_to_act") or f.get("recommendation") or ""
+                sessions = sorted({l.get("session_no") for l in (f.get("locations") or [])
+                                   if l.get("session_no")})
                 self.conn.execute(
                     "INSERT OR REPLACE INTO job_findings (run_id, finding_id, dep_id,"
-                    " signal, severity, name, diff_class, courses)"
-                    " VALUES (?,?,?,?,?,?,?,?)",
+                    " signal, severity, name, diff_class, courses, summary, action,"
+                    " sessions) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     (run_id, f.get("finding_id", ""), f.get("dep_id", ""),
                      f.get("signal", ""), f.get("severity", ""),
                      f.get("canonical_name", ""), f.get("diff_class", ""),
-                     json.dumps(f.get("courses") or [])))
+                     json.dumps(f.get("courses") or []), f.get("summary", ""),
+                     action, json.dumps(sessions)))
             self.conn.commit()
         self.event(run_id, "analyse",
                    f"recorded {len(rows)} finding(s) against this run")
@@ -310,10 +329,13 @@ class JobRunner:
         rows = [dict(r) for r in self._read(
             "SELECT * FROM job_findings WHERE run_id=?", (run_id,))]
         for r in rows:
-            try:
-                r["courses"] = json.loads(r["courses"] or "[]")
-            except json.JSONDecodeError:
-                r["courses"] = []
+            for key in ("courses", "sessions"):
+                try:
+                    r[key] = json.loads(r.get(key) or "[]")
+                except (json.JSONDecodeError, TypeError):
+                    r[key] = []
+            for key in ("summary", "action"):
+                r[key] = r.get(key) or ""
         return sorted(rows, key=lambda r: (order.get(r["severity"], 9), r["name"]))
 
     def _backfill_job_courses(self) -> None:

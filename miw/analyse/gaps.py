@@ -206,6 +206,15 @@ def severity_for_coverage(missing: int, total: int) -> str:
     return "info"
 
 
+_FIRST_SENTENCE = re.compile(r"(?<=[.!?])\s+")
+_WORDS = re.compile(r"[a-z0-9]+")
+# Sentences that announce an example instead of stating something. Anchored at the
+# start, so a sentence that merely CONTAINS "for example" is still usable.
+_EXAMPLE_LEAD = re.compile(
+    r"^(?:now\b|here\b|the following\b|this (?:example|section|guide|page|snippet)\b"
+    r"|let'?s\b|in this\b|for example\b|see\b|refer\b|check out\b|try\b)", re.I)
+
+
 # --------------------------------------------------------------- cross-vendor agreement
 
 def agreement(a_name: str, b_name: str) -> float:
@@ -273,6 +282,40 @@ class Cluster:
 
     def aliases(self) -> list:
         return sorted({i.name for _s, i in self.members} - {self.name})
+
+    def definition(self) -> tuple:
+        """One sentence saying what this topic is, and who said it.
+
+        A vendor's heading is a label, and several of them are imperative phrases -
+        "Break the task down", "Start with clear instructions" - which read as advice to
+        the reader rather than the name of a missing topic. On its own that made a
+        finding unreadable: the reviewer saw an instruction, not a subject.
+
+        The sentence that makes it comprehensible is already on the finding, as the
+        `Claim` quote, and it was being shown at the BOTTOM of the panel under
+        "evidence" - the right place for provenance and the wrong place for a
+        definition. This lifts it to the front.
+
+        Choosing it by length does not work; that was tried and it picked
+        "Now we demonstrate another toy function calling example" over the sentence that
+        actually explains parallel function calling. A definition RESTATES ITS SUBJECT,
+        so candidates are ranked by how much of the topic's own name they contain, and
+        length only breaks ties. Sentences that announce an example rather than make a
+        statement are refused outright - they are the commonest first sentence in vendor
+        documentation and the least useful one.
+        """
+        want = {w for w in _WORDS.findall(self.name.lower()) if len(w) > 2}
+        best, score = ("", ""), -1.0
+        for src, item in self.members:
+            for cand in _FIRST_SENTENCE.split(item.context.strip())[:3]:
+                cand = cand.strip()
+                if len(cand) < 25 or _EXAMPLE_LEAD.match(cand):
+                    continue
+                have = {w for w in _WORDS.findall(cand.lower())}
+                hit = len(want & have) / (len(want) or 1) - len(cand) / 10000.0
+                if hit > score:
+                    best, score = (cand, src.subject), hit
+        return best
 
 
 def corroborate(readings: list) -> list:
@@ -378,6 +421,7 @@ def find_gaps(areas: Iterable[Area], index: CurriculumIndex, *,
     rep = GapReport()
     st = rep.stats
     want_courses = [c for c in courses] or sorted({d.course for d in index.docs})
+    by_session = {(d.course, d.session_no): d for d in index.docs}
 
     for area in areas:
         st.areas += 1
@@ -506,14 +550,12 @@ def find_gaps(areas: Iterable[Area], index: CurriculumIndex, *,
                 signal="S11", signal_label="Curriculum topic gap",
                 kind_of_signal="opportunity",
                 severity=severity_for_coverage(len(missing), len(clusters)),
-                summary=(f"{cluster.name} is documented by "
-                         f"{' and '.join(cluster.subjects())} under {area.title}, and "
-                         f"appears in no session's outline"),
+                summary=_summary(cluster, area),
                 courses=sorted({l.course for l in locations}),
                 locations=locations, claims=claims,
                 affected_urls=sorted({c.source_url for c in claims}),
                 raised_at=utcnow())
-            f.recommendation = _recommend(cluster.name, area, placements)
+            f.recommendation = _recommend(cluster.name, area, placements, by_session)
             # The same deterministic triad every other finding gets, from the same
             # composer - so a gap sorts, schedules and reads like the rest of the
             # digest instead of being a second class of thing.
@@ -554,20 +596,81 @@ def _location_of(session: SessionDoc, area: Area) -> Location:
         session_no=session.session_no)
 
 
-def _recommend(name: str, area: Area, placements: list) -> str:
-    """The one-line action, naming the session and quoting what it already covers."""
-    named = [p for p in placements if p.get("session_no")]
+def _summary(cluster: Cluster, area: Area) -> str:
+    """What this topic IS, then the fact that we do not teach it.
+
+    The previous wording - "X is documented by Google and Microsoft under Prompting
+    techniques, and appears in no session's outline" - describes the detection process
+    and never says what X is. A reviewer reading "Break the task down" learned nothing
+    from it. Lead with the vendor's own definition and keep the provenance second.
+    """
+    quote, who = cluster.definition()
+    tail = (f"Not in any session's outline. Both {' and '.join(cluster.subjects())} "
+            f"document it under {area.title}.")
+    if not quote:
+        return f"{cluster.name} — a {area.title.lower()} topic. {tail}"
+    # A backstop on length. The extractor already drops code and tables, but a vendor
+    # occasionally writes one very long sentence, and a summary line that wraps four
+    # times is not a summary.
+    if len(quote) > 200:
+        quote = quote[:197].rsplit(" ", 1)[0] + "\u2026"
+    return f"{who}: \u201c{quote}\u201d {tail}"
+
+
+def _recommend(name: str, area: Area, placements: list,
+               sessions: Optional[dict] = None) -> str:
+    """The action: every session it belongs in, and what those sessions already cover.
+
+    Every session, not the first one. A finding's recommendation is written once and
+    read from any course's page, so naming a single placement meant the Building LLM
+    Applications page said "Add this to AI for Finance session 9" - true, and not the
+    thing that reader can act on. Listing them all is unambiguous wherever it is read,
+    and it is also the more honest sentence: the topic is missing from both.
+
+    What the target session already covers is included only when there is one, because
+    that line is what makes a placement checkable at a glance and three of them in one
+    sentence is not readable.
+    """
+    named = sorted((p for p in placements if p.get("session_no")),
+                   key=lambda p: (p["course"], p["session_no"]))
     if not named:
         alts = placements[0].get("runners_up") if placements else []
         where = (", ".join(f"session {a['session_no']} ({a['session_name']})"
                            for a in (alts or [])[:2])
                  or "no clear session")
-        return (f"Add {name} to the {area.title} area - the session is a judgement "
-                f"call between {where}; pick one and extend its outline.")
-    first = sorted(named, key=lambda p: (p["course"], p["session_no"]))[0]
-    rest = [p for p in named if p is not first]
-    also = (f" Also missing from {', '.join(sorted(p['course'] for p in rest))}."
-            if rest else "")
-    return (f"Add {name} to {first['course']} session {first['session_no']} "
-            f"({first['session_name']}) - extend that deck's outline and its "
-            f"Key Takeaways.{also}")
+        return (f"Add \u201c{name}\u201d to the {area.title} area - the session is a "
+                f"judgement call between {where}; pick one and extend its outline.")
+
+    where = "; ".join(f"{p['course']} session {p['session_no']} ({p['session_name']})"
+                      for p in named)
+    if len(named) == 1:
+        tail = " - a new line in that deck's outline and its Key Takeaways."
+        doc = (sessions or {}).get((named[0]["course"], named[0]["session_no"]))
+        now = _covers_line(doc) if doc is not None else ""
+        if now:
+            tail += f" That session currently covers: {now}."
+    else:
+        tail = (f" - a new line in each of those {len(named)} decks' outlines and "
+                f"Key Takeaways.")
+    return f"Add \u201c{name}\u201d to {where}{tail}"
+
+
+def _covers_line(doc: SessionDoc, limit: int = 5) -> str:
+    """A short, readable list of what a session already teaches.
+
+    Built from the workbook's own fragments rather than the raw cell, because the cell
+    is a multi-line hand-written list with sub-bullets and hands-on notes, and pasting
+    it into a one-line recommendation is unreadable.
+    """
+    from miw.analyse.curriculum import _fragments
+    seen, out = set(), []
+    for frag in _fragments(f"{doc.key_takeaways}\n{doc.outline}"):
+        flat = " ".join(frag.split())
+        key = flat.lower()
+        if len(flat) < 4 or key in seen or flat.endswith("?"):
+            continue
+        seen.add(key)
+        out.append(flat)
+        if len(out) >= limit:
+            break
+    return ", ".join(out)

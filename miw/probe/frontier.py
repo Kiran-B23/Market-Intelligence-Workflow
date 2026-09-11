@@ -51,6 +51,11 @@ _ROLE_FURNITURE = re.compile(
 
 _HEADING = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1>", re.S | re.I)
 _LI = re.compile(r"<li\b[^>]*>(.*?)</li>", re.S | re.I)
+# Code samples and tables are not prose. Stripped before a quote is taken, because a
+# section's explanatory sentence often runs straight into its example and the flattened
+# result reads as "Call multiple functions at once when they are independent: Python
+# power_disco_ball = { "type" : "function" , ..." — true, cited, and unreadable.
+_NOT_PROSE = re.compile(r"<(pre|code|table|script|style)\b[^>]*>.*?</\1>", re.S | re.I)
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
 _SENT = re.compile(r"(?<=[.!?])\s+")
@@ -146,8 +151,19 @@ def normalise(name: str, drop: Iterable[str] = ()) -> str:
     return re.sub(r"[^a-z0-9]+", "", s)
 
 
+# A heading that exists to hold whatever did not fit the other headings. It names a
+# leftover, not a subject, so "Other image generation modes" cannot be added to a
+# session outline - there is nothing to add. Structural rather than a per-page
+# blocklist: every documentation set has one of these and they all start the same way.
+_CATCH_ALL = re.compile(r"^(?:other|more|additional|misc\.?|miscellaneous|advanced)\b"
+                        r".*\b(?:modes?|options?|topics?|features?|settings?|"
+                        r"resources?|scenarios?|capabilities|considerations?)$", re.I)
+
+
 def _is_item(name: str) -> bool:
     if not (_MIN_NAME <= len(name) <= _MAX_NAME):
+        return False
+    if _CATCH_ALL.match(name.strip()):
         return False
     if not _HAS_LETTER.search(name):
         return False
@@ -211,8 +227,14 @@ def _prose(body: str, limit: int = 320) -> str:
     Taken from the section body rather than the whole page so the quote genuinely
     describes the item it is attached to. `<li>` content is removed first: a quote made
     of the section's sub-list is a list of other items, not evidence about this one.
+    Code, tables and their markup go the same way, for the same reason — and so do
+    nested HEADINGS, which are labels for sub-sections rather than sentences in this
+    one. Without that, a documentation page that presents each code sample under its
+    own language heading contributed "Call multiple functions at once when they are
+    independent: Python JavaScript Java REST" as its definition: the sentence is real,
+    and the tab labels after it are not part of it.
     """
-    text = _text(_LI.sub(" ", body))
+    text = _text(_HEADING.sub(" ", _NOT_PROSE.sub(" ", _LI.sub(" ", body))))
     if len(text) <= limit:
         return text
     cut = text[:limit]

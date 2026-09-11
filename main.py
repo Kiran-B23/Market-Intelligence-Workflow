@@ -696,12 +696,30 @@ def cmd_gaps(args) -> int:
     # was reported last week and not acted on is not this week's news, and a reviewer
     # who rejected one must not be shown it again while the evidence is unchanged.
     state, now = State(), utcnow()
+    findings_path = OUT / f"findings_{_today()}.json"
     # What this run is entitled to REMOVE from the artifact. An unscoped run examined
     # every corroborated topic, so one that no longer holds - because the session's
     # outline now covers it - is dropped, which is how a gap gets resolved. A scoped run
     # claims only the topics it kept: it looked at every course to place them, but it
     # has no mandate to delete a row it was not asked about.
     examined = set(rep.considered) if not courses else {f.dep_id for f in rep.findings}
+    if not courses:
+        # Plus every topic row already on file. A topic stops being a candidate for
+        # more reasons than "the session now teaches it": the vendor rewrote the
+        # heading, the registry excluded it, a new filter rejected it. In each case
+        # `considered` no longer contains it, so its row stood forever and `verify`
+        # then failed on it - the gaps sidecar no longer carries its authority set, so
+        # its citations re-classify as LEAD_ONLY and a standing finding reads as
+        # unsourced. That is how "Other image generation modes" outlived the filter
+        # added to remove it.
+        #
+        # Taken from the FINDINGS artifact rather than the previous gaps sidecar, so
+        # this also repairs a row already orphaned by an earlier run. An unscoped run
+        # has looked at the whole declared area space, so it is entitled to retire any
+        # topic finding it did not just re-raise.
+        on_file = json.load(open(findings_path)) if findings_path.exists() else {}
+        examined |= {f.get("dep_id") for f in (on_file.get("findings") or [])
+                     if f.get("signal") == "S11" and f.get("dep_id")}
     raised, held = [], []
     for f in rep.findings:
         fp = fingerprint_of(f)
@@ -721,7 +739,6 @@ def cmd_gaps(args) -> int:
     dump(side, {"generated_at": now, "areas": [a.area_id for a in areas],
                 "scope": scope.to_dict(), "topics": rep.rows,
                 "coverage": cov, "stats": to_jsonable(st)})
-    findings_path = OUT / f"findings_{_today()}.json"
     merge_by_dep(
         findings_path, new_rows=[to_jsonable(f) for f in raised], examined=examined,
         meta={"gaps_at": _today(), "gaps_run_at": now,
