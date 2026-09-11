@@ -352,6 +352,13 @@ def area_coverage(areas: Iterable[Area], index: CurriculumIndex) -> dict:
 class GapReport:
     findings: list = field(default_factory=list)
     rows: list = field(default_factory=list)      # the gaps artifact sidecar
+    # Every topic this run EXAMINED, raised or not. `merge_by_dep` drops a row whose
+    # dep_id was examined and produced nothing, which is how a finding that no longer
+    # holds disappears from the artifact - so a topic that has since been added to a
+    # session's outline has to be in here, or its row stands forever and `verify`
+    # rightly fails on it: the gaps sidecar no longer carries its authority set, so its
+    # citations re-classify as LEAD_ONLY and the finding reads as unsourced.
+    considered: set = field(default_factory=set)
     stats: GapStats = field(default_factory=GapStats)
 
 
@@ -431,6 +438,8 @@ def find_gaps(areas: Iterable[Area], index: CurriculumIndex, *,
 
         missing = []
         for cluster in clusters:
+            rep.considered.add(
+                topic_dependency(area, cluster.name, cluster.primary_source).dep_id)
             # Any of the cluster's names being taught settles it. Vendors phrase the
             # same technique differently, and "Zero-shot vs few-shot prompts" matches
             # session 8's Key Takeaways where "Few-shot learning" does not.

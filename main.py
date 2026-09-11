@@ -696,9 +696,14 @@ def cmd_gaps(args) -> int:
     # was reported last week and not acted on is not this week's news, and a reviewer
     # who rejected one must not be shown it again while the evidence is unchanged.
     state, now = State(), utcnow()
-    raised, held, examined = [], [], set()
+    # What this run is entitled to REMOVE from the artifact. An unscoped run examined
+    # every corroborated topic, so one that no longer holds - because the session's
+    # outline now covers it - is dropped, which is how a gap gets resolved. A scoped run
+    # claims only the topics it kept: it looked at every course to place them, but it
+    # has no mandate to delete a row it was not asked about.
+    examined = set(rep.considered) if not courses else {f.dep_id for f in rep.findings}
+    raised, held = [], []
     for f in rep.findings:
-        examined.add(f.dep_id)
         fp = fingerprint_of(f)
         f.diff_class = state.classify_finding(
             finding_id=f.finding_id, dep_id=f.dep_id, signal=f.signal,

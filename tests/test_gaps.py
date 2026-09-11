@@ -501,3 +501,25 @@ def test_a_scoped_run_must_not_narrow_a_topic_that_spans_courses():
     assert any(set(kept.get(n, [])) != set(v) for n, v in placed.items() if len(v) > 1), \
         ("scoping find_gaps DOES narrow placements — which is why cmd_gaps places "
          "globally and filters afterwards")
+
+
+def test_a_topic_that_is_now_taught_is_resolvable():
+    """A gap has to be able to STOP being one.
+
+    `merge_by_dep` drops a row whose dep_id the run examined and produced nothing for,
+    so every corroborated topic has to be reported as examined — not only the ones
+    raised. Without it, a topic added to a session's outline keeps its finding forever,
+    and worse: the gaps sidecar stops carrying its authority set, so `main.py verify`
+    re-classifies its citations as LEAD_ONLY and the standing finding reads as unsourced.
+    That is exactly what happened, and it is what `verify` is for.
+    """
+    g, m = _sources()
+    rep = find_gaps([_area([g, m])], _index(), fetcher=_fetcher({
+        GOOGLE: _Fetch(_fixture("google_prompting_strategies.html")),
+        MSFT: _Fetch(_fixture("msft_prompt_engineering.html")),
+    }))
+    raised = {f.dep_id for f in rep.findings}
+    assert raised <= rep.considered
+    # The already-taught topics are the difference, and there is at least one.
+    assert rep.considered - raised, "nothing was examined-but-not-raised"
+    assert len(rep.considered) == rep.stats.candidates
