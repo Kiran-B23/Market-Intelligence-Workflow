@@ -591,6 +591,79 @@ The 554 rows were purged from the artifact and from the finding-state ledger, an
 retirement rule that already covered S11 now covers S12 too — a topic that stops being a
 gap and a catalogue row that stops being new go stale for the same reason.
 
+### B.6 One more adapter, and what it can and cannot do
+
+S12 can only see what an adapter reads, and there were two adapters against nine model
+vendors. Measured properly the gap was smaller than the headline: of 40 taught model ids,
+**9 were already covered** — Groq serves Meta's llamas and OpenAI's whisper models, so
+`with_provider` widening already reached them — leaving 31, of which OpenAI's eleven were
+the largest block.
+
+The measurement came first, and it settled the design:
+
+| Page | Result |
+|---|---|
+| `platform.openai.com/docs/models` | client-rendered; 378KB, **0 tables** |
+| `platform.openai.com/docs/deprecations` | **34 role-typed tables, 260 rows** |
+| `docs.anthropic.com/.../models/overview` | one typed table, but **transposed** |
+| `huggingface.co/models` | 0 tables — it is a search UI |
+| `docs.cohere.com/docs/models` | no response to a plain fetch |
+
+So the OpenAI adapter reads the *deprecations* page, which is a strange place to read a
+catalogue from and the only one OpenAI publishes without JavaScript. And what it gives has
+to be stated precisely rather than optimistically: of the 260 rows, **142 sit in the
+identifier column and every one is retired** — it is a deprecations page — while 118 sit
+in the replacement column, which `build_catalogue` drops because being named as the
+successor to something older is not being catalogued.
+
+* **S7 gains OpenAI entirely.** A taught OpenAI model its provider retires is now
+  detectable at all. None of the eleven is on that list today, so it raises nothing now —
+  it is a watch being put in place, which is the premise of the whole system.
+* **S12 gains nothing from OpenAI**, and the adapter's docstring says so. Claiming
+  otherwise would be claiming coverage we do not have.
+
+That produced one more honesty fix. An all-retired catalogue seeded a snapshot of "0
+entries", which reads as a broken adapter; it is now labelled
+`RETIREMENT WATCH ONLY: openai (113 rows, all retired)`.
+
+Anthropic is the interesting rejection. Its table is real and role-types, but it is
+**transposed** — models are columns, attributes are rows — so the column-role reader binds
+"Fastest" and "$1 / input MTok" as identifiers. Reading it needs a transposed-table mode in
+`probe/catalogue.py`, not an adapter, and forcing it would manufacture exactly the
+fabricated ids that role binding exists to prevent.
+
+### B.7 The capability tag — closing a gap the PRD recorded as abandoned
+
+§29 records a nominator that was built, measured and shelved:
+
+> "Murf.AI and ElevenLabs are alternatives, Murf.AI and Lovable are co-taught in one
+> project. Nothing in the inventory distinguishes them and the registry has no capability
+> field to lean on."
+
+Co-occurrence conflates substitutes with complements, and those are opposites. `kind`
+separates what a thing *is* (tool, service, package, model, n8n node); `capability`
+separates what it is *for*, which is the axis a replacement question actually turns on.
+
+**Closed vocabulary, eighteen terms**, in `config/constants.py` — `llm-api`,
+`agent-framework`, `no-code-automation`, `vector-db`, `voice-synthesis`,
+`speech-recognition`, `image-generation`, `search-api`, `market-data`, `observability`,
+`doc-processing`, `deployment`, `tunnelling`, `ide`, `productivity`, `messaging`,
+`model-hub`, `source-control`. Open text would become 474 spellings of the same dozen
+ideas and the entire value is grouping, so adding a term is a deliberate edit and a test
+asserts nothing outside the list ever appears.
+
+Hand-seeded on **69 of 474** entries, and deliberately not more: a wrong tag groups a
+substitute with a complement, which is the failure this exists to prevent, so leaving it
+blank is always the safe move. Coverage is reported rather than implied. It survives
+`extract` the way `review_status` does — `Registry.add()` never overwrites it, so a
+rebuild merges derived facts around it. A hand-owned value a rebuild silently drops is
+worse than no value, and there is a test for exactly that.
+
+Seeding it caught its own bug: `langchain-chroma` and `langchain-tavily` were each listed
+under two capabilities, and last-write-wins made the result arbitrary. The specific
+category wins — a chroma binding is a vector-db integration that happens to ship as a
+langchain package.
+
 ## G. What is not covered yet, stated plainly
 
 * **A newly released model or tool does not become a Change.** A new model is not a
@@ -719,7 +792,7 @@ dies; inventory recall vs. a hand audit of one course.
 
 **Phase 1 course scope (decided):** Intro to Gen AI (25 sessions — see §31; the
 figure was 26 until the workbook's own numbering was read), Building LLM
-Applications (29), AI for Finance (18), PSE (13) — the four already exported as
+Applications (29), AI for Finance (18) and a fourth — the four already exported as
 JSON + xlsx in `/home/nxtwave/Market Intelligence Workflow/`.
 
 ---
@@ -819,7 +892,7 @@ SQLite run history, `normalize_content()`, canonical/superseded runs;
 
 **Known gaps to fill (not reusable as-is):**
 - `extract_tools.CATALOG` is a hand-curated ~50-name allowlist tuned to AI for
-  Finance. Running `collect()` on `PSE.json` returns several sessions with an
+  Finance. Running `collect()` on the fourth export returns several sessions with an
   **empty** tool list. This allowlist is the single biggest correctness gap and
   must become a maintained registry.
 - The three richest signals in the exports are **entirely unmined**:
@@ -1154,7 +1227,7 @@ Guardrails:
 |---|---|---|
 | M0 | This PRD committed as `MIW/PRD.md`; repo scaffold, settings, `data/` populated with 4 JSON + 4 xlsx | `main.py --help` lists all stages |
 | M1 | **Ingest** — schema adapter + traversal reuse | `content_records.jsonl` for all 4 courses; session counts match **25/29/17/13** (the curriculum's own counts, per §31 — this milestone read 26/29/18/13 while `expect_sessions` was calibrated to the export's positional count); pooled exams traversed; skip reasons reported |
-| M2 | **Extract** — registry + 7 extractors + review queue | `inventory.json`; PSE no longer returns empty tool lists; question tags, `solution_answer` imports, n8n node versions, and URL hosts all mined |
+| M2 | **Extract** — registry + 7 extractors + review queue | `inventory.json`; no course returns empty tool lists any more; question tags, `solution_answer` imports, n8n node versions, and URL hosts all mined |
 | M3 | **Probe** — http/pypi/npm/github/n8n + `state.db` snapshots | two consecutive runs produce identical `probe_status` for unchanged deps |
 | M4 | **Research** — Tavily + LLM, citation-enforced | every claim carries `{source_url, retrieved_at, quote}`; uncited claims dropped |
 | M5 | **Analyse** — severity, blast radius, week-over-week diff | second run's digest contains no `unchanged` findings |
@@ -1176,7 +1249,7 @@ If it cannot reproduce the case that motivated the project, it is not done.
 
 Other checks, each mapping to a stated requirement:
 
-- **Inventory recall (G1)** — hand-audit one course (PSE, the current weak spot,
+- **Inventory recall (G1)** — hand-audit one course (the weakest, 
   ~13 sessions) and compare against `inventory.json`. Report recall and every
   miss. This is the honest measure of stage [2].
 - **Inventory recall against existing ground truth (G1)** — the
@@ -1880,7 +1953,7 @@ three properties that were missing: linkable, bookmarkable, reload-safe. Tabs ar
 ```
 
 Slugs come from `config/constants.py`, which was their only home and never exposed them
-past `cmd_ingest`. Resolution is **lenient** — `?course=pse` and `?course=PSE` both work
+past `cmd_ingest`. Resolution is **lenient** — a slug and a title both work
 — so a URL can carry the slug while the existing scope-preview widget keeps sending
 titles unchanged, and `Scope.courses` stays a set of titles because that is what
 `Location.course` holds.
@@ -1895,7 +1968,8 @@ beside `recover_interrupted()` gave the four existing runs their rows (all
 `intro_to_gen_ai`).
 
 `course_slug = '*'` means unscoped, which is the honest semantic: an all-courses sweep
-really did audit PSE and belongs in PSE's history, while a run scoped to one course must
+really did audit every course and belongs in each of their histories, while a run
+scoped to one course must
 not appear elsewhere. For a **watch-triggered** run — where `Scope.dep_ids` wins outright
 and names no courses at all — the ids are resolved through the inventory; if the
 inventory cannot be read the answer is `'*'`, because "may be relevant to any course"
@@ -1913,7 +1987,7 @@ out/courses/<slug>/digest_<date>.md     # new
 ```
 
 The **subdirectory is load-bearing**. `_latest()` is `sorted(OUT.glob(...))[-1]`,
-lexicographic — a top-level `digest_pse_2026-09-09.md` sorts *after*
+lexicographic — a top-level `digest_zz_2026-09-09.md` sorts *after*
 `digest_2026-09-09.md` (`p` > `2`) and would silently become "the" digest for everyone.
 `OUT.glob("digest_*.md")` does not descend, so the hijack is structurally impossible,
 and a test asserts it.
@@ -2749,7 +2823,7 @@ Intro to Gen AI   export 26 "sessions", workbook numbers 25
                   81 of 104 units disagreed
 AI for Finance    export 18, workbook 17 (`AI Finance Add-On Session`, last -> no shift)
 LLM Applications  export 29, workbook 29 — agrees exactly
-PSE               no workbook; positional is all there is
+fourth course     no workbook; positional is all there is
 ```
 
 It reached the reviewer. `gemini-2.0-flash` was reported at sessions 11/12/17/21; the
@@ -2769,7 +2843,8 @@ comes from the workbook, and `ingest` prints which source it used.
   by alias, as everywhere else in this codebase; a workbook with no `Session No.` column
   reports that and numbers nothing rather than guessing.
 * **`portal.read_course(..., session_of_unit)`** — the workbook wins where it speaks;
-  the positional walk stays as the fallback for units it does not cover and for PSE.
+  the positional walk stays as the fallback for units it does not cover and for a
+  course with no workbook.
   Disagreements are **counted and printed with examples**, never silently resolved:
   changing 81 session numbers without saying so is how a reviewer stops trusting a
   digest.
@@ -2860,7 +2935,7 @@ None of the 24 `Session PPT` decks' outlines appear in the JSON export. The work
 `Course Outline` sheet — already the authority for session *numbering* (§31) — is also
 the only description of what each deck covers. `analyse/curriculum.py` reads it as a
 document per session: title, `Outline`, `Key Takeaways`. All 71 sessions across the
-three workbooks index; PSE has no workbook and therefore contributes none, which is a
+three workbooks index; a course with no workbook contributes none, which is a
 limit of the input rather than of the code.
 
 Placement is IDF-weighted term overlap over that 71-document corpus, multiplied by how

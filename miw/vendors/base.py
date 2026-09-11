@@ -161,9 +161,17 @@ def build_catalogue(vendor: str, key: str, urls: list[str], *,
 # --- registry ---------------------------------------------------------------
 
 def all_adapters() -> list[VendorAdapter]:
+    """Every vendor whose catalogue we can actually read.
+
+    The list is short because it is honest: an adapter exists only where the vendor
+    publishes a table that role-types, and several do not. `miw/vendors/openai.py`
+    records which pages were tested and rejected, and why, so the gaps here are
+    documented rather than assumed.
+    """
     from miw.vendors.google_ai import GoogleAIAdapter
     from miw.vendors.groq import GroqAdapter
-    return [GroqAdapter(), GoogleAIAdapter()]
+    from miw.vendors.openai import OpenAIAdapter
+    return [GroqAdapter(), GoogleAIAdapter(), OpenAIAdapter()]
 
 
 def adapters_for(kind: str) -> list[VendorAdapter]:

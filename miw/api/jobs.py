@@ -119,8 +119,9 @@ CREATE INDEX IF NOT EXISTS idx_events_run ON job_events(run_id, id);
 -- Which courses a run touched. A side table rather than a `course` column on `jobs`,
 -- because `scope.courses` is a LIST and a run may legitimately span courses - a scalar
 -- column could only represent that by lying. `course_slug = '*'` means unscoped, which
--- is the honest semantic: an all-courses sweep really did audit PSE and belongs in
--- PSE's history, while a run scoped to one course must not appear elsewhere.
+-- is the honest semantic: an all-courses sweep really did audit every course and
+-- belongs in each of their histories, while a run scoped to one course must not
+-- appear elsewhere.
 -- What a run FOUND, captured the moment its `analyse` stage exits.
 --
 -- It has to be recorded rather than inferred. The findings artifact carries

@@ -189,8 +189,8 @@ def title_of(slug: str) -> str:
 def resolve_courses(tokens: Iterable[str]) -> set[str]:
     """Course titles from a mix of slugs and titles.
 
-    Lenient on purpose: `?course=pse` and `?course=PSE` must both work, so a URL can
-    use the slug while the existing UI keeps sending titles unchanged. `Scope.courses`
+    Lenient on purpose: `?course=my_course` and `?course=My Course` must both work, so
+    a URL can carry the slug while the existing UI keeps sending titles. `Scope.courses`
     stays a set of TITLES, because that is what `Location.course` holds and what
     `to_cli_args()` emits as `--course`.
     """

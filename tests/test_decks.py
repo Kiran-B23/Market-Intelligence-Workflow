@@ -109,7 +109,7 @@ def test_the_published_form_is_preferred_over_the_editor_link():
 
     The workbook's `Session PPT` column is mostly the editor form (51 of 68); the course
     export carries the published form. Preferring it is the difference between reading
-    17 sessions' decks and reading 85 — including all 13 PSE sessions, which have no
+    17 sessions' decks and reading 85 — including a course's sessions that have no
     workbook at all.
     """
     assert published("https://docs.google.com/presentation/d/e/2PACX-1vQ11/pub")

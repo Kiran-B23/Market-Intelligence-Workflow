@@ -164,7 +164,7 @@ def read_course(path: str, course: str,
     Gen AI's `Common Mistakes` is a LEARNING_SET carrying a video at position 8 but is
     not a numbered session, so every later session was reported one too high. The
     positional walk still runs — it is the fallback for units the workbook does not
-    cover (and for PSE, which has no workbook), and disagreements are counted rather
+    cover (and for a course with no workbook), and disagreements are counted rather
     than silently resolved.
     """
     with open(path) as fh:

@@ -96,6 +96,7 @@ class NewerStats:
     unreadable: list = field(default_factory=list)
     distrusted: list = field(default_factory=list)   # baseline looked wrong; reseeded
     seeded: list = field(default_factory=list)     # first look: baseline only
+    retirement_only: list = field(default_factory=list)   # a catalogue with no live rows
     appeared: int = 0
     already_taught: int = 0
     no_sibling: int = 0
@@ -218,6 +219,15 @@ def _models(deps, state, rep, *, adapters=None, now: str, persist: bool = True) 
             continue
         rep.stats.sources_read += 1
         live = {e.entry_id for e in cat.entries.values() if not e.retired}
+        if cat.entries and not live:
+            # A catalogue whose every identifier-column row is retired. OpenAI's is one:
+            # the only model list it publishes without JavaScript is its deprecations
+            # page. That is a perfectly good RETIREMENT watch (S7) and contributes
+            # nothing to "what is newer" — and saying "0 entries" would read as a broken
+            # adapter rather than as the shape of the source.
+            rep.stats.retirement_only.append(
+                f"{adapter.key} ({len(cat.entries)} rows, all retired)")
+            continue
 
         # The browsable half FIRST, and deliberately independent of the snapshot: "what
         # does this vendor list that we do not teach?" is answerable on the very first

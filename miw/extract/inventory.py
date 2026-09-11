@@ -11,7 +11,7 @@ Recall and precision come from different places here, so they are kept apart:
   Guessing here is how a monitor starts reporting on things that do not exist.
 * **Prose names** are matched only against aliases the registry already knows, which
   is what replaces the hand-curated `CATALOG` allowlist that returned empty tool lists
-  for PSE.
+  for a course whose tools live only in its sheet.
 
 Deduping is the point of the stage: one dependency, many locations. codetotutorial in
 six sessions must be one row with six locations, or the weekly digest reports the same
@@ -384,7 +384,7 @@ class InventoryBuilder:
         `groq.com` is Groq from a link; pass 2 can then recognise the bare word "Groq"
         in a session that never linked it. Without the round trip, a fresh checkout
         with an empty registry would find nothing in prose - which is precisely how the
-        old CATALOG allowlist came to return empty tool lists for PSE.
+        old CATALOG allowlist came to return empty tool lists for a whole course.
         """
         for dep in self.deps.values():
             self.reg.add(Entry(

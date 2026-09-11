@@ -100,3 +100,34 @@ def test_a_document_with_no_role_typed_table_yields_nothing():
     "it is gone"."""
     assert entries("<p>Some models were deprecated. gemini-2.5-flash</p>") == []
     assert entries("<table><tr><th>Colour</th></tr><tr><td>blue</td></tr></table>") == []
+
+
+# ------------------------------------------------------- the OpenAI adapter's real shape
+
+def test_the_openai_adapter_is_a_retirement_watch_not_a_live_catalogue():
+    """Its page is `docs/deprecations`, and that is not an accident.
+
+    `platform.openai.com/docs/models` is client-rendered and a plain fetch returns a
+    378KB shell with zero tables. The deprecations page role-types cleanly — but every
+    identifier-column row on it is, by construction, retired. So this adapter makes S7
+    possible for OpenAI and contributes nothing to S12, and the docstring has to say so
+    rather than imply coverage we do not have.
+    """
+    from miw.vendors.openai import DEPRECATIONS_URL, OpenAIAdapter
+    import miw.vendors.openai as mod
+
+    assert DEPRECATIONS_URL.endswith("/deprecations")
+    assert OpenAIAdapter.kinds == ("model",)
+    assert "platform.openai.com" in OpenAIAdapter.official_domains
+    doc = mod.__doc__ or ""
+    # The rejected pages are recorded so nobody re-tests them by hand.
+    for rejected in ("docs/models", "docs.anthropic.com", "huggingface.co/models"):
+        assert rejected in doc, f"{rejected} is not recorded as tested-and-rejected"
+    assert "S12 gains nothing from OpenAI" in doc
+
+
+def test_every_adapter_is_registered_once():
+    from miw.vendors.base import all_adapters
+    keys = [a.key for a in all_adapters()]
+    assert keys == sorted(set(keys), key=keys.index), "a duplicate adapter key"
+    assert {"groq", "google_ai", "openai"} <= set(keys)

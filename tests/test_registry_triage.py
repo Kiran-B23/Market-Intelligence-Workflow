@@ -139,3 +139,57 @@ def test_the_only_courses_are_the_declared_ones():
     seen = {l["course"] for d in json.loads(inv.read_text())["dependencies"]
             for l in d["locations"]}
     assert seen <= declared, f"undeclared course(s): {sorted(seen - declared)}"
+
+
+# ------------------------------------------------- the capability tag (PRD §29's gap)
+
+def test_every_capability_is_in_the_closed_vocabulary():
+    """A typo'd tag is a silent mis-grouping, which is worse than no tag at all.
+
+    The field exists because co-occurrence conflates substitutes with complements —
+    Murf.AI and ElevenLabs are alternatives, Murf.AI and Lovable are co-taught — and a
+    misspelling quietly recreates exactly that confusion in a new place.
+    """
+    from config.constants import CAPABILITIES
+    from miw.registry import Registry
+    reg = Registry.load()
+    bad = {e.canonical_name: e.capability for e in reg.entries.values()
+           if e.capability and e.capability not in CAPABILITIES}
+    assert not bad, f"capability values outside the vocabulary: {bad}"
+
+
+def test_the_capability_vocabulary_is_closed_and_unique():
+    from config.constants import CAPABILITIES
+    assert len(CAPABILITIES) == len(set(CAPABILITIES))
+    assert all(c == c.lower() and " " not in c for c in CAPABILITIES)
+
+
+def test_a_capability_tag_survives_a_registry_round_trip(tmp_path):
+    """`extract` rebuilds this file every run. A hand-owned value a rebuild silently
+    drops is worse than no value, which is why `review_status` established the pattern
+    and this follows it."""
+    from miw.registry import Entry, Registry
+    path = tmp_path / "tools.yaml"
+    reg = Registry([Entry(canonical_name="Murf.AI", kind="service",
+                          capability="voice-synthesis")])
+    reg.save(path)
+    assert "voice-synthesis" in path.read_text()
+    back = Registry.load(path)
+    assert back.entries["service:murf.ai"].capability == "voice-synthesis"
+    # And a derived entry merging in must not wipe it.
+    back.add(Entry(canonical_name="Murf.AI", kind="service", homepage="https://murf.ai"))
+    assert back.entries["service:murf.ai"].capability == "voice-synthesis"
+    assert back.entries["service:murf.ai"].homepage == "https://murf.ai"
+
+
+def test_substitutes_and_complements_are_now_distinguishable():
+    """The exact pair PRD §29 records as unresolvable without this field."""
+    from miw.registry import Registry
+    reg = Registry.load()
+    def cap(name):
+        hits = [e.capability for e in reg.entries.values()
+                if e.canonical_name.strip().casefold() == name.casefold()]
+        return hits[0] if hits else None
+    murf, lovable = cap("Murf.AI"), cap("Lovable")
+    assert murf == "voice-synthesis"
+    assert lovable and lovable != murf, "co-taught tools must not share a capability"

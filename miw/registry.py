@@ -49,6 +49,11 @@ class Entry:
     vendor: str = ""
     watch_tier: str = ""
     review_status: str = "derived"
+    # What this is FOR, from `config.constants.CAPABILITIES`. Hand-owned and empty by
+    # default: nothing derives it, because the whole point is that co-occurrence cannot.
+    # It survives a rebuild the same way `review_status` and `notes` do — `add()` never
+    # overwrites it, so `extract` merges derived facts around it without touching it.
+    capability: str = ""
     notes: str = ""
 
     @property
@@ -120,7 +125,8 @@ class Registry:
             row = {"canonical_name": e.canonical_name, "kind": e.kind}
             for fld in ("aliases", "homepage", "docs_url", "changelog_url", "pricing_url",
                         "status_url", "official_domains", "registry", "registry_id",
-                        "vendor", "watch_tier", "review_status", "notes"):
+                        "vendor", "watch_tier", "review_status", "capability",
+                        "notes"):
                 v = getattr(e, fld)
                 if v:
                     row[fld] = v

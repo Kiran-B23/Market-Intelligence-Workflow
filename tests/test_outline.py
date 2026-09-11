@@ -9,7 +9,7 @@ numbering, and `expect_sessions` was calibrated to the wrong count, so the integ
 check passed while the digest pointed reviewers at the wrong slide deck.
 
 The workbook is the curriculum team's own record of what a session IS, so where it
-speaks it wins. Where it is silent - PSE has no workbook at all - the positional walk
+speaks it wins. Where it is silent - a course may have no workbook at all - the positional walk
 still runs.
 """
 import json
@@ -173,7 +173,7 @@ def test_a_disagreement_is_counted_and_shown_never_silently_resolved(book, expor
 
 
 def test_units_the_workbook_does_not_cover_still_get_a_positional_number(export, tmp_path):
-    """PSE has no workbook at all; a partial workbook must not blank the rest."""
+    """A course may have no workbook at all; a partial one must not blank the rest."""
     p = tmp_path / "partial.xlsx"
     _workbook(p, sessions=[(1, "sid-1", "Real Session One", "k", "- o")],
               practice=[("sid-1", "u-s1", "Reading Material")])

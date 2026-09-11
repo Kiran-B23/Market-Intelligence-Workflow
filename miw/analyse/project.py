@@ -37,8 +37,8 @@ from typing import Iterable, Optional
 from miw.analyse import score
 from miw.schema import Dependency, Finding
 
-# Facts about a vendor, not about a course. A model Groq retired is retired in PSE too,
-# so these are carried across untouched.
+# Facts about a vendor, not about a course. A model Groq retired is retired in every
+# course that teaches it, so these are carried across untouched.
 VENDOR_FACTS = ("finding_id", "dep_id", "canonical_name", "signal", "signal_label",
                 "kind_of_signal", "severity", "diff_class", "summary", "probe_signals",
                 "claims", "alternatives", "latest_version", "raised_at",

@@ -703,6 +703,9 @@ def cmd_gaps(args) -> int:
                  if dry else "A baseline was recorded; findings start from the next "
                              "run.")
               + " A quiet first look is the rule working, not a failure.")
+    if ns.retirement_only:
+        print(f"  RETIREMENT WATCH ONLY: {', '.join(ns.retirement_only)} — every row is "
+              f"a retirement, so this feeds S7 and can never feed S12")
     for line in ns.unreadable:
         print(f"  CATALOGUE UNREADABLE: {line}")
     for line in ns.distrusted:
@@ -949,7 +952,7 @@ def cmd_report(args) -> int:
             continue
         local = project_all(findings, deps_by_id, course)
         # Per-course digests live in out/courses/<slug>/ because `_latest()` globs
-        # `digest_*.md` lexicographically: a top-level digest_pse_<date>.md sorts AFTER
+        # `digest_*.md` lexicographically: a top-level digest_zz_<date>.md sorts AFTER
         # digest_<date>.md and would silently become "the" digest.
         cdir = OUT / "courses" / slug_of(course)
         cdir.mkdir(parents=True, exist_ok=True)

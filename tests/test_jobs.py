@@ -85,7 +85,7 @@ def test_every_scoped_stage_accepts_the_argv_the_runner_builds():
 
     parser = main.build_parser()
     # A maximal scope, so every flag `to_cli_args` can emit is exercised.
-    sc = Scope(courses={"Intro to Gen AI", "PSE"}, sessions={4, 5, 6},
+    sc = Scope(courses={"Intro to Gen AI", "AI for Finance"}, sessions={4, 5, 6},
                tiers=("critical", "standard"), kinds=("model",),
                dep_ids={"a1b2c3"}, limit=10)
     for stage in sorted(SCOPED):
@@ -98,26 +98,26 @@ def test_report_is_scoped_only_by_course():
     """It chooses which per-course digest to WRITE; it never filters its input."""
     from miw.api.jobs import _stage_args
     from miw.scope import Scope
-    sc = Scope(courses={"PSE"}, sessions={1, 2}, tiers=("critical",),
+    sc = Scope(courses={"AI for Finance"}, sessions={1, 2}, tiers=("critical",),
                kinds=("model",), dep_ids={"x1"}, limit=5)
-    assert _stage_args("report", sc) == ["--course", "PSE"]
+    assert _stage_args("report", sc) == ["--course", "AI for Finance"]
 
 
 def test_repeated_flags_survive_the_course_only_filter():
     """`--course` and `--dep-id` are `action="append"`, so the filter must not eat one."""
     from miw.api.jobs import _stage_args
     from miw.scope import Scope
-    sc = Scope(courses={"PSE", "Intro to Gen AI"}, dep_ids={"a", "b"},
+    sc = Scope(courses={"AI for Finance", "Intro to Gen AI"}, dep_ids={"a", "b"},
                tiers=("critical",))
-    assert _stage_args("report", sc) == ["--course", "Intro to Gen AI",
-                                         "--course", "PSE"]
+    assert _stage_args("report", sc) == ["--course", "AI for Finance",
+                                         "--course", "Intro to Gen AI"]
 
 
 def test_unscoped_stages_get_no_flags_at_all():
     """`ingest`/`extract` rebuild the whole inventory; scoping them would shrink it."""
     from miw.api.jobs import _stage_args
     from miw.scope import Scope
-    sc = Scope(courses={"PSE"}, tiers=("critical",))
+    sc = Scope(courses={"AI for Finance"}, tiers=("critical",))
     assert _stage_args("ingest", sc) == []
     assert _stage_args("extract", sc) == []
 
@@ -160,7 +160,7 @@ def test_the_llm_choice_reaches_the_stage_subprocess_as_environment(tmp_path, mo
     """`MIW_LLM_PROVIDER`/`MIW_LLM_MODEL` is the interface `miw/llm.py` already reads,
     so the choice travels as env rather than as a new CLI flag — one way to say it."""
     with _bare_runner(tmp_path) as r:
-        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"],
+        rid = r.submit(scope={"courses": ["AI for Finance"]}, stages=["probe"],
                        llm={"provider": "openrouter", "model": "sonnet"})
         row = r.get(rid)
         assert json.loads(row["llm"]) == {"provider": "openrouter", "model": "sonnet"}
@@ -175,7 +175,7 @@ def test_no_choice_means_no_env_so_the_default_is_untouched(tmp_path, monkeypatc
     """An empty choice must not export `MIW_LLM_PROVIDER=''` — that is not the same as
     absent, and `available_provider()` would read it as a typo and use no LLM at all."""
     with _bare_runner(tmp_path) as r:
-        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"])
+        rid = r.submit(scope={"courses": ["AI for Finance"]}, stages=["probe"])
         assert r.get(rid)["llm"] is None
         seen = {}
         _no_stream(monkeypatch, seen)
@@ -185,7 +185,7 @@ def test_no_choice_means_no_env_so_the_default_is_untouched(tmp_path, monkeypatc
 
 def test_a_partial_choice_exports_only_what_was_chosen(tmp_path, monkeypatch):
     with _bare_runner(tmp_path) as r:
-        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"],
+        rid = r.submit(scope={"courses": ["AI for Finance"]}, stages=["probe"],
                        llm={"provider": "", "model": "opus"})
         seen = {}
         _no_stream(monkeypatch, seen)
@@ -210,7 +210,7 @@ def test_an_existing_jobs_db_gains_the_llm_column(tmp_path, monkeypatch):
     monkeypatch.setattr(J.JobRunner, "_loop", lambda self: None, raising=True)
     r = J.JobRunner()                        # must migrate, not crash
     try:
-        rid = r.submit(scope={"courses": ["PSE"]}, stages=["probe"],
+        rid = r.submit(scope={"courses": ["AI for Finance"]}, stages=["probe"],
                        llm={"provider": "anthropic"})
         assert json.loads(r.get(rid)["llm"]) == {"provider": "anthropic"}
     finally:
@@ -241,16 +241,16 @@ def test_a_runs_findings_are_recorded_against_it(tmp_path, monkeypatch):
                  "diff_class": "new", "courses": ["Intro to Gen AI"]},
                 {"finding_id": "f2", "dep_id": "d2", "signal": "S6",
                  "severity": "low", "canonical_name": "lib", "diff_class": "unchanged",
-                 "courses": ["PSE"]},
+                 "courses": ["AI for Finance"]},
                 # Carried forward from another scope: this run did not examine d9, so
                 # claiming it found this would be false.
                 {"finding_id": "f3", "dep_id": "d9", "signal": "S1",
                  "severity": "high", "canonical_name": "elsewhere",
-                 "diff_class": "unchanged", "courses": ["PSE"]},
+                 "diff_class": "unchanged", "courses": ["AI for Finance"]},
             ]}))
         monkeypatch.setattr(J, "ROOT", tmp_path)
 
-        rid = r.submit(scope={"courses": ["PSE"]}, stages=["analyse"])
+        rid = r.submit(scope={"courses": ["AI for Finance"]}, stages=["analyse"])
         r._record_findings(rid)
 
         got = r.findings_for(rid)

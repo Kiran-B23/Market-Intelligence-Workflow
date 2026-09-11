@@ -185,7 +185,7 @@ def test_a_legacy_scope_missing_keys_still_backfills():
 # --------------------------------------------------------- digest isolation
 
 def test_a_per_course_digest_can_never_become_the_roll_up():
-    """`_latest()` globs lexicographically. `digest_pse_<date>.md` sorts AFTER
+    """`_latest()` globs lexicographically. `digest_zz_<date>.md` sorts AFTER
     `digest_<date>.md` ('p' > '2'), so a top-level per-course file would silently be
     served as "the" digest. The subdirectory makes that structurally impossible."""
     from miw.api import app
@@ -276,7 +276,7 @@ def test_every_course_page_reports_its_own_coverage():
     c = _client()
     total = len(c.get("/api/findings").json()["coverage"])
     per = {slug: len(c.get(f"/api/findings?course={slug}").json()["coverage"])
-           for slug in ("intro_to_gen_ai", "llm_applications", "ai_for_finance", "pse")}
+           for slug in ("intro_to_gen_ai", "llm_applications", "ai_for_finance")}
     assert all(v <= total for v in per.values()), per
     assert any(v < total for v in per.values()), "coverage was not narrowed at all"
 
@@ -284,7 +284,7 @@ def test_every_course_page_reports_its_own_coverage():
 def test_the_api_says_that_triage_is_global():
     """So the UI can warn at the point of the click rather than in a footnote."""
     c = _client()
-    assert c.get("/api/findings?course=pse").json()["triage_is_global"] is True
+    assert c.get("/api/findings?course=ai_for_finance").json()["triage_is_global"] is True
 
 
 def test_courses_expose_slugs_and_flag_the_uningested():

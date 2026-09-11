@@ -187,7 +187,7 @@ def summary(course: str = "") -> dict:
         # alone told a course page it had zero of them while the findings list below
         # showed two. Two counts of the same thing that disagree is worse than either.
         rows = _project_rows([r for r in rows if _touches_course(r, title, ids)], title)
-        # `coverage` must be narrowed BEFORE any freshness figure is derived, or a PSE
+        # `coverage` must be narrowed BEFORE any freshness figure is derived, or one
         # page reports Intro's staleness.
         coverage = {k: v for k, v in coverage.items() if k in ids}
         probe_results = [r for r in probe_results if r.get("dep_id") in ids]
@@ -776,7 +776,7 @@ def digest(course: str = "") -> str:
     A missing per-course digest says so. Falling back to the roll-up would put other
     courses' findings under a per-course heading, which is the mixing this is meant to
     end. Per-course digests live in `out/courses/<slug>/` rather than `out/` because
-    `_latest()` sorts lexicographically: a top-level `digest_pse_<date>.md` sorts AFTER
+    `_latest()` sorts lexicographically: a top-level `digest_zz_<date>.md` sorts AFTER
     `digest_<date>.md` and would silently become "the" digest.
     """
     from miw.scope import slug_of
@@ -810,7 +810,7 @@ def inventory(q: str = "", kind: str = "", tier: str = "", authority: str = "",
     deps = _read("inventory.json").get("dependencies", [])
     ql = q.strip().lower()
     from miw.scope import resolve_courses
-    # Lenient: `?course=pse` and `?course=PSE` both work, so a URL can carry the slug
+    # Lenient: `?course=x` and `?course=X` both work, so a URL can carry the slug
     # while the existing scope-preview widget keeps sending titles unchanged.
     courses = resolve_courses(course.split("|"))
     tierset = {t.strip() for t in tiers.split(",") if t.strip()}

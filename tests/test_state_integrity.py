@@ -28,14 +28,14 @@ def test_a_scoped_run_never_resolves_what_it_did_not_examine():
     course's open findings as fixed."""
     with tempfile.TemporaryDirectory() as tmp:
         st = _state(tmp)
-        for fid, dep in (("f-llm", "dep-llm"), ("f-pse", "dep-pse")):
+        for fid, dep in (("f-llm", "dep-llm"), ("f-two", "dep-two")):
             st.classify_finding(finding_id=fid, dep_id=dep, signal="S1",
                                 severity="critical", fingerprint="fp", now="t0")
 
-        # A run that only examined the PSE dependency and found nothing wrong there.
+        # A run that examined only one dependency and found nothing wrong there.
         resolved = st.resolve_absent(seen_ids=set(), now="t1",
-                                     examined_dep_ids={"dep-pse"})
-        assert [r["dep_id"] for r in resolved] == ["dep-pse"]
+                                     examined_dep_ids={"dep-two"})
+        assert [r["dep_id"] for r in resolved] == ["dep-two"]
 
         open_now = {r["dep_id"] for r in st.conn.execute(
             "SELECT dep_id FROM finding_state WHERE resolved_at IS NULL").fetchall()}

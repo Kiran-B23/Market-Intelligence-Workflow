@@ -138,7 +138,7 @@ def test_items_returns_a_snapshot_so_a_refresh_cannot_break_an_open_iteration(tm
 @pytest.fixture()
 def staged(tmp_path):
     """A real export, copied so the test can move it without touching the repo's."""
-    src = Path(__file__).resolve().parents[1] / "data" / "courses" / "pse.json"
+    src = Path(__file__).resolve().parents[1] / "data" / "courses" / "ai_for_finance.json"
     if not src.exists():
         pytest.skip("no course export available")
     dest = tmp_path / "up.json"
@@ -193,7 +193,9 @@ def test_a_session_count_mismatch_is_refused_and_shows_what_it_found(staged):
     v = C.validate(C.Candidate(title="Zeta Workshop", export_path=staged,
                                expect_sessions=99))
     assert not v.ok and v.stopped_at == "sessions"
-    assert any("99" in r and "13" in r for r in v.reasons)
+    # 18 is what the fixture export actually contains; the point is that the refusal
+    # SHOWS both numbers rather than just saying no.
+    assert any("99" in r and "18" in r for r in v.reasons)
 
 
 def test_a_non_course_json_is_refused_on_shape(tmp_path):
@@ -229,5 +231,5 @@ def test_a_short_roster_key_cannot_steal_another_courses_workbook():
     """A course slugged `ai` would match `aiforfinance` under naive substring matching."""
     from miw.ingest import sheets
     assert sheets._MIN_SUBSTRING_KEY >= 5
-    # `pse` is 3 chars and must still match its own file by equality.
-    assert sheets.norm_stem("PSE - Course Contents.xlsx") == "pse"
+    # A 4-char stem is still below the floor and must match its own file by equality.
+    assert sheets.norm_stem("Zeta - Course Contents.xlsx") == "zeta"

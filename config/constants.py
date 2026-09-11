@@ -11,10 +11,10 @@
 #   AI for Finance    export 18, workbook 17 (`AI Finance Add-On Session`)
 #   LLM Applications  export 29, workbook 29 - agrees
 #
-# PSE is deliberately NOT declared here. Its export still sits in `data/courses/`, inert
-# until someone registers it — `cmd_ingest` iterates this roster, so an unregistered
-# export is never opened. It was removed to exercise the Add Course flow end to end
-# against a real course rather than a copy of one.
+# Only registered courses are read. `cmd_ingest` iterates this roster, so an export
+# sitting in `data/courses/` without an entry here is never opened — which is what lets
+# a course be added through the UI's Add Course flow instead, landing in the writable
+# overlay rather than in this tracked literal.
 #
 # This literal stays HAND-OWNED. Courses added through the UI land in the writable
 # overlay `data/course_registry.json` instead, and `miw.courses.Roster` merges the two
@@ -32,6 +32,40 @@ _DECLARED = {
 from miw.courses import Roster  # noqa: E402  (after _DECLARED, by necessity)
 
 COURSES = Roster(_DECLARED)
+
+# What a dependency is FOR, as a closed vocabulary.
+#
+# PRD §29 records a nominator that was built, measured and abandoned for want of exactly
+# this field: "Murf.AI and ElevenLabs are alternatives, Murf.AI and Lovable are co-taught
+# in one project. Nothing in the inventory distinguishes them and the registry has no
+# capability field to lean on." Co-occurrence conflates substitutes with complements, and
+# those are opposites. `kind` separates tool/service/package/model/n8n_node — what a
+# thing IS. This separates what it is FOR, which is the axis a replacement question turns
+# on.
+#
+# CLOSED on purpose. An open text field becomes 474 spellings of the same dozen ideas,
+# and the entire value here is grouping. Adding a term is a deliberate edit to this list,
+# not something a typo can do.
+CAPABILITIES = (
+    "llm-api",              # a hosted model endpoint: OpenAI, Groq, Gemini API
+    "agent-framework",      # LangChain, CrewAI, LangGraph
+    "no-code-automation",   # n8n, Make, Zapier
+    "vector-db",            # Chroma, Pinecone, Qdrant
+    "voice-synthesis",      # Murf.AI, ElevenLabs, F5-TTS
+    "speech-recognition",   # Whisper, AssemblyAI
+    "image-generation",     # Stable Diffusion, Midjourney, FLUX
+    "search-api",           # SerpAPI, Tavily, ScraperAPI
+    "market-data",          # Twelve Data, Alpaca
+    "observability",        # LangSmith, Langfuse
+    "doc-processing",       # unstructured, PyPDF, text splitters
+    "deployment",           # Render, Vercel, Streamlit Cloud
+    "tunnelling",           # ngrok, localtunnel
+    "ide",                  # Cloud IDE, Cursor, Claude Code
+    "productivity",         # Google Docs/Sheets/Calendar, Notion
+    "messaging",            # Telegram, Slack, Gmail
+    "model-hub",            # Hugging Face, Kaggle
+    "source-control",       # GitHub
+)
 
 # Our own asset and delivery hosts. Never treated as curriculum dependencies.
 INTERNAL_HOSTS = (

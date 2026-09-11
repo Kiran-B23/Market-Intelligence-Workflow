@@ -56,8 +56,8 @@
 # never be covered ("Your Learning Journey", "Cloud IDE Walkthrough") are expected to
 # appear there; a subject cluster appearing there is a missing area.
 #
-# PSE has no workbook, so it contributes no sessions to the index at all and can never
-# receive a gap finding. That is a limit of the input, not of this file.
+# A course registered without a workbook contributes no sessions to the index at all
+# and can never receive a gap finding. That is a limit of the input, not of this file.
 # Add a source only after checking it parses. `python3 main.py gaps --dry-run` prints
 # the item list a source yields without writing anything.
 

@@ -204,7 +204,7 @@ def test_an_unknown_finding_is_a_404(wired):
 
 
 def test_a_finding_that_does_not_touch_the_course_says_so(wired):
-    d = api.finding_detail("f-1", course="pse")
+    d = api.finding_detail("f-1", course="ai_for_finance")
     assert d["projection"] == "not_in_course"
     assert d["locations_total"] == 0
 

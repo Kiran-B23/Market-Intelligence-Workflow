@@ -87,7 +87,7 @@ def test_per_course_blast_radii_sum_to_the_global_one():
 
 def test_a_course_that_does_not_reference_it_gets_nothing():
     dep = _dep()
-    assert project_finding(_finding(dep), dep, "PSE") is None
+    assert project_finding(_finding(dep), dep, "Some Other Course") is None
 
 
 # ------------------------------------------------------------- the prose
@@ -170,7 +170,7 @@ def test_a_projected_finding_says_where_else_it_reaches():
 
 
 def test_vendor_facts_survive_the_projection():
-    """A model Groq retired is retired in PSE too."""
+    """A model Groq retired is retired in every course too."""
     dep = _dep()
     f = _finding(dep)
     p = project_finding(f, dep, INTRO)
@@ -186,7 +186,7 @@ def test_project_all_selects_only_the_findings_that_touch_the_course():
     f = _finding(dep)
     by_id = {dep.dep_id: dep}
     assert len(project_all([f], by_id, INTRO)) == 1
-    assert project_all([f], by_id, "PSE") == []
+    assert project_all([f], by_id, "Some Other Course") == []
 
 
 def test_a_dependency_dropped_from_the_inventory_is_flagged_not_faked():

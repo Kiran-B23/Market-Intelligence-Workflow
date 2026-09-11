@@ -253,7 +253,7 @@ def deck_urls(outlines: dict, records_path: str | Path = "out/content_records.js
     `Session PPT` column is mostly the editor form (51 of 68), while the course export
     carries the published form. Same decks, different links. Taking the published one
     wherever either source has it is the difference between reading 17 sessions' decks
-    and reading 85 — including all 13 PSE sessions, which have no workbook at all.
+    and reading 85 — including the sessions of a course with no workbook at all.
     """
     out: dict = {}
     for course, outline in (outlines or {}).items():

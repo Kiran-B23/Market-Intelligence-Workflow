@@ -40,7 +40,8 @@ def test_compact_round_trips_through_the_parser():
 def test_scope_matches_on_locations_not_names():
     d = dep("Groq", [loc("Intro to Gen AI", 4), loc("AI for Finance", 11)])
     assert Scope(courses={"Intro to Gen AI"}).matches(d)
-    assert Scope(courses={"PSE"}).matches(d) is False
+    # A course this dependency does not appear in, which is the whole point of the test.
+    assert Scope(courses={"Some Other Course"}).matches(d) is False
     assert Scope(sessions={11}).matches(d)
     assert Scope(sessions={99}).matches(d) is False
 
@@ -48,18 +49,18 @@ def test_scope_matches_on_locations_not_names():
 def test_course_and_session_must_hold_in_the_same_location():
     """Session 4 of Gen AI must not match a dependency that is in Gen AI *and*
     separately in session 4 of a different course."""
-    d = dep("X", [loc("Intro to Gen AI", 20), loc("PSE", 4)])
+    d = dep("X", [loc("Intro to Gen AI", 20), loc("AI for Finance", 4)])
     assert Scope(courses={"Intro to Gen AI"}, sessions={4}).matches(d) is False
-    assert Scope(courses={"PSE"}, sessions={4}).matches(d)
+    assert Scope(courses={"AI for Finance"}, sessions={4}).matches(d)
 
 
 def test_session_without_course_spans_courses():
-    d = dep("X", [loc("PSE", 4)])
+    d = dep("X", [loc("AI for Finance", 4)])
     assert Scope(sessions={4}).matches(d)
 
 
 def test_tier_and_kind_filters_are_independent_of_location():
-    d = dep("X", [loc("PSE", 4)], tier="mention-only", kind="package")
+    d = dep("X", [loc("AI for Finance", 4)], tier="mention-only", kind="package")
     assert Scope(tiers={"critical"}).matches(d) is False
     assert Scope(tiers={"mention-only"}).matches(d)
     assert Scope(kinds={"service"}).matches(d) is False
@@ -67,13 +68,13 @@ def test_tier_and_kind_filters_are_independent_of_location():
 
 
 def test_empty_scope_selects_everything():
-    deps = [dep("a", [loc("PSE", 1)]), dep("b", [loc("PSE", 2)])]
+    deps = [dep("a", [loc("AI for Finance", 1)]), dep("b", [loc("AI for Finance", 2)])]
     s = Scope()
     assert s.is_everything and len(s.select(deps)) == 2
 
 
 def test_limit_caps_the_selection():
-    deps = [dep(str(i), [loc("PSE", i)]) for i in range(10)]
+    deps = [dep(str(i), [loc("AI for Finance", i)]) for i in range(10)]
     assert len(Scope(limit=3).select(deps)) == 3
 
 
@@ -87,6 +88,6 @@ def test_cli_args_round_trip():
 
 
 def test_course_map_lists_sessions_per_course():
-    deps = [dep("a", [loc("PSE", 3), loc("PSE", 1)]),
+    deps = [dep("a", [loc("AI for Finance", 3), loc("AI for Finance", 1)]),
             dep("b", [loc("Intro to Gen AI", 9)])]
-    assert course_map(deps) == {"Intro to Gen AI": [9], "PSE": [1, 3]}
+    assert course_map(deps) == {"Intro to Gen AI": [9], "AI for Finance": [1, 3]}

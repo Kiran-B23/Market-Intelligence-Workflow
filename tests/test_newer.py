@@ -321,3 +321,18 @@ def test_a_handful_of_new_rows_in_a_small_catalogue_still_reports(st):
                     "acme-2.0-flash": _entry("acme-2.0-flash")}, [taught])
     assert not rep.stats.distrusted
     assert [f.canonical_name for f in rep.findings] == ["acme-2.0-flash"]
+
+
+def test_a_deprecations_only_catalogue_is_labelled_not_seeded_as_empty(st):
+    """OpenAI publishes no live model list without JavaScript; its readable page is the
+    deprecations one, where every identifier-column row is retired by construction.
+
+    Seeding that as "0 entries" reads as a broken adapter. It is a perfectly good
+    retirement watch that simply cannot feed S12, and the run should say which.
+    """
+    dead = {f"old-{i}": _entry(f"old-{i}", status="shut down") for i in range(4)}
+    rep = _run(st, dead, [_dep("old-0")])
+    assert rep.findings == []
+    assert not rep.stats.seeded, "an all-retired catalogue is not a baseline"
+    assert rep.stats.retirement_only and "all retired" in rep.stats.retirement_only[0]
+    assert st.snapshot("catalogue:acme") is None, "nothing worth snapshotting"
