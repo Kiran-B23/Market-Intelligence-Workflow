@@ -1,7 +1,421 @@
-# PRD — Market Intelligence & Curriculum Gap Analyser (MIW), Phase 1
+# PRD — Market Intelligence & Curriculum Gap Analyser (MIW)
 
-Status: draft for review · Owner: gen-ai-content · Date: 2026-09-07 · Phase 1
-Target dir: `/home/nxtwave/MIW` (currently empty)
+Owner: gen-ai-content · Repo: `/home/nxtwave/MIW` · Branch: `feat/agent-workflow-and-ui`
+Current state as of 11 Sep 2026 · Build record from 7 Sep 2026
+
+This document has two parts. **Part I** is what the system is now: the use case it
+serves, how it is built, and what it actually produces, with every number measured off
+the artifacts on disk rather than asserted. **Part II** (§1–§34) is the chronological
+record of how it got there — the original plan, and every place reality differed from
+it. Part I is the one to read first, and the one to hand to someone new; Part II is
+where to look when you want to know *why* a rule is the way it is, because almost every
+rule in Part I exists because something specific went wrong.
+
+---
+
+# Part I — The system as built
+
+## A. The use case
+
+**Who it is for.** The NxtWave curriculum team, who own four Gen-AI courses carrying
+9,998 references to things they do not control. Three of the four have a workbook and
+contribute 71 indexed sessions; PSE does not, and the consequences of that are stated in
+§C.1 and §G rather than glossed.
+
+**The problem, stated once.** Courses teach through external dependencies — tools,
+hosted services, SDKs, model ids, docs pages, n8n nodes. Those dependencies change
+constantly. The curriculum does not. The founding incident: the Gen AI course taught
+`codetotutorial` as the way to read a GitHub repo, the tool died, DeepWiki already
+existed as a replacement, and nobody knew until students hit a dead link. Every part of
+that failure is structural rather than unlucky — detection was reactive, knowledge of
+what a session depends on was tribal, and nothing could answer "which sessions break if
+X dies?" without reading every session by hand.
+
+**The two questions.** They sound similar and they are different work, so the system,
+the digest and the UI all split on them:
+
+| | Question | Signals | What it means for the reader |
+|---|---|---|---|
+| **Fixes** | Is what we teach still *true*? | S1–S9 | Published material is now wrong. A student is hitting it today. |
+| **Changes** | Is what we teach still *complete*? | S10–S11 | Nothing is broken. A decision for the next curriculum cycle. |
+
+The second question is the one the architecture makes hard, and §32 is about why: the
+dependency inventory is extracted *from the course content*, so every stage that reads
+it is confined to what is already taught. Its answer to "is our prompting session
+complete?" is structurally always yes. That is why `gaps` exists as a stage that reads
+neither the inventory nor the probe.
+
+**The eleven signals.** Taken from `miw/analyse/score.py`; the last column is what is
+open on today's artifact, so a signal with no producer is visible as one rather than
+implied to work.
+
+| | Signal | Means | Default severity | Open now |
+|---|---|---|---|---|
+| **S1** | Dead / moved URL | regression → *Fix* | critical | 3 |
+| **S2** | Login- or paywall added | regression → *Fix* | high | — |
+| **S3** | Free tier cut or now paid | regression → *Fix* | high | — |
+| **S4** | Deprecated / abandoned | regression → *Fix* | high | — |
+| **S5** | Implementation or UX change | regression → *Fix* | medium | 3 |
+| **S6** | Package version drift | regression → *Fix* | medium | 6 |
+| **S7** | Model deprecated or superseded | regression → *Fix* | high | 5 |
+| **S8** | Docs rewritten | regression → *Fix* | low | 3 |
+| **S9** | n8n node / version update | regression → *Fix* | medium | 14 |
+| **S10** | Better alternative available | opportunity → *Change* | low | — |
+| **S11** | Curriculum topic gap | opportunity → *Change* | low | 5 |
+
+Four have no open finding today, for three different reasons, and the difference
+matters. **S4** is wired and has fired (one open on 9 Sep); nothing is deprecated this
+cycle. **S2** and **S3** depend on a vendor changing its access or pricing *wording*,
+which none has this cycle — these are the quietest signals by design, because a pricing
+page that merely lists prices is not a finding. **S10** has never produced a finding on
+any artifact, and §G says exactly why rather than leaving it to look like the same
+situation as the other three.
+
+**The scope boundary, which is not negotiable.** MIW **never writes to course content or
+the CMS**. It has no production access and is not asking for any. It identifies changes
+and proposes fixes; a human applies them. Every output is a finding with evidence
+attached, pointed at a named session.
+
+## B. What it produces
+
+For each finding, five things, and none of them optional:
+
+1. **What changed**, in the vendor's own words — a quoted sentence, never a paraphrase.
+2. **Where it is**, down to the course, the session number and the exact cell or field
+   the text lives in, with the surrounding excerpt resolved so a reviewer can read it
+   without opening the workbook.
+3. **What to do** — one sentence naming the session and the edit.
+4. **Why it matters** — the consequence, scoped to what the curriculum actually *does*
+   with the thing (a model id executed in a coding question is a live outage; the same
+   id named in a paragraph is not).
+5. **When**, as prose and as a sortable `due_by` date derived from severity by one
+   mapping, so the two cannot disagree.
+
+Measured on the current artifact — 39 open findings:
+
+```
+by kind      regression 34 · opportunity 5
+by signal    S1 3 · S5 3 · S6 6 · S7 5 · S8 3 · S9 14 · S11 5
+by severity  critical 8 · high 17 · medium 10 · low 3 · info 1
+evidence     17 carry an authoritative citation · 22 rest on our own probe observation
+notes        39/39 carry what_to_act, why_to_act, when_to_act and due_by
+```
+
+### B.1 The outcome, measured against the founding failure
+
+The founding incident was: a taught tool died, a replacement already existed, and nobody
+knew until a student hit the dead link. The honest test of this system is whether that
+exact shape is now caught before a student sees it. It is — three times over, on the
+current artifact:
+
+```
+CRITICAL  Composio      https://mcp.composio.dev/dashboard returns 404/410
+          Building LLM Applications + Intro to Gen AI, sessions 22, 24, 25, 26
+          6 linked places · candidate replacements: Nango, Qveris (both verified
+          against their own official domains)
+
+CRITICAL  Stability AI  https://api.stability.ai/v2beta/stable-image/... returns 404/410
+          Intro to Gen AI, sessions 2, 13, 15, 17 · 6 linked places
+          candidates: DigitalOcean, MindStudio
+```
+
+Dead tool, named sessions, a count of affected places, and verified alternatives — the
+codetotutorial/DeepWiki shape, caught by a scheduled run instead of a support ticket.
+Every element the original incident lacked is present, and every claim carries the URL
+it came from and the date it was fetched.
+
+**And the third one is a false positive**, which belongs here rather than in a footnote.
+The Ngrok finding fires on `https://abc123.ngrok.io` — a *placeholder* subdomain from a
+tutorial, not a link any student is meant to click. It is correctly reported as dead
+because it is dead; it is wrong as a curriculum finding because the URL was never real.
+That is a live precision bug in link extraction, not a rounding error, and one
+false CRITICAL in three is a rate that will cost the digest its authority if it is not
+fixed. It is listed in §G.
+
+Three delivery surfaces, one source of truth (`out/findings_<date>.json`):
+
+* **`out/digest_<date>.md`** plus one per course under `out/courses/<slug>/` — the
+  weekly read, split under `## Fixes` and `## Changes`.
+* **The local UI** (`python3 main.py serve`) — one page per course, Fixes and Changes as
+  separate lists with their own counts, a detail panel showing every occurrence grouped
+  by session, and inline accept/reject that feeds the next run.
+* **`registry/tools.yaml`** — the queryable dependency inventory that did not exist
+  before, which answers "which sessions break if X dies?" directly.
+
+## C. Architecture
+
+### C.1 Two inputs per course, and which half is load-bearing
+
+```
+  Course JSON export  ──►  what was PUBLISHED: units, questions, links, code
+  Course workbook     ──►  what was AUTHORED: the per-session deck outline,
+  (.xlsx)                  Key Takeaways, tool pins, and the authoritative
+                           session numbering
+```
+
+The export is downstream of the workbook, and the workbook is the only bridge back. Two
+consequences the system depends on:
+
+* **Session numbering comes from the workbook**, not from counting units. Inferring it
+  positionally counted `Common Mistakes` as a session and mis-numbered 81 of 104 units
+  in one course — and the integrity check passed, because its expected value had been
+  calibrated to the defect (§31). An integrity check's expected value must come from a
+  different source than the value it checks.
+* **The deck outlines exist nowhere else.** All 135 slide-outline records, covering 68
+  distinct `Session PPT` decks, come from the workbook's `Course Outline` sheet; **zero**
+  come from the JSON export. They are the only description of what a session covers, so
+  the entire gap-analysis half of the product is impossible without the workbook. PSE has
+  no workbook and therefore can never receive a gap finding — a limit of the input, not
+  of the code.
+
+### C.2 The pipeline
+
+```
+ ┌──────────── INSIDE-OUT: is what we teach still true? ─────────────┐
+ │                                                                   │
+ │  ingest ──► extract ──► probe ──► research ──► analyse ──┐        │
+ │    │           │          │          │           │       │        │
+ │  course     inventory   HTTP,      official     score,   │        │
+ │  JSON +     460 deps    registry,  pages,       diff,    │        │
+ │  workbook   9,998 refs  vendor     Tavily       triage   │        │
+ │                         catalogues                       │        │
+ └──────────────────────────────────────────────────────────┼────────┘
+                                                            ▼
+                                              out/findings_<date>.json ──► report
+                                                            ▲
+ ┌──────────── OUTSIDE-IN: is what we teach still complete? ┼────────┐
+ │                                                          │        │
+ │  workbook outlines ──► curriculum index (71 sessions) ──► gaps    │
+ │  registry/topics.yaml ─► official docs read as ──────────┘        │
+ │  (10 areas, 20 sources)  enumerations, corroborated               │
+ └───────────────────────────────────────────────────────────────────┘
+```
+
+Seven stages, each a CLI subcommand and each independently runnable:
+
+| Stage | Reads | Writes | Scoped by |
+|---|---|---|---|
+| `ingest` | course JSON + workbooks | `out/content_records.jsonl` | never — rebuilds everything |
+| `extract` | content records | `out/inventory.json`, `registry/tools.yaml` | never — same reason |
+| `probe` | inventory | `out/probe_<date>.json` | course, session, tier, kind, dep-id |
+| `research` | probe + inventory | `out/research_<date>.json` | same |
+| `analyse` | probe + research | `out/findings_<date>.json` | same |
+| `gaps` | workbooks + `registry/topics.yaml` | `out/gaps_<date>.json` + findings | course only |
+| `report` | findings | `out/digest_<date>.md` + per course | course only |
+
+`ingest` and `extract` are deliberately outside the scope system: they rebuild the whole
+inventory, and scoping them would silently shrink it and break every other course's
+findings. `report` and `gaps` accept only `--course`, because the other flags describe
+*dependencies* and those two stages are scoped in what they **write**, not what they
+read — sending `report` a flag it did not declare is what once made every UI-initiated
+run die at its last stage with exit 2 (§23).
+
+### C.3 The trust layer, which is the spine
+
+Ground truth is enforced **structurally, not by prompt**. There is exactly one way to
+create an assertion the system will act on:
+
+```python
+Claim.build(kind=…, statement=…, source_url=…, quote=…, subject=…)
+```
+
+It fetches nothing and believes nothing. It classifies the URL against the subject's
+declared authority set and refuses on an empty statement, a missing source, or a quote
+too short to verify. There is deliberately **no way to construct a Claim from model
+recall**. Four tiers:
+
+| Tier | What it is | What it may settle |
+|---|---|---|
+| `AUTHORITATIVE` | the vendor's own domain, or a canonical registry within its remit | anything |
+| `CORROBORATING` | independent but reputable (arXiv, MDN, major press) | non-strict kinds only |
+| `LEAD_ONLY` | directories, forums, any unrecognised host | may *nominate*, never prove |
+| `EXCLUDED` | known-bad | nothing |
+
+Five claim kinds are **strict** — `existence`, `deprecation`, `pricing`, `version`,
+`implementation` — and may rest on nothing below `AUTHORITATIVE`, because they are the
+ones that make us change published curriculum. Two rules fall out and are load-bearing
+everywhere:
+
+* **News may only nominate; the vendor's own pages must confirm.** Search discovery runs
+  unfiltered so a tool nobody has heard of can enter the picture, and every candidate is
+  then re-verified against its own official domains.
+* **A model may emit only a name, or a URL.** It never emits a fact. Our code fetches,
+  and `Claim.build` gates. A model's fit judgement is recorded as `opinion`, is never a
+  Claim, never enters the evidence block, and is never fed back into a later prompt.
+
+`python3 main.py verify` re-checks all of this **from outside**, against the artifacts on
+disk, re-classifying every citation rather than trusting the tier the artifact records —
+so a tightened trust rule retroactively invalidates old findings instead of leaving them
+standing. It is the check that catches the failures no test anticipates; it has caught
+three in the last week.
+
+### C.4 Two extractors, because vendors say things two ways
+
+* **Prose quoting** (`research/official.py`) — pulls the sentence that states a fact.
+* **Column-role table reading** (`probe/catalogue.py`) — vendors publish retirements as
+  *table rows*, and reading those as text is wrong in a specific way: on Groq's
+  deprecations page a single model id appears eight times, once in `Deprecated Model` and
+  seven times in `Recommended Replacement`. So the module never looks at a character
+  offset — it segments `<table>`→`<tr>`→`<td>`, binds each column to a role from its
+  header, and reads a status only from the row the id occupies. If no table can be
+  role-typed the answer is `supported=False`: an explicit "this vendor publishes no such
+  thing here", never a fallback to text search.
+* **Enumeration reading** (`probe/frontier.py`, added for `gaps`) — the same discipline
+  in a third shape: furniture removed by *element* (`<nav>`, `<footer>`, ARIA roles),
+  items bound to headings, code and sub-headings stripped from quotes, and
+  `supported=False` when nothing binds.
+
+That last rule is the one that keeps *we could not parse it* from becoming *it is gone*.
+
+### C.5 How `gaps` avoids manufacturing work
+
+Read on their own, four vendor documentation pages produced **32 findings**, most of them
+API mechanics rather than teachable topics — "Batch embeddings", "Migration from
+gemini-embedding-001". Two rules, both added after measuring the alternative, cut that to
+5:
+
+* **Corroboration.** A topic must be named by two sources whose `official_domains` are
+  **disjoint**, enforced structurally so two pages from the same vendor cannot
+  corroborate each other. What distinguishes an industry topic from one vendor's
+  implementation detail is that a competitor documents it too.
+* **Taught anywhere is not a gap**, checked against the workbook's own wording and across
+  every vendor's name for the topic — Google writes "Zero-shot vs few-shot prompts" where
+  the workbook writes "Prompting Techniques (Zero-shot, One-shot, Few-shot, CoT)".
+
+Placement is IDF-weighted term overlap over the 71-session corpus, weighted by how much
+a session is *about* the area — not an embedding, because the score has to be explainable
+in the finding ("matched on: prompt, chain-of-thought, thought") and a reviewer settling
+a placement in five seconds needs to see why. Below a floor it declines to name a session
+and lists the candidates instead; a confidently wrong session number is worse than an
+honest shrug.
+
+### C.6 The LLM, and why testing needs no API key
+
+The model is an **enhancement to deterministic prose, never a source of fact**. Every
+digest renders complete with no key and no model. When one is available it may rewrite
+the what/why/when triad, handed only facts already verified and forbidden from adding
+any — a rewrite that introduces a URL not already in the evidence is rejected whole.
+
+Provider order is `claude_code` → OpenRouter → none, chosen per run from the sidebar.
+The CLI runs in print mode with 16 tools denied, a daily call cap and a spend cap.
+`eval/parity.py` proves every provider receives identical prompt bytes, so "is the output
+the same with an API key" is answerable by measurement rather than assertion.
+
+### C.7 Agents, and where they are allowed to be
+
+Two LangGraph graphs (`miw/agents/`): a **signal agent** (plan → read → replan → done)
+that hunts for a vendor's own announcement across candidate pages, and an **impact
+agent** (classify → artifacts → score → review gate) that uses a real `interrupt()` so a
+human decision is part of the graph rather than bolted beside it.
+
+**LangGraph orchestrates; it never calls the model.** Every node goes through
+`miw/llm.py`, so provider choice, the denied-tool list, the daily caps and prompt parity
+all still apply. The graphs are opt-in (`main.py agent`) and sit *beside* the pipeline —
+the weekly run does not depend on them, because a deterministic stage that always works
+is worth more to this team than an agentic one that usually does.
+
+### C.8 The UI
+
+One self-contained HTML file, served by FastAPI, making **no external request of any
+kind** — the font is an embedded subsetted woff2, not a font host — so it works on a
+laptop with no network, which is often exactly when someone is reading last week's
+digest. A background job runner executes stages as subprocesses, streams their logs, and
+records what each run found so a run page shows findings rather than only a log.
+
+The page's labels are deliberately **not** the names in the code. `watch_tier`,
+`blast_radius`, `diff_class` and `S7` are precise, and they are also words nobody outside
+this repo has heard, so every one renders through a single `WORDS` map while the API, the
+CLI flags and every saved scope keep the internal names unchanged (§34). A label is safe
+to edit; a wire value is not.
+
+## D. What it deliberately does not do
+
+* **No writes to course content or the CMS.** No production access, none requested.
+* **No claim without a source.** A finding that cannot be evidenced is dropped and the
+  refusal is recorded, because "we looked and could not cite it" is a result and silence
+  is indistinguishable from never having looked.
+* **No temporal staleness signal (S12).** "This page has not changed in 18 months" is as
+  often a sign of stability as of abandonment; it was designed and deliberately not built
+  (§15).
+* **No bare version bumps as news.** 91 taught packages release constantly. What makes a
+  release curriculum-relevant is that it moved past what the course *pins*. State is
+  recorded either way; only news is reported.
+* **No self-marking.** Half of all triage decisions are held out of learning and used
+  only to score precision.
+
+## E. Measured state
+
+```
+Courses               4 declared · 3 with workbooks · 71 sessions indexed
+Inventory             460 dependencies · 9,998 references
+  by kind             tool 203 · package 91 · service 83 · model 42 · n8n node 41
+  authority           257 can be spoken for officially; 203 cannot, and are listed
+  watch tier          critical 194 · standard 58 · mention-only 208
+Findings              39 open · 34 fixes · 5 changes
+Gap analysis          10 areas · 20 official sources · 65/71 sessions inside an area
+                      95 items enumerated → 12 corroborated → 7 already taught → 5 raised
+Code                  ~15,000 lines of Python · 2,800-line single-file UI
+Gates                 546 tests · eval 4 suites at 100% (trust 13, extraction 10,
+                      findings 22, discovery 17) · `main.py verify` clean
+Cost of a run         probe / analyse / report / gaps: zero. research spends Tavily
+                      searches (~73 for a scoped Intro to Gen AI run). Note refinement
+                      is opt-in, capped at 120 calls and $2.00/day.
+```
+
+## F. Running it
+
+```bash
+pip install -r requirements.txt            # core: needs no API key at all
+python3 main.py ingest && python3 main.py extract
+python3 main.py probe --course "Intro to Gen AI"
+python3 main.py research && python3 main.py analyse
+python3 main.py gaps --dry-run             # see what it would raise; write nothing
+python3 main.py gaps && python3 main.py report
+python3 main.py verify                     # audit the trust invariants
+python3 main.py serve                      # the UI, http://127.0.0.1:8000
+python3 main.py run-weekly                 # all seven stages, unattended
+```
+
+## G. What is not covered yet, stated plainly
+
+* **A newly released model or tool does not become a Change.** A new model is not a
+  topic, so `gaps` will not see it; it is not a replacement for something broken, so S10
+  will not either. The mechanism exists — `probe/catalogue.py` already reads vendor model
+  tables as enumerations, which is the same shape `probe/frontier.py` reads documentation
+  headings in — so this is the `gaps` stage pointed at a model catalogue. Not built.
+* **S10 has never produced a finding.** Not because it is gated shut: six alternatives
+  are attached and all six verify. Discovery ran on dependencies that were already broken,
+  and when a dependency has an S1 or S4 its verified replacements attach to *that* finding
+  rather than raising a second one. The rotation path that would raise a standalone S10 on
+  a healthy dependency is wired and has not yet produced a verified candidate.
+* **n8n is a deliberate hole in gap analysis.** Nine Intro to Gen AI sessions build n8n
+  workflows, `docs.n8n.io` yields zero headings to a plain fetch, and no *independent*
+  vendor documents n8n's node set, so no area can corroborate it. n8n drift is caught
+  instead by `probe/n8n_upstream.py` reading n8n's own declared breaking changes — a
+  regression check, not a gap check.
+* **PSE gets no gap findings**, having no workbook.
+* **`inventory._links` attributes by domain only**, which overstates the n8n S4's blast
+  radius. Known, reported, not fixed.
+* **Placeholder URLs are extracted as real links.** `https://abc123.ngrok.io` is an
+  example subdomain in a tutorial; it produces a live CRITICAL finding. One false
+  CRITICAL in three is the single highest-value precision fix outstanding — a digest
+  that cries wolf once is read with suspicion afterwards. The fix is a structural one in
+  `extract/links.py` (an example-host pattern is not a dependency reference), not a
+  blocklist.
+* **The 68 `Session PPT` decks are never checked** — 0 dependencies carry a
+  `docs.google.com` URL, so a dead deck link is invisible.
+* **Two items from the approved UI plan are unbuilt**: the run-progress stage stepper
+  (`stage_now` is returned and unused) and the queue-depth guard (`queue.Queue()` is
+  unbounded and `queued_behind` only ever reports 0 or 1).
+
+---
+
+# Part II — The build record (§1–§34)
+
+What follows is chronological and unedited: §1–§12 are the original plan, written when
+the target directory was empty, and §13–§34 are what actually happened — including every
+place the plan was wrong. Where Part I states a rule, Part II is where the incident that
+produced it is written down.
 
 ---
 
