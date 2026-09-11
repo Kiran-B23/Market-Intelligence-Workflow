@@ -375,6 +375,117 @@ Neither is needed to test the system. `python3 main.py verify` and
 `python3 eval/run_eval.py` are both fully offline and keyless, and are the fastest way
 to confirm a fresh clone is sound.
 
+## Setting up OpenRouter as the LLM provider
+
+OpenRouter is the third provider, behind the Claude CLI and the Anthropic API. Use it
+when you want one key to reach many models, or when the `claude` CLI is not available on
+the machine.
+
+### 1. Install the client and set the key
+
+```bash
+pip install -r requirements-optional.txt      # brings openai>=2.0, which this path uses
+```
+
+```bash
+# .env
+OPENROUTER_API_KEY=sk-or-v1-...
+LLM_BASE_URL=https://openrouter.ai/api/v1     # already the default
+LLM_MODEL=anthropic/claude-haiku-4-5          # OpenRouter-style id, vendor-prefixed
+```
+
+### 2. Select it explicitly — `auto` will not choose it
+
+```bash
+MIW_LLM_PROVIDER=openrouter python3 -c \
+  "from miw.llm import provider_status; print(provider_status())"
+```
+
+`auto` tries **`claude_code` → `anthropic` → `openrouter`** and stops at the first one
+available, so with the `claude` CLI on `PATH` OpenRouter is never reached. That order is
+deliberate: a key exported for some other tool must not silently start charging. Set the
+variable per command, or put `MIW_LLM_PROVIDER=openrouter` in `.env` to make it the
+default.
+
+### 3. Run something that uses it
+
+```bash
+MIW_LLM_PROVIDER=openrouter python3 main.py analyse --course "Intro to Gen AI" --refine
+MIW_LLM_PROVIDER=openrouter python3 main.py agent --dep "gemini-2.0-flash"
+```
+
+Every digest records the provider and model that produced its prose, so a run is always
+attributable.
+
+### Read this before you spend anything
+
+**The `$2.00` daily spend cap only works for models MIW knows the price of.**
+`PRICE_USD_PER_MTOK` in `miw/llm.py` covers exactly three:
+
+| Model | Priced |
+|---|---|
+| `anthropic/claude-haiku-4-5` | yes |
+| `anthropic/claude-sonnet-5` | yes |
+| `anthropic/claude-opus-5` | yes |
+| anything else (`google/…`, `openai/…`, `meta-llama/…`) | **no** |
+
+For an unpriced model the call is recorded at `$0.00` with
+`cost_basis: "unpriced"`, it prints
+
+```
+WARNING: no price known for 'google/gemini-2.5-flash'; the spend cap is
+acting as a call cap for this model
+```
+
+and the run continues. Your only remaining guard is `LLM_MAX_CALLS` (120/day). So if you
+point this at a model outside that table, **set a call budget you are happy to pay for**
+and treat the dollar cap as absent:
+
+```bash
+LLM_MAX_CALLS=25 MIW_LLM_PROVIDER=openrouter python3 main.py agent --limit 5
+```
+
+Adding a model to `PRICE_USD_PER_MTOK` is a two-line change and makes the dollar cap real
+again. The prices are not guessed at on purpose — a wrong number is worse than a
+declared absence.
+
+### Two knobs that interact
+
+`MIW_LLM_MODEL` takes a *logical* name (`haiku` / `sonnet` / `opus`) and is translated per
+provider. `LLM_MODEL` is an **OpenRouter-only override that wins over it**:
+
+```bash
+# LLM_MODEL is still anthropic/claude-haiku-4-5, so this does NOT get you Sonnet
+MIW_LLM_MODEL=sonnet MIW_LLM_PROVIDER=openrouter python3 main.py analyse --refine
+
+# Change the OpenRouter id itself
+LLM_MODEL=anthropic/claude-sonnet-5 MIW_LLM_PROVIDER=openrouter python3 main.py analyse --refine
+```
+
+Clear `LLM_MODEL` if you would rather drive everything with the logical names.
+
+### What is the same, and what differs
+
+Same across all three providers, and asserted by `eval/parity.py`: the prompt bytes, so
+switching provider cannot change a finding; `temperature=0`; and the fact that the model
+is handed **no tools at all**.
+
+Different, and recorded on every result so the two are never confused:
+
+| | Claude CLI | OpenRouter / Anthropic API |
+|---|---|---|
+| `isolation` | `denylist:16` — 16 ambient tools denied by name | `no-tools` — no tools array is sent |
+| Output limit | the CLI has no equivalent knob | `max_tokens=1500` (`LLM_MAX_OUTPUT_TOKENS`) |
+| Cost | not metered | `cost_basis` is `estimated` or `unpriced` |
+
+Two more things worth knowing while testing:
+
+* **Replies are cached** in `state/llm_cache/`, keyed by provider, model and prompt — so
+  re-running the same stage costs nothing. Delete the directory to force real calls.
+* **A typo in `MIW_LLM_PROVIDER` fails loudly** and uses no LLM at all. It used to fall
+  through to OpenRouter, which meant a misspelling silently changed backend and started
+  charging.
+
 ## The LLM, and why testing needs no API key
 
 The evidence path is deterministic, so the model is never load-bearing. `miw/llm.py`
