@@ -616,7 +616,8 @@ def cmd_gaps(args) -> int:
     re-classify each citation without trusting the tier the artifact records - the same
     arrangement the probe artifact provides for provider widening.
     """
-    from miw.analyse.curriculum import CurriculumIndex, session_bodies
+    from miw.analyse.curriculum import (CurriculumIndex, deck_bodies, merge_bodies,
+                                        session_bodies)
     from miw.analyse.gaps import area_coverage, find_gaps, load_areas
     from miw.analyse.score import fingerprint_of
     from miw.artifacts import merge_by_dep
@@ -633,7 +634,8 @@ def cmd_gaps(args) -> int:
         return 2
     # Everything the sessions actually contain, not just the workbook's summary of
     # them. The coverage check used to see 0.4% of the curriculum text already on disk.
-    bodies = session_bodies()
+    decks = deck_bodies()
+    bodies = merge_bodies(session_bodies(), decks)
     index = CurriculumIndex.from_outlines(outlines, bodies)
     areas = load_areas(getattr(args, "topics", None) or "registry/topics.yaml")
     summary_chars = sum(len(d.outline) + len(d.key_takeaways) + len(d.session_name)
@@ -642,9 +644,15 @@ def cmd_gaps(args) -> int:
     with_body = sum(1 for d in index.docs if d.body)
     print(f"  {len(index.docs)} session(s) indexed from {len(outlines)} workbook(s); "
           f"{len(areas)} curriculum area(s) declared")
+    deck_chars = sum(len(t) for (c, n), t in decks.items()
+                     if any(d.course == c and d.session_no == n for d in index.docs))
     print(f"  coverage reads {summary_chars + body_chars:,} char(s): "
-          f"{summary_chars:,} of deck summary + {body_chars:,} of session content "
+          f"{summary_chars:,} of deck summary + {body_chars - deck_chars:,} of course "
+          f"content + {deck_chars:,} of slide text "
           f"({with_body}/{len(index.docs)} session(s) have content)")
+    if not decks:
+        print("  NOTE: no deck artifact found — run `python3 main.py decks` so the "
+              "coverage check can see what the slides actually say")
     if not areas:
         print("  registry/topics.yaml declares no area with a source; nothing to do")
         return 0
@@ -758,6 +766,63 @@ def cmd_gaps(args) -> int:
           f"decisions)")
     print(f"  -> {side}")
     print(f"  -> {findings_path}")
+    return 0
+
+
+def cmd_decks(args) -> int:
+    """Read the session decks: their text, and whether they are still reachable.
+
+    Its own command rather than a step inside `gaps`, because the cost profile is
+    completely different - 85 fetches of 0.6-14MB against a host that throttles, on a
+    curriculum's revision cadence rather than a news cycle. `gaps` reads the artifact
+    this writes and never fetches a deck itself, so the weekly run stays fast and works
+    offline.
+
+    Health comes free: we had to open the deck to read it, so a 404, or a deck that is
+    no longer published to us, is observed on the way past rather than needing a second
+    pass over the same 85 URLs.
+    """
+    from miw.ingest import decks as deckmod
+    from miw.schema import dump, utcnow
+
+    outlines, problems = _outlines_by_course()
+    for pr in problems:
+        print(f"  WARNING: {pr}")
+    urls = deckmod.deck_urls(outlines)
+    scope = _scope_from(args, default_tiers=())
+    if scope.courses:
+        urls = {k: v for k, v in urls.items() if k[0] in scope.courses}
+        print(f"  scope: {', '.join(sorted(scope.courses))}")
+    if not urls:
+        print("  no session carries a deck URL; nothing to do")
+        return 0
+
+    ttl = 0 if getattr(args, "refresh", False) else deckmod.CACHE_TTL_S
+    print(f"  {len(urls)} session(s) with a deck URL")
+    rows = []
+    counts = {"supported": 0, "restricted": 0, "gone": 0, "unreachable": 0}
+    for i, ((course, session), url) in enumerate(sorted(urls.items()), 1):
+        deck = deckmod.read_deck(url, ttl=ttl)
+        state = ("ok" if deck.supported else "gone" if deck.gone
+                 else "restricted" if deck.restricted else "unreachable")
+        counts["supported" if state == "ok" else state] += 1
+        rows.append({"course": course, "session_no": session, "url": url,
+                     "status": deck.status, "supported": deck.supported,
+                     "gone": deck.gone, "restricted": deck.restricted,
+                     "reason": deck.reason, "slides": len(deck.slides),
+                     "chars": len(deck.text), "text": deck.text,
+                     "fetched_at": deck.fetched_at, "from_cache": deck.from_cache})
+        if state != "ok" or getattr(args, "verbose", False):
+            print(f"  [{i:3}/{len(urls)}] {state:11} {course[:22]:24} s{session:<3} "
+                  f"{deck.reason[:52]}")
+
+    total = sum(r["chars"] for r in rows)
+    print(f"  {counts['supported']} read ({total:,} chars of slide text), "
+          f"{counts['restricted']} not published to us, {counts['gone']} gone, "
+          f"{counts['unreachable']} unreachable")
+    out = OUT / f"decks_{_today()}.json"
+    dump(out, {"generated_at": utcnow(), "counts": counts, "decks": rows})
+    print(f"  -> {out}")
     return 0
 
 
@@ -1414,6 +1479,12 @@ def build_parser() -> argparse.ArgumentParser:
     an.add_argument("--refine", action="store_true",
                     help="rewrite action notes with the LLM (Claude Code CLI by "
                          "default; no API key needed)")
+    dk = sub.add_parser("decks", help="read session decks: slide text and reachability")
+    _add_scope_args(dk)
+    dk.add_argument("--refresh", action="store_true",
+                    help="ignore the cache and re-fetch every deck")
+    dk.add_argument("--verbose", action="store_true",
+                    help="show every deck, not only the ones we could not read")
     gp = sub.add_parser("gaps", help="topics the curriculum does not teach yet (S11)")
     _add_scope_args(gp)
     gp.add_argument("--topics", default="registry/topics.yaml",
@@ -1477,7 +1548,7 @@ def main() -> int:
             "verify": cmd_verify, "triage": cmd_triage, "serve": cmd_serve,
             "watch": cmd_watch, "resolve-packages": cmd_resolve_packages,
             "run-weekly": cmd_run_weekly, "agent": cmd_agent,
-            "gaps": cmd_gaps}[args.cmd](args)
+            "gaps": cmd_gaps, "decks": cmd_decks}[args.cmd](args)
 
 
 if __name__ == "__main__":

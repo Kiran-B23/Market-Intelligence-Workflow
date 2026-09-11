@@ -45,12 +45,15 @@ DB = ROOT / "state" / "jobs.db"
 # not consult the dependency inventory at all - it reads the workbooks and official
 # documentation directly, which is what lets it notice a topic the courses never
 # mention (see `miw/analyse/gaps.py`).
-STAGES = ("ingest", "extract", "probe", "research", "analyse", "gaps", "report")
+# `decks` sits after `extract` because `gaps` reads the artifact it writes. It is NOT in
+# `run-weekly`: 85 fetches of 0.6-14MB against a throttling host is a curriculum-revision
+# cadence, not a weekly one, and the 7-day cache means a re-run is nearly free anyway.
+STAGES = ("ingest", "extract", "decks", "probe", "research", "analyse", "gaps", "report")
 # Which stages accept scope flags. `ingest`/`extract` rebuild the whole inventory:
 # scoping them would silently shrink it and break every other course's findings.
 # `report` is scoped only in what it WRITES - it always reads the whole merged findings
 # artifact and always re-renders the roll-up, then writes the named course's digest.
-SCOPED = {"probe", "research", "analyse", "gaps", "report"}
+SCOPED = {"probe", "research", "analyse", "gaps", "decks", "report"}
 
 # Which scope flags each stage's argparse actually declares. `report` takes ONLY
 # `--course` (main.py applies `_add_scope_args` to probe/research/analyse/run-weekly,
@@ -65,7 +68,7 @@ SCOPED = {"probe", "research", "analyse", "gaps", "report"}
 # `gaps` is course-scoped in the same narrow sense: tier, kind and dep-id describe
 # dependencies, and a topic gap is about a SESSION, so those flags would parse and then
 # silently do nothing.
-COURSE_ONLY = {"report", "gaps"}
+COURSE_ONLY = {"report", "gaps", "decks"}
 
 
 def _stage_args(stage: str, sc) -> list:

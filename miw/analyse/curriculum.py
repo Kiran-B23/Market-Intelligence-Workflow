@@ -181,6 +181,48 @@ def session_bodies(path: str | Path = "out/content_records.jsonl",
     return out
 
 
+def deck_bodies(path: str | Path | None = None) -> dict:
+    """Slide text per session, `{(course, session_no): text}`, from `main.py decks`.
+
+    Read from the artifact rather than fetched here: 85 decks are 0.6-14MB each against
+    a host that throttles, which is a refresh cadence, not something `gaps` should do.
+    Missing artifact means no slide text and nothing else - the index still builds.
+
+    Only decks that actually parsed contribute. A deck we were served a sign-in shell
+    for carries ~108 characters of boilerplate identical across every such session, and
+    stamping that into the coverage index would be worse than having no deck text: it
+    would make 51 sessions look like they all teach the same thing.
+    """
+    out: dict = {}
+    if path is None:
+        found = sorted(Path("out").glob("decks_*.json")) if Path("out").exists() else []
+        if not found:
+            return out
+        path = found[-1]
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError):
+        return out
+    for row in data.get("decks") or []:
+        if not row.get("supported"):
+            continue
+        text = (row.get("text") or "").strip()
+        if text and row.get("session_no"):
+            out[(row.get("course") or "", int(row["session_no"]))] = text
+    return out
+
+
+def merge_bodies(*sources: dict) -> dict:
+    """Join several `{(course, session): text}` maps into one."""
+    out: dict = {}
+    for src in sources:
+        for key, text in (src or {}).items():
+            if not text:
+                continue
+            out[key] = f"{out[key]}\n{text}" if key in out else text
+    return out
+
+
 @dataclass
 class SessionDoc:
     """One session: the deck's summary, plus everything the session actually contains."""
@@ -320,13 +362,27 @@ class CurriculumIndex:
             d.taught |= {normalise(t) for t in d.tokens}
             d.taught |= {normalise(t) for t in d.windows}
             d.taught.discard("")
-        # Document frequency over the session corpus. A term appearing in 60 of 71
-        # sessions ("model", "ai") must not decide placement; one appearing in two
-        # ("diffusion", "chain") should.
+        # Two document frequencies, over two different corpora, because they answer
+        # two different questions.
+        #
+        # `df` counts the SUMMARIES and feeds `idf`, which weights placement — and
+        # placement scores against summaries, so its notion of "common" has to be the
+        # summaries' own.
+        #
+        # `body_df` counts everything, and feeds `topic_terms`, which decides which
+        # words of a topic name are distinctive enough to demand. Getting that from the
+        # summaries was a real defect: "support" occurs in almost none of 39,144
+        # characters of outline, so it counted as distinctive, and coverage then
+        # required it to appear beside "json" and "schema" in a body of 8.2M characters
+        # where it is everywhere and means nothing. Distinctiveness has to be measured
+        # against the corpus you are matching in.
         self.df: dict[str, int] = {}
+        self.body_df: dict[str, int] = {}
         for d in self.docs:
             for t in set(d.tokens):
                 self.df[t] = self.df.get(t, 0) + 1
+            for t in set(d.tokens) | set(d.windows):
+                self.body_df[t] = self.body_df.get(t, 0) + 1
         self.n = max(1, len(self.docs))
 
     # ------------------------------------------------------------------ build
@@ -408,6 +464,20 @@ class CurriculumIndex:
         Terms appearing in more than half the corpus are dropped: "prompt" is in most
         sessions of this curriculum, so requiring it proves nothing, while "affordance"
         or "component" decides the question on its own.
+
+        Measured over the SUMMARIES (`df`), not over everything. Switching it to the
+        full corpus was tried and reverted: across 8.2M characters almost every ordinary
+        word appears in more than half the sessions, so nearly every term was dropped as
+        common, topics were left with no distinctive terms at all, and `teaches` — which
+        returns False on an empty term list — stopped recognising coverage it had been
+        getting right. The summaries are a vocabulary of what sessions are *about*,
+        which is the right place to ask whether a word discriminates.
+
+        The known cost is a generic word in a topic name ("JSON schema **support**")
+        counting as distinctive and blocking an otherwise sound match. That surfaces as
+        an `info` finding with both citations attached, which a reviewer rejects in one
+        click — and that rejection is recorded and learned from. A silent false negative
+        would not be.
         """
         return [t for t in dict.fromkeys(_tokens(name))
                 if self.df.get(t, 0) <= self.n / 2]

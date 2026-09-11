@@ -764,3 +764,25 @@ def test_verify_judges_an_alternatives_claim_by_the_alternatives_authority():
                          capture_output=True, text=True, timeout=300)
     assert "INVARIANT VIOLATION" not in out.stdout, out.stdout[-1500:]
     assert out.returncode == 0
+
+
+def test_one_topic_is_never_reported_twice_under_the_same_name():
+    """Member-set keying alone does not dedupe.
+
+    When one heading corroborates two headings on the other page, the cluster found from
+    its side has three members and the ones found from the others' have two — different
+    key sets, same topic, shipped more than once. Four identical rows is indefensible
+    output whatever the internal reason, so the widest cluster per name wins.
+    """
+    from miw.probe.frontier import FrontierItem
+    g, m = _sources()
+    ctx = "A way of getting structured output back from a model, described at length."
+    a = [FrontierItem(name="Structured outputs with tools", context=ctx, source_url=GOOGLE)]
+    b = [FrontierItem(name="Structured outputs with tools", context=ctx, source_url=MSFT),
+         FrontierItem(name="Structured output with tools", context=ctx, source_url=MSFT),
+         FrontierItem(name="Structured outputs for tools", context=ctx, source_url=MSFT)]
+    clusters = corroborate([(g, a), (m, b)])
+    names = [c.name for c in clusters]
+    assert len(names) == len(set(normalise(n) for n in names)), names
+    # And the survivor is the widest one, because more members is more corroboration.
+    assert max(len(c.members) for c in clusters) == len(clusters[0].members)

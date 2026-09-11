@@ -347,7 +347,20 @@ def corroborate(readings: list) -> list:
             # so the second discovery updates rather than duplicates - without this an
             # area with two sources reported every corroborated topic twice.
             clusters.setdefault(cluster.key_set(), cluster)
-    return list(clusters.values())
+
+    # Member-set keying is not enough on its own. When one heading corroborates two on
+    # the other page, the cluster found from its side has three members and the ones
+    # found from the others' have two, so the key sets differ and the same topic ships
+    # more than once under the same name. Four identical "Structured outputs with tools"
+    # rows is indefensible output whatever the internal reason. Keep the widest cluster
+    # per name - most members means most corroboration - and drop the rest.
+    best: dict = {}
+    for c in clusters.values():
+        key = normalise(c.name)
+        prev = best.get(key)
+        if prev is None or len(c.members) > len(prev.members):
+            best[key] = c
+    return list(best.values())
 
 
 # ------------------------------------------------------------------------- the analyser

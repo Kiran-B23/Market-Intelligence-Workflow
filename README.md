@@ -107,6 +107,7 @@ python3 main.py probe --course "Intro to Gen AI" --session 4-6 --tiers critical
 python3 main.py research     # flagged deps -> out/research_<date>.json
 python3 main.py research --nominate   # ...and ask a model for replacement candidates
 python3 main.py analyse      # everything   -> out/findings_<date>.json
+python3 main.py decks        # read the 85 session decks: slide text + reachability
 python3 main.py gaps         # workbooks + official docs -> topics we do not teach yet
 python3 main.py gaps --dry-run   # print what it would raise; write nothing
 python3 main.py report       # findings     -> out/digest_<date>.md + out/courses/<slug>/

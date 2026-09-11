@@ -422,6 +422,66 @@ indexes in under five seconds, and `curriculum.py` uses IDF term overlap rather 
 embeddings *because the score has to be explainable in the finding* — a reviewer settling
 a placement needs "matched on: prompt, chain-of-thought", not a cosine distance.
 
+### B.2a The decks, read at last
+
+§31 established the deck as the authoring source — everything else is downstream of it —
+and it was the least observed input in the system: the workbook records a `Session PPT`
+URL per session and nothing ever opened it. A deck deleted, unshared or emptied was
+invisible until someone opened it by hand. The founding codetotutorial failure, pointed
+inward.
+
+It turned out to cost almost nothing. The decks are **published to web**, so an
+anonymous fetch works and no Drive API or credential is involved, and the parse was
+already written: `extract_deck.py` in the sibling project reads exactly this markup, and
+PRD §5 listed it as reusable prior art and then never reused it. It is vendored into
+`miw/ingest/decks.py` the way `ingest/portal.py` vendored `build_course_sheet.py`.
+
+**The load-bearing rule is the refusal.** Google answers a request for a deck you may not
+open with **HTTP 200** and a sign-in shell. Measured on the workbook's own URLs: 17 are
+published and yield 2,700–11,500 characters each; **51 return 200 with an identical
+108-character shell**. Treating those as content would stamp the same boilerplate onto 51
+sessions of the coverage index — worse than no deck text, because it would make them all
+look alike. The discriminator is structural, not a keyword search for "Sign in": a
+published deck embeds its slide model as `[objectId, index, title]` triples and a gated
+one embeds none — 17–53 versus exactly 0. Same shape as "did a table role-type".
+
+**Which link to use turned out to matter more than the parsing.** Two inputs carry deck
+links for the same decks and they disagree: the workbook's `Session PPT` column is mostly
+the editor form (51 of 68), while the course export carries the published form.
+Preferring the published one wherever either source has it took readable decks from 17 to
+**85 — including all 13 PSE sessions, which have no workbook at all** and therefore get
+no curriculum text from any other route.
+
+```
+85 deck URLs · 85 read · 0 gone · 0 restricted · 0 unreachable
+833,316 chars of slide text
+  Building LLM Applications 261,217 · AI for Finance 245,896
+  Intro to Gen AI           173,413 · PSE            152,790
+```
+
+`main.py decks` is its own command, not a step inside `gaps`: 85 fetches of 0.6–14MB
+against a throttling host is a curriculum-revision cadence, not a weekly one. It writes
+`out/decks_<date>.json`, caches the *extracted slides* rather than the HTML (14MB of
+markup becomes ~8KB of text), and `gaps` reads the artifact and never fetches a deck
+itself — so the weekly run stays fast and works offline. Health comes free: we had to
+open the deck to read it, so a 404 or a lost share is observed on the way past.
+
+Coverage after decks: **8,232,739 characters** — 39,144 of deck summary, 7,520,131 of
+course content, 673,464 of slide text. The three surviving gap findings survive this too;
+checked directly against the slide corpus, "parallel function" and "compositional
+function" appear nowhere in 833,316 characters of slides.
+
+Two things were tried here and reverted, both recorded because the measurement is the
+useful part. Measuring term distinctiveness over the **full** corpus instead of the
+summaries looked more principled and was worse: across 8.2M characters almost every
+ordinary word appears in more than half the sessions, so topics were left with no
+distinctive terms and `teaches` — which returns False on an empty list — stopped
+recognising coverage it had been getting right. And the same run exposed a latent
+duplicate: when one heading corroborates two on the other page, the cluster found from
+its side has three members and the ones found from the others' have two, so member-set
+keying let the same topic ship four times under one name. Deduping by name, widest
+cluster winning, closes it.
+
 ### B.3 The auditor was rebuilding the wrong subject
 
 Surfaced by the first S10 findings reaching an artifact. A finding carries claims about
