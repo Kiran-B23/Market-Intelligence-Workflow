@@ -223,8 +223,32 @@ def test_the_shell_is_a_sidebar_plus_a_content_column():
 
 
 def test_the_primary_run_action_lives_in_the_content_header_and_names_the_course():
+    """Naming the course on the button is the guard against starting a run for someone
+    else's course from a page that looks like yours."""
     assert 'id="hrun"' in PAGE
-    assert "Run audit · ${COURSE_TITLE" in PAGE, "the button says which course"
+    assert "Start check · ${COURSE_TITLE" in PAGE, "the button says which course"
+    # The old label must be gone from everything RENDERED. It still appears in two
+    # comments that record why it changed, and deleting those would throw away the
+    # reason — so this asserts on the markup and the template, not the whole file.
+    assert ">Run audit<" not in PAGE, "the button's default label is stale"
+    assert "`Run audit" not in PAGE, "a template still builds the old label"
+
+
+def test_every_page_says_what_it_is_for():
+    """A title alone assumes the reader already knows why they are on the page."""
+    assert "const PAGE_DESC = {" in PAGE
+    for scope in ("overview:", "watch:", "add:", "'global:run'", "'global:runs'"):
+        assert scope in PAGE, scope
+
+
+def test_the_sidebar_has_an_icon_per_entry_and_fetches_none_of_them():
+    """Icons are what make a sidebar scannable rather than a list of similar words — and
+    they have to be inline, because the page may make no external request."""
+    assert "const VIEW_ICON = {" in PAGE
+    assert 'class="ic" viewBox="0 0 24 24"' in PAGE
+    for sym in ("i-fix", "i-change", "i-inventory", "i-run", "i-history", "i-report",
+                "i-home", "i-vendor", "i-trust", "i-course", "i-add", "i-mark"):
+        assert f'id="{sym}"' in PAGE, f"sprite is missing {sym}"
 
 
 def test_the_sidebar_collapses_on_a_narrow_screen():

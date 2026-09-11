@@ -2,67 +2,59 @@
 # These are NOT in the inventory and are not monitored. Promote a real tool by
 # adding it to registry/tools.yaml with its official_domains; leave lesson
 # topics alone. Unreviewed guesses are deliberately kept out of the inventory.
-# 2109 candidates.
+# 1832 candidates.
 
 candidates:
-- name: UNDERSTAND
-  occurrences: 122
-  courses:
-  - AI for Finance
-  - Building LLM Applications
-  - Intro to Gen AI
-  - PSE
-- name: REMEMBER
-  occurrences: 115
-  courses:
-  - AI for Finance
-  - Building LLM Applications
-  - Intro to Gen AI
-  - PSE
 - name: UNDERSTANDING
-  occurrences: 86
+  occurrences: 85
   courses:
   - AI for Finance
   - Building LLM Applications
   - Intro to Gen AI
-  - PSE
+- name: UNDERSTAND
+  occurrences: 82
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: REMEMBER
+  occurrences: 75
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
 - name: APPLY
-  occurrences: 57
+  occurrences: 51
   courses:
   - AI for Finance
   - Building LLM Applications
   - Intro to Gen AI
-  - PSE
-- name: ANALYZE
-  occurrences: 45
-  courses:
-  - AI for Finance
-  - Building LLM Applications
-  - Intro to Gen AI
-  - PSE
 - name: APPLICATION
   occurrences: 42
   courses:
   - AI for Finance
   - Intro to Gen AI
+- name: ANALYZE
+  occurrences: 35
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
 - name: Icebreaker Question
-  occurrences: 24
+  occurrences: 23
   courses:
   - AI for Finance
   - Intro to Gen AI
-  - PSE
 - name: Learner Engagement
-  occurrences: 24
+  occurrences: 23
   courses:
   - AI for Finance
   - Intro to Gen AI
-  - PSE
 - name: Session Warm-up
-  occurrences: 24
+  occurrences: 23
   courses:
   - AI for Finance
   - Intro to Gen AI
-  - PSE
 - name: ANALYZING
   occurrences: 20
   courses:
@@ -111,11 +103,6 @@ candidates:
   courses:
   - Building LLM Applications
   - Intro to Gen AI
-- name: Coding Agents
-  occurrences: 7
-  courses:
-  - AI for Finance
-  - PSE
 - name: Definition
   occurrences: 6
   courses:
@@ -127,10 +114,6 @@ candidates:
   - AI for Finance
   - Building LLM Applications
   - Intro to Gen AI
-- name: Building College Help Desk Agent
-  occurrences: 6
-  courses:
-  - PSE
 - name: Open Source Models
   occurrences: 5
   courses:
@@ -218,11 +201,6 @@ candidates:
   courses:
   - AI for Finance
   - Building LLM Applications
-- name: RAG Indexing
-  occurrences: 4
-  courses:
-  - Building LLM Applications
-  - PSE
 - name: Agent Creation
   occurrences: 4
   courses:
@@ -236,28 +214,10 @@ candidates:
   courses:
   - AI for Finance
   - Building LLM Applications
-- name: Running Models Locally
-  occurrences: 4
-  courses:
-  - Building LLM Applications
-  - PSE
-- name: Autonomous Agents
-  occurrences: 4
-  courses:
-  - AI for Finance
-  - PSE
 - name: Setting Up LangSmith
   occurrences: 4
   courses:
   - AI for Finance
-- name: SDLC Phases
-  occurrences: 4
-  courses:
-  - PSE
-- name: Software Development Models
-  occurrences: 4
-  courses:
-  - PSE
 - name: Open vs Closed Source Models
   occurrences: 3
   courses:
@@ -414,11 +374,6 @@ candidates:
   occurrences: 3
   courses:
   - Building LLM Applications
-- name: Ollama Commands
-  occurrences: 3
-  courses:
-  - Building LLM Applications
-  - PSE
 - name: Introduction to AI in Finance
   occurrences: 3
   courses:
@@ -443,11 +398,6 @@ candidates:
   occurrences: 3
   courses:
   - AI for Finance
-- name: IDE-Native Agents
-  occurrences: 3
-  courses:
-  - AI for Finance
-  - PSE
 - name: Finance Productivity Tools
   occurrences: 3
   courses:
@@ -500,66 +450,6 @@ candidates:
   occurrences: 3
   courses:
   - AI for Finance
-- name: Development
-  occurrences: 3
-  courses:
-  - PSE
-- name: Waterfall Model
-  occurrences: 3
-  courses:
-  - PSE
-- name: Agile Frameworks
-  occurrences: 3
-  courses:
-  - PSE
-- name: Agile Model
-  occurrences: 3
-  courses:
-  - PSE
-- name: Kanban
-  occurrences: 3
-  courses:
-  - PSE
-- name: Scrum
-  occurrences: 3
-  courses:
-  - PSE
-- name: V-Model
-  occurrences: 3
-  courses:
-  - PSE
-- name: Building College Help Desk Agent Part 3
-  occurrences: 3
-  courses:
-  - PSE
-- name: Integrating Ollama Models with AI Coding Agents
-  occurrences: 3
-  courses:
-  - PSE
-- name: Testing a Real-World Project
-  occurrences: 3
-  courses:
-  - PSE
-- name: Traditional Testing
-  occurrences: 3
-  courses:
-  - PSE
-- name: Deploying a Frontend Application
-  occurrences: 3
-  courses:
-  - PSE
-- name: Deploying a Backend Application
-  occurrences: 3
-  courses:
-  - PSE
-- name: Setting up CI/CD
-  occurrences: 3
-  courses:
-  - PSE
-- name: Fullstack App Development using Lovable
-  occurrences: 3
-  courses:
-  - PSE
 - name: Closed Source Models
   occurrences: 2
   courses:
@@ -1028,16 +918,15 @@ candidates:
   occurrences: 2
   courses:
   - Building LLM Applications
+- name: RAG Indexing
+  occurrences: 2
+  courses:
+  - Building LLM Applications
 - name: Vector Store
   occurrences: 2
   courses:
   - AI for Finance
   - Building LLM Applications
-- name: Retrieval-Augmented Generation
-  occurrences: 2
-  courses:
-  - Building LLM Applications
-  - PSE
 - name: Agent Invocation
   occurrences: 2
   courses:
@@ -1152,6 +1041,10 @@ candidates:
   occurrences: 2
   courses:
   - Building LLM Applications
+- name: Running Models Locally
+  occurrences: 2
+  courses:
+  - Building LLM Applications
 - name: Dataset Splits
   occurrences: 2
   courses:
@@ -1233,6 +1126,14 @@ candidates:
   occurrences: 2
   courses:
   - AI for Finance
+- name: Autonomous Agents
+  occurrences: 2
+  courses:
+  - AI for Finance
+- name: Coding Agents
+  occurrences: 2
+  courses:
+  - AI for Finance
 - name: Integration Tools
   occurrences: 2
   courses:
@@ -1285,11 +1186,6 @@ candidates:
   occurrences: 2
   courses:
   - AI for Finance
-- name: Introduction
-  occurrences: 2
-  courses:
-  - AI for Finance
-  - PSE
 - name: Portfolio Checking
   occurrences: 2
   courses:
@@ -1498,175 +1394,263 @@ candidates:
   occurrences: 2
   courses:
   - AI for Finance
-- name: Software Development Life Cycle
-  occurrences: 2
+- name: Definition and role in generative AI
+  occurrences: 1
   courses:
-  - PSE
-- name: Benefits of AI in SDLC
-  occurrences: 2
+  - Intro to Gen AI
+- name: Definition and use
+  occurrences: 1
   courses:
-  - PSE
-- name: Design
-  occurrences: 2
+  - Intro to Gen AI
+- name: Features and ecosystem
+  occurrences: 1
   courses:
-  - PSE
-- name: Maintenance
-  occurrences: 2
+  - Intro to Gen AI
+- name: Fine-Tuned Models
+  occurrences: 1
   courses:
-  - PSE
-- name: Planning
-  occurrences: 2
+  - Intro to Gen AI
+- name: Hugging Face Platform
+  occurrences: 1
   courses:
-  - PSE
-- name: AI Across Industries
-  occurrences: 2
+  - Intro to Gen AI
+- name: Identify the limitations of closed source models
+  occurrences: 1
   courses:
-  - PSE
-- name: How It Starts in the Real World
-  occurrences: 2
+  - Intro to Gen AI
+- name: LLM Capabilities
+  occurrences: 1
   courses:
-  - PSE
-- name: Phase 01 — Requirement Gathering & Analysis
-  occurrences: 2
+  - Intro to Gen AI
+- name: Process of Fine-Tuning
+  occurrences: 1
   courses:
-  - PSE
-- name: The Reality Check
-  occurrences: 2
+  - Intro to Gen AI
+- name: Understand the components and process of fine-tuning LLMs
+  occurrences: 1
   courses:
-  - PSE
-- name: The Shift — AI in Software Development
-  occurrences: 2
+  - Intro to Gen AI
+- name: Understand the core capabilities of LLMs
+  occurrences: 1
   courses:
-  - PSE
-- name: AI-Assisted Design
-  occurrences: 2
+  - Intro to Gen AI
+- name: Advantages of Open Source
+  occurrences: 1
   courses:
-  - PSE
-- name: Phase 02 — Planning
-  occurrences: 2
+  - Intro to Gen AI
+- name: Definition of Fine-Tuning
+  occurrences: 1
   courses:
-  - PSE
-- name: RAG Packages
-  occurrences: 2
+  - Intro to Gen AI
+- name: Definition of Hugging Face
+  occurrences: 1
   courses:
-  - PSE
-- name: Setting Up the RAG Service
-  occurrences: 2
+  - Intro to Gen AI
+- name: Definition of LLM
+  occurrences: 1
   courses:
-  - PSE
-- name: Storing Embeddings
-  occurrences: 2
+  - Intro to Gen AI
+- name: Definition of LLMs
+  occurrences: 1
   courses:
-  - PSE
-- name: Vector Search Index
-  occurrences: 2
+  - Intro to Gen AI
+- name: Definition of Open Source
+  occurrences: 1
   courses:
-  - PSE
-- name: Building College Help Desk Agent Part 4
-  occurrences: 2
+  - Intro to Gen AI
+- name: Definition of Pre-Trained
+  occurrences: 1
   courses:
-  - PSE
-- name: CLI-First Agents
-  occurrences: 2
+  - Intro to Gen AI
+- name: Differentiating Open and Closed Source Models
+  occurrences: 1
   courses:
-  - PSE
-- name: Folder Structure
-  occurrences: 2
+  - Intro to Gen AI
+- name: Disadvantages of Closed Source
+  occurrences: 1
   courses:
-  - PSE
-- name: Clean Code
-  occurrences: 2
+  - Intro to Gen AI
+- name: Examples of Closed Source Models
+  occurrences: 1
   courses:
-  - PSE
-- name: The Real Problem — Cloud Limits
-  occurrences: 2
+  - Intro to Gen AI
+- name: Examples of Open Source Models
+  occurrences: 1
   courses:
-  - PSE
-- name: Tools for Running Models Locally
-  occurrences: 2
+  - Intro to Gen AI
+- name: Identifying Top Open Source Platforms
+  occurrences: 1
   courses:
-  - PSE
-- name: What You Need to Run Models Locally
-  occurrences: 2
+  - Intro to Gen AI
+- name: Open Source Ecosystem
+  occurrences: 1
   courses:
-  - PSE
-- name: What is Ollama
-  occurrences: 2
+  - Intro to Gen AI
+- name: Pre-Trained LLMs
+  occurrences: 1
   courses:
-  - PSE
-- name: Launch Claude Code with Ollama
-  occurrences: 2
+  - Intro to Gen AI
+- name: Pros of Open Source
+  occurrences: 1
   courses:
-  - PSE
-- name: Why Claude Code
-  occurrences: 2
+  - Intro to Gen AI
+- name: Using Hugging Face Models
+  occurrences: 1
   courses:
-  - PSE
-- name: SDLC vs STLC
-  occurrences: 2
+  - Intro to Gen AI
+- name: Exploring Gen AI Capabilities
+  occurrences: 1
   courses:
-  - PSE
-- name: Software Testing Life Cycle (STLC)
-  occurrences: 2
+  - Intro to Gen AI
+- name: Gen AI Capabilities
+  occurrences: 1
   courses:
-  - PSE
-- name: What Is Software Testing
-  occurrences: 2
+  - Intro to Gen AI
+- name: Understand the benefits of real-time information access in Gen AI tools
+  occurrences: 1
   courses:
-  - PSE
-- name: Why Testing Matters
-  occurrences: 2
+  - Intro to Gen AI
+- name: Use Cases for Deep Research
+  occurrences: 1
   courses:
-  - PSE
-- name: AI-Assisted Testing with TestSprite
-  occurrences: 2
+  - Intro to Gen AI
+- name: AI Models
+  occurrences: 1
   courses:
-  - PSE
-- name: Functional Testing Sub-Types
-  occurrences: 2
+  - Intro to Gen AI
+- name: Analyze
+  occurrences: 1
   courses:
-  - PSE
-- name: Content Delivery Network (CDN)
-  occurrences: 2
+  - Intro to Gen AI
+- name: Defining Voice Interaction
+  occurrences: 1
   courses:
-  - PSE
-- name: Domain Name System (DNS)
-  occurrences: 2
+  - Intro to Gen AI
+- name: Identify features of reasoning models
+  occurrences: 1
   courses:
-  - PSE
-- name: File Storage
-  occurrences: 2
+  - Intro to Gen AI
+- name: Identify tasks suitable for AI screen sharing
+  occurrences: 1
   courses:
-  - PSE
-- name: What Is Cloud Computing
-  occurrences: 2
+  - Intro to Gen AI
+- name: Matching Models to Tasks
+  occurrences: 1
   courses:
-  - PSE
-- name: What Is Deployment
-  occurrences: 2
+  - Intro to Gen AI
+- name: Reasoning Models
+  occurrences: 1
   courses:
-  - PSE
-- name: What Is a Server
-  occurrences: 2
+  - Intro to Gen AI
+- name: Screen Sharing Capability
+  occurrences: 1
   courses:
-  - PSE
-- name: Amazon CloudFront
-  occurrences: 2
+  - Intro to Gen AI
+- name: Understand the characteristics of reasoning models
+  occurrences: 1
   courses:
-  - PSE
-- name: Amazon S3
-  occurrences: 2
+  - Intro to Gen AI
+- name: Understand the features of reasoning models
+  occurrences: 1
   courses:
-  - PSE
-- name: Cloud Providers
-  occurrences: 2
+  - Intro to Gen AI
+- name: Understanding Different AI Models
+  occurrences: 1
   courses:
-  - PSE
-- name: What Is AWS
-  occurrences: 2
+  - Intro to Gen AI
+- name: Use Cases for Screen Sharing
+  occurrences: 1
   courses:
-  - PSE
-- name: Frontend Deployment Services
-  occurrences: 2
+  - Intro to Gen AI
+- name: AI Model Strategy
+  occurrences: 1
   courses:
-  - PSE
+  - Intro to Gen AI
+- name: AI Model Types
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Deep Reasearch
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Generative AI Applications
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Internet Access
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Logical Analysis
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Model Requirements
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Model Selection for Problem Solving
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Multi-step Investigation
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Natural Language Processing
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Problem Solving
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Real-time Information
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Research Automation
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Screen Sharing for Presentation Support
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Screen-Aware Support
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Smart Web Search
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Source Citations
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Travel Support via Voice
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Understanding Model Categories
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Use of the model category
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: User Experience
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Voice Interaction for Music Discovery
+  occurrences: 1
+  courses:
+  - Intro to Gen AI
+- name: Voice-Based Learning Assistance
+  occurrences: 1
+  courses:
+  - Intro to Gen AI

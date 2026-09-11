@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MIW — Curriculum Drift Watch</title>
+<title>Market Intelligence Agent</title>
 <!-- Inline favicon: the page must make no external request, and a missing
      /favicon.ico is a 404 in every visitor's console. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230e6a5e'/%3E%3Cpath d='M6 21l5-9 5 5 4-7 6 11' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -137,6 +137,12 @@
     outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;
   }
   ::selection{background:var(--accent-wash); color:var(--ink)}
+  /* Thin scrollbars: the sidebar and the log both scroll, and a 15px system bar eats
+     enough of a 232px rail to change the layout. */
+  *::-webkit-scrollbar{width:7px; height:7px}
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:var(--rule2); border-radius:99px}
+  *::-webkit-scrollbar-thumb:hover{background:var(--faint)}
 
   /* ---------- header ---------- */
   header{
@@ -419,7 +425,12 @@
      Dividers between rows, not a border per row - stacked bordered rows double every
      line and read as a stack of unrelated boxes. */
   .srow{
-    display:grid; grid-template-columns:96px 62px minmax(0,1fr);
+    /* `auto` on the two chip tracks, not fixed widths. They held "critical" and "S7"
+       when this was written; the drift code is now rendered as a phrase ("model
+       retired"), which overflowed a 62px track and printed on top of the next column.
+       `auto` still aligns the columns across rows — it sizes to the widest cell — and
+       cannot overflow. */
+    display:grid; grid-template-columns:auto auto minmax(0,1fr);
     align-items:center; gap:10px; padding:9px 14px;
     border-top:1px solid var(--rule); font-size:13px;
   }
@@ -697,9 +708,29 @@
     border-bottom:1px solid var(--rule);
   }
   .brand > a{
-    font-weight:600; font-size:var(--t-bd); letter-spacing:-.01em;
-    color:var(--ink); text-decoration:none; margin-right:auto;
+    display:flex; align-items:center; gap:var(--s2); margin-right:auto;
+    color:var(--ink); text-decoration:none;
   }
+  /* A mark, not a wordmark alone. It gives the sidebar a fixed visual anchor and it is
+     the only place the accent appears at full strength, which is what makes the accent
+     read as deliberate everywhere else. */
+  .mark{
+    display:grid; place-items:center; width:28px; height:28px; flex:0 0 auto;
+    border-radius:8px; background:var(--accent); color:#fff; box-shadow:var(--e1);
+  }
+  .mark svg{width:16px; height:16px}
+  .bname{
+    display:flex; flex-direction:column; font-weight:650; font-size:var(--t-bd);
+    letter-spacing:-.01em; line-height:1.15;
+  }
+  .bname small{
+    font:400 10.5px/1.3 var(--mono); letter-spacing:.04em; color:var(--faint);
+    text-transform:lowercase;
+  }
+  /* Nav icons. Sized once here so every `use` inherits it. */
+  .ic{width:16px; height:16px; flex:0 0 auto; opacity:.75}
+  .sitem[aria-current="page"] .ic{opacity:1; color:var(--accent-ink)}
+  .sitem:hover .ic{opacity:1}
   .themebtn,.sidetoggle{
     border:1px solid var(--rule2); background:var(--surface); color:var(--soft);
     width:26px; height:26px; border-radius:var(--r-sm); cursor:pointer;
@@ -852,6 +883,61 @@
 </style>
 </head>
 <body>
+<!-- Icon sprite. Inline, hand-authored, 16x16 on a 24 grid, stroked in currentColor so
+     every icon inherits the nav item's colour and the theme's. An icon set is the one
+     thing the reference UI had that this page did not, and it is what makes a sidebar
+     scannable rather than a list of similar-length words. It cannot be a library here:
+     the page makes no external request, and `test_ui_contract.py` enforces that. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <g id="i-fix" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/>
+      <path d="M12 9v4"/><path d="M12 17h.01"/></g>
+    <g id="i-change" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="m12 3 2.1 4.9L19 10l-4.9 2.1L12 17l-2.1-4.9L5 10l4.9-2.1Z"/>
+      <path d="M18 17.5 19 20l2.5 1-2.5 1-1 2.5"/></g>
+    <g id="i-inventory" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></g>
+    <g id="i-run" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="m10 8.5 6 3.5-6 3.5Z"/></g>
+    <g id="i-history" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v4h4"/><path d="M12 7v5l3 2"/></g>
+    <g id="i-report" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/>
+      <path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></g>
+    <g id="i-home" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1.5"/>
+      <rect x="14" y="3" width="7" height="5" rx="1.5"/>
+      <rect x="14" y="12" width="7" height="9" rx="1.5"/>
+      <rect x="3" y="16" width="7" height="5" rx="1.5"/></g>
+    <g id="i-vendor" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 11a16 16 0 0 1 9 9"/><path d="M4 4a23 23 0 0 1 16 16"/>
+      <circle cx="5" cy="19" r="1.6"/></g>
+    <g id="i-trust" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6Z"/>
+      <path d="m9 12 2 2 4-4"/></g>
+    <g id="i-course" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5Z"/>
+      <path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5Z"/></g>
+    <g id="i-add" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 8v8"/><path d="M8 12h8"/></g>
+    <g id="i-mark" fill="none" stroke="currentColor" stroke-width="2.1"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12h4l3 7 6-14 3 7h4"/></g>
+  </defs>
+</svg>
+
 <div class="shell">
 
 <!-- The sidebar. A different PRESENTATION of the same COURSE_TABS/GLOBAL_TABS the top
@@ -860,7 +946,8 @@
      therefore invisible - the complaint was "no button to run for a course". -->
 <aside class="side" id="side">
   <div class="brand">
-    <a href="#/" id="home">MIW</a>
+    <a href="#/" id="home"><span class="mark"><svg viewBox="0 0 24 24"><use href="#i-mark"/></svg></span>
+      <span class="bname">Market Intelligence<small>curriculum agent</small></span></a>
     <button class="themebtn" id="themebtn" title="Light / dark" aria-label="Toggle theme">◐</button>
     <button class="sidetoggle" id="sidetoggle" aria-label="Menu" aria-expanded="false">☰</button>
   </div>
@@ -868,7 +955,8 @@
     <div class="sgroup">
       <div class="slabel">Courses</div>
       <div id="sidecourses"></div>
-      <a class="sitem addc" href="#/add">+ Add course</a>
+      <a class="sitem addc" href="#/add"><svg class="ic" viewBox="0 0 24 24"
+         aria-hidden="true"><use href="#i-add"/></svg><span>Add course</span></a>
     </div>
     <div class="sgroup" id="sidecoursenav" hidden>
       <div class="slabel" id="sidecoursename">This course</div>
@@ -899,7 +987,7 @@
     <div class="hsub" id="pagesub"></div>
   </div>
   <div class="switcher" id="switcher"></div>
-  <button class="act primary hrun" id="hrun" hidden>Run audit</button>
+  <button class="act primary hrun" id="hrun" hidden>Start check</button>
 </header>
 
 <nav role="tablist" id="nav" hidden></nav>
@@ -1169,8 +1257,12 @@ const COURSE_TABS = [['findings','Fixes'], ['changes','Changes'],
                      ['inventory','Tools & models used'],
                      ['run','Run a check'], ['runs','Past checks'],
                      ['digest','Weekly report']];
-const GLOBAL_TABS = [['run','Run a check'], ['runs','Past checks'],
-                     ['trust','Sources & decisions'], ['digest','Weekly report']];
+/* The global entries say their scope in the label. They sit directly beneath the
+   course's own "Run a check" / "Past checks" / "Weekly report", and with the same words
+   and the same icon the only thing telling them apart was the group heading — which is
+   not enough when the two do different things to different data. */
+const GLOBAL_TABS = [['run','Run across all courses'], ['runs','All past checks'],
+                     ['trust','Sources & decisions'], ['digest','All-course report']];
 /* Which `kind_of_signal` each list shows. One map, so the nav count and the list can
    never disagree about what belongs where. */
 const VIEW_KIND = {findings: 'regression', changes: 'opportunity'};
@@ -1222,10 +1314,22 @@ const WORDS = {
 };
 const word = (group, key) => (WORDS[group] || {})[key] || key || '';
 
+/* Which sprite symbol each nav entry uses. Keyed on the view name, so the icon and the
+   route cannot drift apart, and a view with no entry here simply renders without one
+   rather than showing a broken reference. */
+const VIEW_ICON = {
+  findings: 'fix', changes: 'change', inventory: 'inventory', run: 'run',
+  runs: 'history', digest: 'report', trust: 'trust', watch: 'vendor', home: 'home',
+  course: 'course', add: 'add',
+};
+const icon = name => name
+  ? `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-${name}"/></svg>`
+  : '';
+
 function renderNav(r) {
-  const item = (href, label, on, extra = '') =>
+  const item = (href, label, on, extra = '', ico = '') =>
     `<a class="sitem" href="${href}"${on ? ' aria-current="page"' : ''}>` +
-    `<span>${esc(label)}</span>${extra}</a>`;
+    `${icon(ico)}<span>${esc(label)}</span>${extra}</a>`;
 
   /* Courses, each carrying its worst severity as a dot and its finding count — so
      "which course needs me" is a glance, which is what the severity rail did for the
@@ -1236,8 +1340,11 @@ function renderNav(r) {
       sev === 'critical' ? 'crit' : sev === 'high' ? 'high'
       : sev === 'medium' ? 'med' : 'low'})"></span>` : '';
     const n = c.findings_total ? `<span class="scount">${c.findings_total}</span>` : '';
+    /* The severity dot replaces the icon when there is something wrong: a course row
+       either says "here is your worst problem" or it says "this is a course", and
+       showing both makes neither read. */
     return `<a class="sitem" href="#/c/${esc(c.slug)}/findings"${
-      r.slug === c.slug ? ' aria-current="page"' : ''}>${dot}<span>${
+      r.slug === c.slug ? ' aria-current="page"' : ''}>${dot || icon('course')}<span>${
       esc(c.title)}</span>${n}</a>`;
   }).join('') || '<div class="slabel">none ingested</div>';
 
@@ -1252,21 +1359,37 @@ function renderNav(r) {
            week, and one number over both is not. */
         const n = VIEW_KIND[v] ? (kinds[VIEW_KIND[v]] || 0) : null;
         return item(`#/c/${r.slug}/${v}`, l, r.view === v,
-                    n === null ? '' : `<span class="scount">${n}</span>`);
+                    n === null ? '' : `<span class="scount">${n}</span>`,
+                    VIEW_ICON[v]);
       }).join('');
   } else {
     cn.hidden = true;
   }
 
   $('#sideglobal').innerHTML = [
-    item('#/', 'All courses', r.scope === 'overview'),
-    item('#/watch', 'Vendor releases', r.scope === 'watch'),
+    item('#/', 'All courses', r.scope === 'overview', '', VIEW_ICON.home),
+    item('#/watch', 'Vendor releases', r.scope === 'watch', '', VIEW_ICON.watch),
     ...GLOBAL_TABS.map(([v, l]) =>
-      item(`#/global/${v}`, l, r.scope === 'global' && r.view === v)),
+      item(`#/global/${v}`, l, r.scope === 'global' && r.view === v, '', VIEW_ICON[v])),
   ].join('');
 
   renderPageHead(r);
 }
+
+/* One line under every title saying what the page is for. The reference UI this was
+   modelled on pairs a title with a description everywhere, and it is the cheapest way to
+   stop a page assuming the reader already knows why they are on it. */
+const PAGE_DESC = {
+  overview: 'Every course, with its worst open issue and how many there are.',
+  watch: 'What the vendors themselves announced — model retirements, package releases, '
+       + 'breaking changes. Checked daily.',
+  add: 'Register a course from its export, so the agent starts watching what it '
+     + 'teaches.',
+  'global:run': 'Pick the courses and steps, then start a check.',
+  'global:runs': 'Every check that has run, and what each one found.',
+  'global:trust': 'Re-check that every issue still rests on a source we can quote.',
+  'global:digest': 'This week\'s report, across all courses.',
+};
 
 /* The content header: what you are looking at, and the one action for it. */
 function renderPageHead(r) {
@@ -1281,12 +1404,14 @@ function renderPageHead(r) {
       c.findings_total === 1 ? '' : 's'}`);
     sub.textContent = bits.join(' · ');
     run.hidden = false;
-    run.textContent = `Run audit · ${COURSE_TITLE || r.slug}`;
+    run.textContent = `Start check · ${COURSE_TITLE || r.slug}`;
   } else {
-    t.textContent = r.scope === 'watch' ? 'Vendor watch'
+    t.textContent = r.scope === 'watch' ? 'Vendor releases'
       : r.scope === 'global' ? 'All courses' : 'Courses';
-    sub.textContent = r.scope === 'overview'
-      ? 'Drift in what the curriculum already teaches.' : '';
+    /* Every header says what the page is for. A title alone assumes the reader already
+       knows, which is the assumption this page kept making. */
+    sub.textContent = PAGE_DESC[r.scope === 'global' ? `global:${r.view || 'runs'}`
+                                : r.scope] || '';
     run.hidden = true;
   }
 }
@@ -1337,7 +1462,7 @@ async function route() {
   if (known && !known.ingested) {
     show('findings');
     $('#findings').innerHTML = `<div class="empty"><b>${esc(known.title)} has not been
-      ingested yet.</b><div>No export has been read for this course, so MIW knows
+      ingested yet.</b><div>No export has been read for this course, so the agent knows
       nothing about it — this is not the same as “no problems found”. Run
       <code>python3 main.py ingest</code> then <code>extract</code>.</div></div>`;
     $('#strip').innerHTML = ''; return;

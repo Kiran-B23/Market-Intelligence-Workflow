@@ -1,4 +1,6 @@
-# PRD — Market Intelligence & Curriculum Gap Analyser (MIW)
+# PRD — Market Intelligence Agent
+
+_Short name `MIW` throughout: it is the package, the repo directory and the prefix on every environment variable, so it stays in the code and in these pages. The product's name, on its own title bar and in conversation, is Market Intelligence Agent._
 
 Owner: gen-ai-content · Repo: `/home/nxtwave/MIW` · Branch: `feat/agent-workflow-and-ui`
 Current state as of 11 Sep 2026 · Build record from 7 Sep 2026
@@ -17,10 +19,11 @@ rule in Part I exists because something specific went wrong.
 
 ## A. The use case
 
-**Who it is for.** The NxtWave curriculum team, who own four Gen-AI courses carrying
-9,998 references to things they do not control. Three of the four have a workbook and
-contribute 71 indexed sessions; PSE does not, and the consequences of that are stated in
-§C.1 and §G rather than glossed.
+**Who it is for.** The NxtWave curriculum team. Three courses are registered today —
+Intro to Gen AI, Building LLM Applications and AI for Finance — carrying **9,061
+references** to things they do not control across **71 indexed sessions**. A fourth
+export sits in `data/courses/` unregistered; courses are added through the UI's Add
+Course flow, which writes the runtime overlay rather than the hand-owned roster.
 
 **The problem, stated once.** Courses teach through external dependencies — tools,
 hosted services, SDKs, model ids, docs pages, n8n nodes. Those dependencies change
@@ -163,9 +166,9 @@ consequences the system depends on:
 * **The deck outlines exist nowhere else.** All 135 slide-outline records, covering 68
   distinct `Session PPT` decks, come from the workbook's `Course Outline` sheet; **zero**
   come from the JSON export. They are the only description of what a session covers, so
-  the entire gap-analysis half of the product is impossible without the workbook. PSE has
-  no workbook and therefore can never receive a gap finding — a limit of the input, not
-  of the code.
+  the entire gap-analysis half of the product is impossible without the workbook. A
+  course registered without one still inventories and probes fine, but can never receive
+  a gap finding — a limit of the input, not of the code.
 
 ### C.2 The pipeline
 
@@ -448,18 +451,18 @@ one embeds none — 17–53 versus exactly 0. Same shape as "did a table role-ty
 **Which link to use turned out to matter more than the parsing.** Two inputs carry deck
 links for the same decks and they disagree: the workbook's `Session PPT` column is mostly
 the editor form (51 of 68), while the course export carries the published form.
-Preferring the published one wherever either source has it took readable decks from 17 to
-**85 — including all 13 PSE sessions, which have no workbook at all** and therefore get
-no curriculum text from any other route.
+Preferring the published one wherever either source has it roughly quintupled the decks
+we can read — and it reaches sessions of a course with no workbook, which get curriculum
+text from no other route.
 
 ```
-85 deck URLs · 85 read · 0 gone · 0 restricted · 0 unreachable
-833,316 chars of slide text
+72 deck URLs · 72 read · 0 gone · 0 restricted · 0 unreachable
+680,526 chars of slide text
   Building LLM Applications 261,217 · AI for Finance 245,896
-  Intro to Gen AI           173,413 · PSE            152,790
+  Intro to Gen AI           173,413
 ```
 
-`main.py decks` is its own command, not a step inside `gaps`: 85 fetches of 0.6–14MB
+`main.py decks` is its own command, not a step inside `gaps`: dozens of fetches of 0.6–14MB
 against a throttling host is a curriculum-revision cadence, not a weekly one. It writes
 `out/decks_<date>.json`, caches the *extracted slides* rather than the HTML (14MB of
 markup becomes ~8KB of text), and `gaps` reads the artifact and never fetches a deck
@@ -516,7 +519,8 @@ and it had been silently wrong for every S10; there simply had not been one unti
   vendor documents n8n's node set, so no area can corroborate it. n8n drift is caught
   instead by `probe/n8n_upstream.py` reading n8n's own declared breaking changes — a
   regression check, not a gap check.
-* **PSE gets no gap findings**, having no workbook.
+* **A course registered without a workbook gets no gap findings.** It still inventories,
+  probes and reports; only the gap half needs the deck outlines.
 * **`inventory._links` attributes by domain only**, which overstates the n8n S4's blast
   radius. Known, reported, not fixed.
 * **Placeholder URLs are extracted as real links.** `https://abc123.ngrok.io` is an

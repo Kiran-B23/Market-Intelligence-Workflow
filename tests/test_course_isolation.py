@@ -22,6 +22,7 @@ from miw.api.jobs import JobRunner, _slugs_for_scope
 from miw.scope import resolve_courses, slug_of, slugify, title_of
 
 INTRO, APPS = "Intro to Gen AI", "Building LLM Applications"
+FIN = "AI for Finance"
 
 
 # ------------------------------------------------------------------ slugs
@@ -42,9 +43,9 @@ def test_an_unknown_course_still_gets_an_addressable_slug():
 
 def test_course_resolution_accepts_slugs_and_titles_together():
     """So a URL can carry the slug while the existing widget keeps sending titles."""
-    assert resolve_courses(["pse"]) == {"PSE"}
-    assert resolve_courses(["PSE"]) == {"PSE"}
-    assert resolve_courses(["pse", "PSE"]) == {"PSE"}, "must dedupe to one course"
+    assert resolve_courses(["ai_for_finance"]) == {FIN}
+    assert resolve_courses([FIN]) == {FIN}
+    assert resolve_courses(["ai_for_finance", FIN]) == {FIN}, "must dedupe to one course"
     assert resolve_courses(["intro_to_gen_ai", APPS]) == {INTRO, APPS}
     assert resolve_courses(["", None]) == set()
 
@@ -61,7 +62,7 @@ def test_a_multi_course_run_belongs_to_both():
 
 
 def test_an_unscoped_sweep_belongs_to_every_course():
-    """It really did audit PSE, so hiding it from PSE's history would be a lie."""
+    """It really did audit every course, so hiding it from one history would be a lie."""
     assert _slugs_for_scope({}) == ["*"]
     assert _slugs_for_scope({"courses": [], "dep_ids": []}) == ["*"]
 
@@ -139,14 +140,14 @@ def test_a_run_on_one_course_does_not_appear_under_another():
             intro = [x["run_id"] for x in r.list(50, course_slug="intro_to_gen_ai")]
             apps = [x["run_id"] for x in r.list(50, course_slug="llm_applications")]
             assert intro == ["aaa"] and apps == ["bbb"]
-            assert [x["run_id"] for x in r.list(50, course_slug="pse")] == []
+            assert [x["run_id"] for x in r.list(50, course_slug="ai_for_finance")] == []
 
 
 def test_an_unscoped_sweep_appears_in_every_course_history():
     with tempfile.TemporaryDirectory() as tmp:
         with _runner(tmp) as r:
             _add(r, "sweep", {})
-            for slug in ("intro_to_gen_ai", "llm_applications", "ai_for_finance", "pse"):
+            for slug in ("intro_to_gen_ai", "llm_applications", "ai_for_finance"):
                 assert [x["run_id"] for x in r.list(50, course_slug=slug)] == ["sweep"]
 
 
@@ -191,9 +192,9 @@ def test_a_per_course_digest_can_never_become_the_roll_up():
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)
         (out / "digest_2026-09-09.md").write_text("ROLLUP")
-        cdir = out / "courses" / "pse"
+        cdir = out / "courses" / "ai_for_finance"
         cdir.mkdir(parents=True)
-        (cdir / "digest_2026-09-09.md").write_text("PSE ONLY")
+        (cdir / "digest_2026-09-09.md").write_text("COURSE ONLY")
         original = app.OUT
         try:
             app.OUT = out
@@ -212,11 +213,11 @@ def test_a_missing_per_course_digest_does_not_fall_back_to_the_rollup():
         original = app.OUT
         try:
             app.OUT = out
-            text = app.digest(course="pse")
+            text = app.digest(course="ai_for_finance")
         finally:
             app.OUT = original
         assert "ROLLUP" not in text
-        assert "No digest for PSE yet" in text
+        assert "No digest for AI for Finance yet" in text
         assert "report --course" in text
 
 
@@ -246,9 +247,9 @@ def test_a_slug_and_a_title_reach_the_same_page():
     if not Path("out/inventory.json").exists():
         return
     c = _client()
-    a = c.get("/api/summary?course=pse").json()
-    b = c.get("/api/summary?course=PSE").json()
-    assert a["course"] == b["course"] == "PSE"
+    a = c.get("/api/summary?course=ai_for_finance").json()
+    b = c.get("/api/summary?course=AI for Finance").json()
+    assert a["course"] == b["course"] == "AI for Finance"
     assert a["dependencies"] == b["dependencies"]
 
 

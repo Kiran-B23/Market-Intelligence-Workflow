@@ -68,7 +68,6 @@ LEGACY_WORKBOOK_KEYS = {
     "llmapps": "Building LLM Applications",
     "llmapplications": "Building LLM Applications",
     "aiforfinance": "AI for Finance",
-    "pse": "PSE",
 }
 # Kept as the old name so nothing that imported it breaks.
 WORKBOOK_COURSES = LEGACY_WORKBOOK_KEYS

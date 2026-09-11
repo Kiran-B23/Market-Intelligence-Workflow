@@ -1,4 +1,6 @@
-# MIW — Market Intelligence & Curriculum Gap Analyser
+# Market Intelligence Agent
+
+_Curriculum drift watch · short name `MIW`, which is still the package name, the repo directory and every environment variable._
 
 A weekly watch on everything the curriculum depends on: third-party tools, hosted
 services, packages, models, and n8n nodes. It exists because the content team's
@@ -64,7 +66,7 @@ dropped into `data/courses/` with no entry is never opened. It needs `title` (th
 course's identity everywhere downstream — it is what every `Location.course` stores) and
 `expect_sessions`, which is read directly and so cannot be omitted.
 
-**The workbook** is optional — PSE has none and inventories fine — but it is not
+**The workbook** is optional — a course without one inventories fine — but it is not
 supplementary. It is the only bridge back to the authoring source, and it carries four
 things the export cannot:
 
@@ -111,7 +113,7 @@ python3 main.py decks        # read the 85 session decks: slide text + reachabil
 python3 main.py gaps         # workbooks + official docs -> topics we do not teach yet
 python3 main.py gaps --dry-run   # print what it would raise; write nothing
 python3 main.py report       # findings     -> out/digest_<date>.md + out/courses/<slug>/
-python3 main.py report --course pse   # write just PSE's digest (still reads them all)
+python3 main.py report --course ai_for_finance   # one course's digest (reads them all)
 python3 main.py verify       # audit the trust invariants on those artifacts
 python3 main.py resolve-packages --dry-run   # sheet-declared names that are really packages
 python3 main.py triage --list # reviewer decisions; teaches the next run
@@ -164,7 +166,7 @@ Two rules keep it honest, and both were added after measuring what happens witho
 Areas live in `registry/topics.yaml`, hand-owned, two sources each. The stage prints its
 own blind spot — how many indexed sessions fall inside a declared area and which do not —
 so an undeclared subject cluster is a reported number rather than something you have to
-infer. It needs the course **workbook**: PSE has none, so PSE can never receive a gap
+infer. It needs the course **workbook**: a course registered without one never receives a gap
 finding.
 
 ## Two ways in: a manual run, and a daily watch

@@ -155,7 +155,7 @@ def test_a_good_candidate_passes_and_reports_what_it_parsed(staged):
 
 
 def test_a_duplicate_slug_or_title_is_refused(staged):
-    v = C.validate(C.Candidate(title="PSE", export_path=staged))
+    v = C.validate(C.Candidate(title="AI for Finance", export_path=staged))
     assert not v.ok and v.stopped_at == "metadata"
     assert any("already exists" in r for r in v.reasons)
 

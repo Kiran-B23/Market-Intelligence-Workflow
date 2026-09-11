@@ -10,7 +10,11 @@
 #                     (`Common Mistakes` is a LEARNING_SET with a video, not a session)
 #   AI for Finance    export 18, workbook 17 (`AI Finance Add-On Session`)
 #   LLM Applications  export 29, workbook 29 - agrees
-#   PSE               no workbook, so the positional count is all there is
+#
+# PSE is deliberately NOT declared here. Its export still sits in `data/courses/`, inert
+# until someone registers it — `cmd_ingest` iterates this roster, so an unregistered
+# export is never opened. It was removed to exercise the Add Course flow end to end
+# against a real course rather than a copy of one.
 #
 # This literal stays HAND-OWNED. Courses added through the UI land in the writable
 # overlay `data/course_registry.json` instead, and `miw.courses.Roster` merges the two
@@ -20,7 +24,6 @@ _DECLARED = {
     "intro_to_gen_ai":  {"title": "Intro to Gen AI",            "expect_sessions": 25},
     "llm_applications": {"title": "Building LLM Applications",  "expect_sessions": 29},
     "ai_for_finance":   {"title": "AI for Finance",             "expect_sessions": 17},
-    "pse":              {"title": "PSE",                        "expect_sessions": 13},
 }
 
 # `COURSES` is still the only name anything imports, so no caller changed. It is a dict
