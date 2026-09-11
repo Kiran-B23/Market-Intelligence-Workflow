@@ -34,7 +34,11 @@ def _finding_block(f: Finding) -> list[str]:
            "",
            f"{f.summary}",
            "",
-           f"- **Affects:** {_loc_line(f)} · blast radius {f.blast_radius}"
+           # Blast radius is a weighted count of where a dependency is USED, so a
+           # topic gap has one of exactly zero and printing it says only "this number
+           # does not apply here". Omitted rather than shown as 0.
+           f"- **Affects:** {_loc_line(f)}"
+           f"{f' · blast radius {f.blast_radius}' if f.blast_radius else ''}"
            f"{f' · {f.graded_locations} graded item(s)' if f.graded_locations else ''}",
            f"- **What to do:** {f.what_to_act or f.recommendation}",
            f"- **Why it matters:** {f.why_to_act}",
@@ -132,9 +136,21 @@ def render(findings: Iterable[Finding], *, resolved: list[dict] | None = None,
     if not findings:
         L += ["**No new or worsened findings this week.**", ""]
     else:
-        L += [f"**{len(regressions)} regression(s)** — something we teach is now wrong. "
-              f"**{len(opportunities)} opportunity(ies)** — still right, no longer best.",
-              ""]
+        # The two kinds of opportunity are not the same claim and must not share one
+        # sentence: S10 says a tool we teach has been overtaken, S11 says a topic is
+        # missing from the outline altogether. "Still right, no longer best" is true of
+        # the first and meaningless about the second.
+        gaps = [f for f in opportunities if f.signal == "S11"]
+        better = [f for f in opportunities if f.signal != "S11"]
+        bits = [f"**{len(regressions)} regression(s)** — something we teach is now "
+                f"wrong."]
+        if better:
+            bits.append(f"**{len(better)} better option(s)** — still right, no longer "
+                        f"best.")
+        if gaps:
+            bits.append(f"**{len(gaps)} topic gap(s)** — documented by two independent "
+                        f"vendors and in no session's outline.")
+        L += [" ".join(bits), ""]
     L += [f"_{inventory_size} dependencies{' in this course' if course else ''} "
           f"inventoried · {probed} probed · "
           f"{researched} researched · {max(standing, suppressed)} unchanged finding(s) "

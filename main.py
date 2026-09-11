@@ -600,6 +600,135 @@ def _nomination_tally(research) -> dict:
             "blocked": blocked, "rejected": rejected, "examples": examples}
 
 
+def cmd_gaps(args) -> int:
+    """S11: what the curriculum does not teach yet.
+
+    The only stage that runs OUTSIDE-IN. Every other stage starts from the dependency
+    inventory, which is extracted from the course content and therefore contains only
+    what is already taught - so no other stage can ever notice that a session is
+    incomplete. This one starts from `registry/topics.yaml`, reads official
+    documentation as an enumeration of an area, and reports the part of that
+    enumeration that appears in no session's outline.
+
+    It writes its findings into the same `findings_<date>.json` the analyser writes, so
+    a gap sorts, schedules, triages and renders exactly like every other finding. The
+    per-topic evidence goes to a `gaps_<date>.json` sidecar, which `verify` reads to
+    re-classify each citation without trusting the tier the artifact records - the same
+    arrangement the probe artifact provides for provider widening.
+    """
+    from miw.analyse.curriculum import CurriculumIndex
+    from miw.analyse.gaps import area_coverage, find_gaps, load_areas
+    from miw.analyse.score import fingerprint_of
+    from miw.artifacts import merge_by_dep
+    from miw.schema import dump, to_jsonable, utcnow
+    from miw.state import State
+    from miw import triage
+
+    outlines, problems = _outlines_by_course()
+    for pr in problems:
+        print(f"  WARNING: {pr}")
+    if not outlines:
+        print("no workbook could be mapped to a course, so no session has a "
+              "description to compare against; nothing to do", file=sys.stderr)
+        return 2
+    index = CurriculumIndex.from_outlines(outlines)
+    areas = load_areas(getattr(args, "topics", None) or "registry/topics.yaml")
+    print(f"  {len(index.docs)} session(s) indexed from {len(outlines)} workbook(s); "
+          f"{len(areas)} curriculum area(s) declared")
+    if not areas:
+        print("  registry/topics.yaml declares no area with a source; nothing to do")
+        return 0
+
+    # How much of the curriculum the declared areas can see at all. Printed before any
+    # fetching, because a reader needs to know the denominator before they read the
+    # numerator - "6 gaps found" means something different across 58 sessions than
+    # across 71.
+    cov = area_coverage(areas, index)
+    print(f"  area coverage: {cov['in_an_area']}/{cov['sessions']} session(s) fall "
+          f"inside at least one declared area")
+    if cov["not_in_any_area"]:
+        print(f"  {len(cov['not_in_any_area'])} session(s) are in NO declared area, so "
+              f"no gap can ever be reported for them:")
+        for line in cov["not_in_any_area"]:
+            print(f"      {line}")
+
+    scope = _scope_from(args, default_tiers=())
+    courses = sorted(scope.courses) if scope.courses else []
+    if courses:
+        print(f"  scope: {', '.join(courses)}")
+
+    # Placement always runs across EVERY course, even when the run is scoped, and the
+    # scope then filters what gets written. A topic gap's identity is the topic, not the
+    # course - the same row carries the sessions it belongs in across all of them - so a
+    # scoped run that placed only within its own course replaced the global row with a
+    # narrower one and silently deleted the other courses' placements. This is the same
+    # rule the other scoped stages already follow: scope chooses what to LOOK at, and
+    # for `report` what to WRITE, never what a finding is allowed to say.
+    rep = find_gaps(areas, index)
+    st = rep.stats
+    if courses:
+        wanted = set(courses)
+        kept = [f for f in rep.findings
+                if wanted & {l.course for l in f.locations}]
+        print(f"  scope: {len(kept)} of {len(rep.findings)} gap(s) touch "
+              f"{', '.join(courses)}; the rest are left exactly as they were")
+        rep.findings = kept
+    print(f"  read {st.sources_read} official source(s); {st.items_enumerated} item(s) "
+          f"enumerated, {st.excluded} excluded by the registry")
+    print(f"  {st.candidates} topic(s) corroborated by two independent sources; "
+          f"{st.already_taught} already taught, {st.unplaced} could not be placed")
+    for pr in st.sources_unsupported:
+        print(f"  NOT READ: {pr}")
+    for pr in st.uncorroborated_areas:
+        print(f"  NO SECOND OPINION: {pr}")
+    for pr in st.uncitable:
+        print(f"  NOT CITEABLE: {pr}")
+
+    if getattr(args, "dry_run", False):
+        # Print what would be raised and write nothing. This is how a new source in
+        # `registry/topics.yaml` gets checked before it can affect an artifact.
+        for f in rep.findings:
+            print(f"\n  [{f.severity}] {f.canonical_name}\n      {f.recommendation}")
+        print(f"\n  dry run: {len(rep.findings)} finding(s), nothing written")
+        return 0
+
+    # Same diff and triage discipline as the analyser, for the same reason: a gap that
+    # was reported last week and not acted on is not this week's news, and a reviewer
+    # who rejected one must not be shown it again while the evidence is unchanged.
+    state, now = State(), utcnow()
+    raised, held, examined = [], [], set()
+    for f in rep.findings:
+        examined.add(f.dep_id)
+        fp = fingerprint_of(f)
+        f.diff_class = state.classify_finding(
+            finding_id=f.finding_id, dep_id=f.dep_id, signal=f.signal,
+            severity=f.severity, fingerprint=fp, now=now)
+        why = triage.suppressed(state, f.finding_id, fp)
+        if why:
+            held.append({"finding_id": f.finding_id,
+                         "canonical_name": f.canonical_name,
+                         "signal": f.signal, "reason": why})
+            continue
+        raised.append(f)
+    state.close()
+
+    side = OUT / f"gaps_{_today()}.json"
+    dump(side, {"generated_at": now, "areas": [a.area_id for a in areas],
+                "scope": scope.to_dict(), "topics": rep.rows,
+                "coverage": cov, "stats": to_jsonable(st)})
+    findings_path = OUT / f"findings_{_today()}.json"
+    merge_by_dep(
+        findings_path, new_rows=[to_jsonable(f) for f in raised], examined=examined,
+        meta={"gaps_at": _today(), "gaps_run_at": now,
+              "gaps_held_by_reviewer": held},
+        rows_key="findings")
+    print(f"  {len(raised)} gap finding(s) written ({len(held)} held by reviewer "
+          f"decisions)")
+    print(f"  -> {side}")
+    print(f"  -> {findings_path}")
+    return 0
+
+
 def cmd_report(args) -> int:
     from config import settings
     from miw.reporters.markdown import render
@@ -1022,6 +1151,13 @@ def cmd_verify(args) -> int:
     by_id = {d.dep_id: d for d in deps}
     probe_rows = {r.get("dep_id"): r
                   for r in (_read_latest("probe_*.json") or {}).get("results", [])}
+    # A gap finding's subject is a TOPIC, which is deliberately not in the inventory -
+    # the inventory records what the curriculum uses, and a topic we do not teach is
+    # precisely not that. Its authority set comes off the gaps artifact instead, the
+    # same arrangement that lets provider widening be re-checked from the probe
+    # artifact rather than believed from the finding.
+    topic_rows = {r.get("dep_id"): r
+                  for r in (_read_latest("gaps_*.json") or {}).get("topics", [])}
     no_authority = [d for d in deps if not d.subject().official_domains]
     strict_capable = len(deps) - len(no_authority)
     print(f"  inventory: {len(deps)} dependencies")
@@ -1058,6 +1194,15 @@ def cmd_verify(args) -> int:
                 # stamp.
                 dep = by_id.get(f.get("dep_id"))
                 subj = dep.subject() if dep else None
+                topic = topic_rows.get(f.get("dep_id"))
+                if dep is None and topic:
+                    from miw.trust import Subject as _Subj
+                    # Union of every corroborating source's authority set: the claim
+                    # being checked may come from either of them.
+                    doms = {d for src in (topic.get("sources") or [])
+                            for d in (src.get("official_domains") or [])}
+                    subj = _Subj(name=topic.get("canonical_name", ""),
+                                 official_domains=tuple(sorted(doms)))
                 # A model's authority set is widened by its SERVING provider, and that
                 # widening is recorded on the probe result, not on the finding. Rebuild
                 # it here or Groq's own deprecation table reads as LEAD_ONLY against a
@@ -1116,6 +1261,17 @@ def cmd_verify(args) -> int:
             # asserted here: an S7 finding must name the provider that granted the
             # authority, and that provider must have been discovered by its own
             # catalogue listing the exact id (which is what sets `provider`).
+            # Corroboration is the only thing standing between an S11 and a vendor's
+            # API reference, so assert it against the artifact rather than trusting the
+            # analyser that wrote it: two substantiating claims, on DIFFERENT domains.
+            if f.get("signal") == "S11":
+                from miw.trust import domain as _dom
+                hosts = {_dom(c["source_url"]) for c in substantiating}
+                if len(hosts) < 2:
+                    problems.append(
+                        f"{f['canonical_name']} / S11: corroborated by {len(hosts)} "
+                        f"independent source(s); a topic gap needs two, or it is one "
+                        f"vendor's documentation detail")
             if f.get("signal") == "S7" and claims:
                 probe_sigs = set(f.get("probe_signals") or [])
                 if probe_sigs & {"model_shutdown_passed", "model_deprecation_declared"} \
@@ -1154,7 +1310,12 @@ def cmd_run_weekly(args) -> int:
     """Unattended run. Ingest is skipped unless exports changed."""
     for name, fn, a in (("ingest", cmd_ingest, args), ("extract", cmd_extract, args),
                         ("probe", cmd_probe, args), ("research", cmd_research, args),
-                        ("analyse", cmd_analyse, args), ("report", cmd_report, args)):
+                        ("analyse", cmd_analyse, args),
+                        # Between analyse and report because it merges into the same
+                        # findings artifact the reporter reads. `cmd_gaps` reads its
+                        # two extra options through `getattr`, so the shared `args`
+                        # namespace needs nothing added for it.
+                        ("gaps", cmd_gaps, args), ("report", cmd_report, args)):
         print(f"\n=== {name} ===")
         rc = fn(a)
         if rc not in (0, 1):
@@ -1190,6 +1351,12 @@ def build_parser() -> argparse.ArgumentParser:
     an.add_argument("--refine", action="store_true",
                     help="rewrite action notes with the LLM (Claude Code CLI by "
                          "default; no API key needed)")
+    gp = sub.add_parser("gaps", help="topics the curriculum does not teach yet (S11)")
+    _add_scope_args(gp)
+    gp.add_argument("--topics", default="registry/topics.yaml",
+                    help="curriculum-topic registry to read")
+    gp.add_argument("--dry-run", action="store_true",
+                    help="print what would be raised and write nothing")
     tr = sub.add_parser("triage", help="record a reviewer decision on a finding")
     tr.add_argument("finding_id", nargs="?", help="finding id (prefix is enough)")
     tr.add_argument("--list", action="store_true", help="list findings and precision")
@@ -1246,7 +1413,8 @@ def main() -> int:
             "research": cmd_research, "analyse": cmd_analyse, "report": cmd_report,
             "verify": cmd_verify, "triage": cmd_triage, "serve": cmd_serve,
             "watch": cmd_watch, "resolve-packages": cmd_resolve_packages,
-            "run-weekly": cmd_run_weekly, "agent": cmd_agent}[args.cmd](args)
+            "run-weekly": cmd_run_weekly, "agent": cmd_agent,
+            "gaps": cmd_gaps}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -40,12 +40,17 @@ from typing import Iterator, Optional
 ROOT = Path(__file__).resolve().parents[2]
 DB = ROOT / "state" / "jobs.db"
 
-STAGES = ("ingest", "extract", "probe", "research", "analyse", "report")
+# `gaps` sits between `analyse` and `report` because it writes into the same findings
+# artifact the analyser writes and the reporter reads. It is the only stage that does
+# not consult the dependency inventory at all - it reads the workbooks and official
+# documentation directly, which is what lets it notice a topic the courses never
+# mention (see `miw/analyse/gaps.py`).
+STAGES = ("ingest", "extract", "probe", "research", "analyse", "gaps", "report")
 # Which stages accept scope flags. `ingest`/`extract` rebuild the whole inventory:
 # scoping them would silently shrink it and break every other course's findings.
 # `report` is scoped only in what it WRITES - it always reads the whole merged findings
 # artifact and always re-renders the roll-up, then writes the named course's digest.
-SCOPED = {"probe", "research", "analyse", "report"}
+SCOPED = {"probe", "research", "analyse", "gaps", "report"}
 
 # Which scope flags each stage's argparse actually declares. `report` takes ONLY
 # `--course` (main.py applies `_add_scope_args` to probe/research/analyse/run-weekly,
@@ -57,7 +62,10 @@ SCOPED = {"probe", "research", "analyse", "report"}
 #
 # and `_run` treats any code outside (0,1) as fatal, so the run was marked FAILED. It
 # went unnoticed because `report` joined SCOPED after the last successful run.
-COURSE_ONLY = {"report"}
+# `gaps` is course-scoped in the same narrow sense: tier, kind and dep-id describe
+# dependencies, and a topic gap is about a SESSION, so those flags would parse and then
+# silently do nothing.
+COURSE_ONLY = {"report", "gaps"}
 
 
 def _stage_args(stage: str, sc) -> list:
@@ -261,7 +269,7 @@ class JobRunner:
         self.q.put(run_id)
         return run_id
 
-    def _record_findings(self, run_id: str) -> None:
+    def _record_findings(self, run_id: str, stage: str = "analyse") -> None:
         """Snapshot the findings this run's `analyse` just produced.
 
         Keyed on `examined_this_run`, which is the set of dependencies the stage
@@ -276,7 +284,7 @@ class JobRunner:
                 return
             data = json.loads(Path(files[-1]).read_text())
         except (OSError, json.JSONDecodeError) as exc:
-            self.event(run_id, "analyse", f"-- could not record findings: {exc} --")
+            self.event(run_id, stage, f"-- could not record findings: {exc} --")
             return
 
         examined = set(data.get("examined_this_run") or [])
@@ -418,10 +426,17 @@ class JobRunner:
                     cmd.append("--refine")
                 self.event(run_id, stage, f"$ {' '.join(cmd[2:])}")
                 code = self._stream(run_id, stage, cmd)
-                if stage == "analyse" and code in (0, 1):
+                if stage in ("analyse", "gaps") and code in (0, 1):
                     # Immediately after, while `examined_this_run` in the artifact is
-                    # still this run's. Any later analyse overwrites it.
-                    self._record_findings(run_id)
+                    # still this stage's. Any later analyse overwrites it.
+                    #
+                    # Called after `gaps` as well, because `gaps` merges its own
+                    # findings into the same artifact and so replaces
+                    # `examined_this_run` with its topic ids. The insert is keyed on
+                    # (run_id, finding_id), so this adds the gaps without dropping what
+                    # `analyse` recorded a moment earlier - which is exactly what the
+                    # run page needs to show both kinds together.
+                    self._record_findings(run_id, stage=stage)
                 # `ingest` exits 1 on data problems it has already reported; that is a
                 # warning, not a stage failure.
                 if code not in (0, 1):

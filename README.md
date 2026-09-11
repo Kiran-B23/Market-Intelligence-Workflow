@@ -107,6 +107,8 @@ python3 main.py probe --course "Intro to Gen AI" --session 4-6 --tiers critical
 python3 main.py research     # flagged deps -> out/research_<date>.json
 python3 main.py research --nominate   # ...and ask a model for replacement candidates
 python3 main.py analyse      # everything   -> out/findings_<date>.json
+python3 main.py gaps         # workbooks + official docs -> topics we do not teach yet
+python3 main.py gaps --dry-run   # print what it would raise; write nothing
 python3 main.py report       # findings     -> out/digest_<date>.md + out/courses/<slug>/
 python3 main.py report --course pse   # write just PSE's digest (still reads them all)
 python3 main.py verify       # audit the trust invariants on those artifacts
@@ -122,6 +124,47 @@ python3 eval/parity.py --dry-run   # do both providers behave the same? (free)
 ```
 
 Optional keys live in `.env` (see `.env.example`); every one is optional.
+
+## Two directions of inquiry: is it still true, and is it still complete
+
+Stages `probe`, `research` and `analyse` run **inside-out**: they start from the
+dependency list, which `extract` derives from the course content, and ask whether what
+we teach is still true. That is a regression check, and it is most of the system.
+
+It cannot, even in principle, notice that a session is *incomplete*. A technique the
+courses have never mentioned has no dependency row, so it is never probed, never
+researched, and can never become a finding — the inventory's universe is exactly what is
+already taught.
+
+`gaps` runs the other way. It reads the workbook to learn what each session covers, reads
+official vendor documentation as an enumeration of an area, and reports the part of that
+enumeration that appears in no session's outline — naming the session it belongs in:
+
+```
+Add Parallel function calling to Building LLM Applications session 10
+(Tool Use & Function Calling in LLMs) — extend that deck's outline and its Key Takeaways.
+```
+
+Two rules keep it honest, and both were added after measuring what happens without them:
+
+* **Two independent vendors, or it is not reported.** Read on their own, four Google
+  documentation pages produced 32 findings, most of them API mechanics rather than
+  teachable topics ("Batch embeddings", "Migration from gemini-embedding-001"). What
+  separates an industry topic from one vendor's implementation detail is that a
+  competitor documents it too, so a topic must be named by two sources whose
+  `official_domains` are **disjoint**. 32 became 7. Recall suffers and that is the right
+  direction: a digest reporting three real gaps gets read, one reporting thirty of which
+  nine are real does not get read twice.
+* **Already taught anywhere is not a gap.** Checked against the workbook's own wording
+  and across both vendors' names for the topic, because Google writes "Zero-shot vs
+  few-shot prompts" where the workbook writes "Prompting Techniques (Zero-shot,
+  One-shot, Few-shot, CoT)".
+
+Areas live in `registry/topics.yaml`, hand-owned, two sources each. The stage prints its
+own blind spot — how many indexed sessions fall inside a declared area and which do not —
+so an undeclared subject cluster is a reported number rather than something you have to
+infer. It needs the course **workbook**: PSE has none, so PSE can never receive a gap
+finding.
 
 ## Two ways in: a manual run, and a daily watch
 
@@ -254,11 +297,18 @@ matters because probing is throttled to 1.5s per domain: the whole inventory is 
 minutes, one course's sessions 4-6 is ~3. The log streams live and is persisted, so
 reloading mid-run shows it from the beginning.
 
-Then **Findings** (severity-ranked cards with evidence, affected sessions and the
-act/why/when note, each with inline triage), **Inventory** (all 460 dependencies,
-filterable — including `no authority` to find the unmonitorable ones), **Trust** (runs
-the invariant audit, shows what the system has learned from reviewers), and **Digest**
-(the raw markdown).
+Then **What to fix** (urgency-ranked cards with evidence, affected sessions and the
+what/why/when note, each with inline accept/reject), **Tools & models used** (all 460,
+filterable — including `no official source` to find the unwatched ones), **Sources &
+decisions** (runs the source check, and shows what the system has learned from your
+accept/reject decisions), and **Weekly report** (the raw markdown).
+
+The labels on the page are deliberately not the names in the code. `watch_tier`,
+`blast_radius`, `diff_class` and `S7` are precise and they are also words nobody outside
+this repo has heard, so the page renders every one of them through a single `WORDS` map
+(`impact`, `only mentioned`, `no change`, `model retired`) while the API, the CLI flags
+and every saved scope keep the internal names unchanged. The real name is on hover
+wherever losing it would stop you cross-checking the page against the digest.
 
 ### How runs are executed
 

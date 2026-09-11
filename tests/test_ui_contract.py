@@ -277,7 +277,7 @@ def test_the_chooser_is_populated_at_startup_not_on_one_view():
 
 
 def test_the_run_form_says_where_the_control_is():
-    assert "section of the" in PAGE and "sidebar, and apply to this run" in PAGE
+    assert "section of the" in PAGE and "sidebar, and applies to this check" in PAGE
 
 
 
@@ -320,7 +320,7 @@ def test_the_form_says_research_spends_tavily_searches():
     `--nominate`. Measured: ~73 searches for a scoped Intro to Gen AI run."""
     assert "tavilyNote" in PAGE
     assert "spends <b>Tavily</b> searches" in PAGE
-    assert "official pages + Tavily" in PAGE, "the stage label says so too"
+    assert "official pages + Tavily" in PAGE, "the step label says so too"
 
 
 def test_unchecking_research_updates_that_note():
@@ -331,20 +331,31 @@ def test_unchecking_research_updates_that_note():
 
 def test_the_run_form_is_in_the_sidebar_not_only_the_header_button():
     """It was filtered out on the reasoning that the header button replaced it, which
-    left "Run history" — the obvious-looking entry — as a dead end that hides the form,
+    left "Past checks" — the obvious-looking entry — as a dead end that hides the form,
     and with it the model chooser. Nothing should be reachable by one route only."""
-    assert "'New run'" in PAGE
+    assert "'Check for changes'" in PAGE
     assert "v !== 'run'" not in PAGE, "the sidebar must not filter the form out"
 
 
 def test_the_form_and_the_history_are_named_distinguishably():
-    """"Runs" vs "Run audit" asked the reader to guess which started one."""
-    assert "'Run history'" in PAGE
-    assert "'Run audit'" not in PAGE
+    """"Runs" vs "Run audit" asked the reader to guess which started one.
+
+    The names changed when the page's vocabulary was rewritten for readers outside this
+    repo, so this asserts the PROPERTY the old literals stood for: the entry that starts
+    a check and the entry that lists past ones must not read as the same thing, and the
+    verb-phrase names must be the ones on the page.
+    """
+    form, history = "'Check for changes'", "'Past checks'"
+    assert form in PAGE and history in PAGE
+    assert form != history
+    assert "'Run audit'" not in PAGE, "the old ambiguous label is gone"
+    assert "'Run history'" not in PAGE
 
 
 def test_the_unscoped_form_is_linked_rather_than_only_typeable():
-    assert "'New run (any scope)'" in PAGE
+    """`#/global/run` was reachable but unlinked. It now shares the course form's name,
+    so the assertion is that the global nav carries an entry pointing at it."""
+    assert "['run','Check for changes']" in PAGE
 
 
 def test_the_history_view_offers_a_way_to_start_one():
@@ -391,3 +402,61 @@ def test_a_run_without_the_analyse_stage_says_why_it_has_no_findings():
 def test_the_history_row_says_what_the_run_produced():
     assert "findings_count" in PAGE and "worst_severity" in PAGE
     assert "no findings recorded" in PAGE
+
+
+# ------------------------------- the page reads without a glossary
+#
+# The complaint that produced these: "the naming in the UI is a bit confusing and I'm
+# not able to make others understand". The page's labels and the system's internal
+# names had been the same vocabulary, so reading it required knowing the codebase.
+# These assert the separation holds — plain words in the labels, real names in the API
+# calls — because the pull back towards the internal name is constant.
+
+def test_internal_names_are_translated_through_one_map():
+    """One place to edit, and one place to look when a label reads wrong."""
+    assert "const WORDS = {" in PAGE
+    assert "const word = (group, key) =>" in PAGE
+    for group in ("tier:", "diff:", "kind:", "authority:", "signal:", "stage:"):
+        assert group in PAGE, group
+
+
+def test_jargon_is_not_shown_raw():
+    """Each of these was on screen with no explanation anywhere on the page."""
+    for jargon in ("blast ${", "esc(f.kind_of_signal)", "esc(r.diff_class)",
+                   "esc(r.watch_tier)", "esc(String(c.tier || '').toLowerCase())"):
+        assert jargon not in PAGE, jargon
+
+
+def test_the_drift_codes_carry_their_meaning():
+    """"S7" is precise and tells a reader nothing. It stays, with the words beside it."""
+    assert "word('signal', " in PAGE
+    assert "S11: \"topic we don't teach yet\"" in PAGE
+
+
+def test_api_values_were_not_renamed_with_the_labels():
+    """A label is safe to edit; a value is a wire contract.
+
+    The watch tiers reach `Scope.to_cli_args()`, the database and every saved scope, so
+    the checkbox VALUES and the filter options must still be the internal names even
+    though their text is now plain English.
+    """
+    assert 'class="tier" value="${esc(t)}"' in PAGE
+    for value in ('value="critical"', 'value="standard"', 'value="mention-only"'):
+        assert value in PAGE, value
+    for stage in ("ingest", "extract", "probe", "research", "analyse", "gaps", "report"):
+        assert f'value="{stage}"' in PAGE, stage
+
+
+def test_the_gaps_step_is_offered_in_the_form():
+    """It is the only stage that can produce an S11, and it is off by default because
+    it fetches vendor documentation rather than reading the inventory."""
+    assert 'value="gaps"' in PAGE
+    assert "Look for topics we don't teach yet" in PAGE
+    assert 'value="gaps" checked' not in PAGE
+
+
+def test_a_topic_gap_is_not_described_as_a_stale_dependency():
+    """Its dependency is absent from the inventory BY DESIGN, so the "re-run extract"
+    warning would be advice that changes nothing."""
+    assert "f.projection === 'topic'" in PAGE
+    assert "Where it belongs" in PAGE

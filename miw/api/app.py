@@ -100,6 +100,20 @@ def _course_dep_ids(course: str, deps: dict) -> set:
     return {i for i, d in deps.items() if any(l.course == course for l in d.locations)}
 
 
+def _touches_course(row: dict, course: str, ids: set) -> bool:
+    """Does this finding belong on `course`'s page?
+
+    Normally the answer comes from the inventory: a dependency's locations say which
+    courses reference it. A TOPIC GAP (S11) has no inventory entry by design - the
+    inventory records what the curriculum uses, and a topic we do not teach is
+    precisely not that - so filtering on inventory membership alone silently dropped
+    every gap finding from every course page while leaving it on the roll-up. A gap
+    carries its own `courses`, populated from the sessions it was placed in, so that
+    is what answers the question for it.
+    """
+    return row.get("dep_id") in ids or course in (row.get("courses") or [])
+
+
 def _project_rows(rows: list, course: str) -> list:
     """Project raw finding dicts onto one course, recomputing every count."""
     from miw.analyse.project import project_all
@@ -245,7 +259,7 @@ def findings(course: str = "") -> dict:
     if title:
         deps = _inventory_deps()
         ids = _course_dep_ids(title, deps)
-        rows = [r for r in rows if r.get("dep_id") in ids]
+        rows = [r for r in rows if _touches_course(r, title, ids)]
         coverage = {k: v for k, v in coverage.items() if k in ids}
     standing_raw = [r for r in rows if r.get("diff_class") == "unchanged"]
     rows = [r for r in rows if r.get("diff_class") != "unchanged"]
@@ -386,6 +400,36 @@ def _session_groups(locs: list, graded: tuple) -> list:
 DETAIL_LOCATION_CAP = 40
 
 
+def _topic_block(row: dict) -> dict:
+    """What to show in place of the dependency panel for a topic gap.
+
+    Read from the `gaps_*.json` sidecar rather than the finding, because that is where
+    the corroborating sources and their authority sets live - the same arrangement
+    `main.py verify` uses to re-classify a topic claim without trusting the tier the
+    finding records.
+    """
+    base = {"canonical_name": row.get("canonical_name", "")}
+    if not str(row.get("dep_id", "")).startswith("topic:"):
+        return {**base, "stale": True}
+    side = _read("gaps_*.json")
+    topic = next((t for t in (side.get("topics") or [])
+                  if t.get("dep_id") == row.get("dep_id")), {})
+    srcs = topic.get("sources") or []
+    return {**base, "kind": "topic",
+            "dep_id": row.get("dep_id", ""),
+            "area_id": topic.get("area_id", ""),
+            "area_title": topic.get("area_title", ""),
+            "also_documented_as": topic.get("also_documented_as") or [],
+            "corroboration": topic.get("corroboration"),
+            "vendor": ", ".join(s.get("subject", "") for s in srcs),
+            "docs_url": (srcs[0] or {}).get("url", "") if srcs else "",
+            "homepage": "",
+            "official_domains": sorted({d for s in srcs
+                                        for d in (s.get("official_domains") or [])}),
+            "referenced_urls": [s.get("url", "") for s in srcs],
+            "placements": topic.get("placements") or []}
+
+
 @app.get("/api/finding/{finding_id}")
 def finding_detail(finding_id: str, course: str = "", session: str = "",
                    offset: int = 0) -> dict:
@@ -434,7 +478,13 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
         else:
             projection = "not_in_course"
     elif title and dep is None:
-        projection = "unavailable"
+        # Two different situations wearing one label. A dependency dropped by a later
+        # `extract` really is unavailable and its figures really are global. A topic gap
+        # has no inventory entry by construction, and its per-course figures are exact -
+        # its locations ARE the sessions - so calling it stale would tell the reviewer
+        # to re-run `extract`, which would change nothing.
+        projection = "topic" if str(row.get("dep_id", "")).startswith("topic:") \
+            else "unavailable"
 
     # --- where ---------------------------------------------------------------
     from miw.extract import locate
@@ -516,8 +566,7 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
             "taught_version": dep.taught_version or "",
             "official_domains": dep.official_domains,
             "referenced_urls": dep.referenced_urls[:8],
-        } if dep is not None else {"canonical_name": row.get("canonical_name", ""),
-                                   "stale": True}),
+        } if dep is not None else _topic_block(row)),
         "where": where,
         "groups": groups,
         "locations_total": total_locations,

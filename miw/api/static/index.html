@@ -849,7 +849,7 @@
       <div id="sidecoursetabs"></div>
     </div>
     <div class="sgroup">
-      <div class="slabel">Across the curriculum</div>
+      <div class="slabel">All courses</div>
       <div id="sideglobal"></div>
     </div>
     <!-- The model, where the active one was already being reported. It applies to the
@@ -869,7 +869,7 @@
 <!-- The content header carries the page identity and the PRIMARY action. -->
 <header>
   <div class="hgrow">
-    <h1 id="pagetitle">Curriculum Drift Watch</h1>
+    <h1 id="pagetitle">What changed in the courses</h1>
     <div class="hsub" id="pagesub"></div>
   </div>
   <div class="switcher" id="switcher"></div>
@@ -915,25 +915,26 @@
   <section id="tab-overview" hidden>
     <div class="panel">
       <h2>Courses</h2>
-      <p class="hint">One page per course. A dependency referenced by more than one
-        course appears on each, with that course's own counts — 133 of 464 are shared,
-        so the numbers on a course page are that course's share, not the global total.</p>
+      <p class="hint">One page per course. A tool used by more than one course shows
+        on each of them, counting only that course's own uses — most tools are shared,
+        so a course page shows that course's share, never the total.</p>
       <div id="overview"></div>
     </div>
   </section>
   <section id="tab-watch" hidden>
     <div class="panel">
-      <h2>Vendor watch</h2>
-      <p class="hint">Daily polling of vendor catalogues and package registries. A
-        signal is about a <em>vendor</em>, not a course, so it lives here; the courses
-        it resolves to are linked from each row.</p>
+      <h2>Vendor releases</h2>
+      <p class="hint">What the vendors themselves announced — model retirements,
+        package releases, breaking changes — checked daily. These are about a
+        <em>vendor</em> rather than a course, so they live here; each row links to the
+        courses it affects.</p>
       <div id="watch"></div>
     </div>
   </section>
   <section id="tab-run" hidden>
     <a class="act primary" id="newrun" href="#/global/run" hidden
        style="display:inline-block;margin-bottom:var(--s4);text-decoration:none">
-       + New run — pick scope, stages and model</a>
+       + New check — pick courses, steps and model</a>
     <div class="panel" id="runform">
       <div class="grid2">
         <fieldset>
@@ -945,27 +946,37 @@
           <input class="ti" id="sessions" placeholder="all sessions — or 12, 3-7, 3,5,9-11">
           <p class="note" style="margin:7px 0 0">A session filter with no course selected
             matches that number in every course.</p>
-          <span class="flabel" style="margin-top:14px">Watch tier</span>
+          <span class="flabel" style="margin-top:14px">How closely we watch</span>
           <div class="inline" id="tiers"></div>
-          <span class="flabel" style="margin-top:14px">Cap</span>
+          <span class="flabel" style="margin-top:14px">Stop after (optional)</span>
           <input class="ti" id="limit" type="number" min="1" placeholder="no cap"
                  style="max-width:130px">
         </fieldset>
         <fieldset>
-          <legend>Stages</legend>
+          <!-- The `value` of each box is the stage name the CLI and the database use,
+               and none of them changed. Only the words beside them did: a colleague
+               being shown this page cannot be expected to know what "extract" or
+               "analyse" produce, and the small grey name keeps the real one visible for
+               anyone reading the log underneath. -->
+          <legend>Steps to run</legend>
           <div class="checks" id="stages">
-            <label><input type="checkbox" value="ingest"> re-read course exports</label>
-            <label><input type="checkbox" value="extract"> rebuild inventory
-              <span class="cnt">(unscoped)</span></label>
-            <label><input type="checkbox" value="probe" checked> probe
-              <span class="cnt">deterministic</span></label>
-            <label><input type="checkbox" value="research" checked> research
-              <span class="cnt">official pages + Tavily</span></label>
-            <label><input type="checkbox" value="analyse" checked> analyse</label>
-            <label><input type="checkbox" value="report" checked> report</label>
+            <label><input type="checkbox" value="ingest"> Re-read the course exports
+              <span class="cnt">ingest</span></label>
+            <label><input type="checkbox" value="extract"> Rebuild the list of tools used
+              <span class="cnt">extract · always all courses</span></label>
+            <label><input type="checkbox" value="probe" checked> Check every link and version
+              <span class="cnt">probe · no AI, no cost</span></label>
+            <label><input type="checkbox" value="research" checked> Read the official pages
+              <span class="cnt">research · official pages + Tavily web search</span></label>
+            <label><input type="checkbox" value="analyse" checked> Rank the issues and say what to do
+              <span class="cnt">analyse</span></label>
+            <label><input type="checkbox" value="gaps"> Look for topics we don't teach yet
+              <span class="cnt">gaps · reads the course workbook</span></label>
+            <label><input type="checkbox" value="report" checked> Write the report
+              <span class="cnt">report</span></label>
           </div>
           <label style="margin-top:10px;display:flex;gap:7px;align-items:center">
-            <input type="checkbox" id="refine"> refine notes with the LLM
+            <input type="checkbox" id="refine"> Let the model rewrite the advice
           </label>
           <p class="note" style="margin:6px 0 0" id="refinenote"></p>
         </fieldset>
@@ -973,31 +984,31 @@
 
       <div class="preview">
         <div><span class="big" id="pvdeps">—</span>
-          <span class="note">dependencies in scope</span></div>
+          <span class="note">tools &amp; models to check</span></div>
         <div><span class="big" id="pvurls">—</span>
-          <span class="note">referenced URLs</span></div>
+          <span class="note">links students click</span></div>
         <div><span class="note" id="pvtime"></span></div>
         <div><span class="note" id="pvtier"></span></div>
       </div>
 
       <div class="note" id="tavilynote"></div>
 
-      <div class="note">Provider and model are chosen in the <b>Model</b> section of the
-        sidebar, and apply to this run.</div>
+      <div class="note">The AI model is chosen in the <b>Model</b> section of the
+        sidebar, and applies to this check.</div>
 
       <div class="runbar">
-        <button class="act primary" id="runbtn">Run audit</button>
+        <button class="act primary" id="runbtn">Start check</button>
         <button class="act" id="cancelbtn" hidden>Cancel</button>
         <input class="ti" id="label" placeholder="label (optional)" style="max-width:230px">
         <span class="note" id="runstatus"></span>
       </div>
     </div>
 
-    <h2>Run log</h2>
+    <h2>Live log</h2>
     <div id="runfindings"></div>
-    <pre class="log" id="log">No run started in this session. Pick a scope above and press Run audit.</pre>
+    <pre class="log" id="log">Nothing running. Pick the courses and steps above, then press Start check.</pre>
 
-    <h2>Recent runs</h2>
+    <h2>Recent checks</h2>
     <div class="panel" style="padding:0" id="runs"></div>
   </section>
 
@@ -1012,37 +1023,44 @@
   </section>
 
   <section id="tab-inventory" hidden>
-    <p class="hint">Every external dependency the curriculum references, deduplicated.
-      A row with no authority set can never produce a deprecation, pricing or version
-      finding — that is the safe direction, but it also means it is unmonitored.</p>
+    <p class="hint">Every outside tool, model, package and service the courses point
+      students at. A row with no official source cannot produce a "deprecated",
+      "now paid" or "version moved on" issue — we will not claim something we cannot
+      quote, which is the safe direction and also means that row is unwatched.</p>
     <div class="filters">
       <input class="q" id="q" placeholder="search name, alias or domain…">
       <select id="kind"><option value="">all kinds</option></select>
-      <select id="tier"><option value="">all watch tiers</option>
-        <option value="critical">critical</option><option value="standard">standard</option>
-        <option value="mention-only">mention-only</option></select>
-      <select id="authority"><option value="">any authority</option>
-        <option value="yes">has official authority</option>
-        <option value="no">no authority (unmonitorable)</option></select>
+      <!-- The option VALUES are the tier names the API filters on; only the text
+           a person reads was rewritten. -->
+      <select id="tier"><option value="">watched at any level</option>
+        <option value="critical">watched closely</option>
+        <option value="standard">watched normally</option>
+        <option value="mention-only">only mentioned</option></select>
+      <select id="authority"><option value="">official source: either</option>
+        <option value="yes">has an official source</option>
+        <option value="no">no official source (unwatched)</option></select>
       <span class="note" id="invcount"></span>
     </div>
     <div class="scroll"><table id="invtable"></table></div>
   </section>
 
   <section id="tab-trust" hidden>
-    <h2>Trust invariant audit</h2>
-    <p class="hint">Runs <code>main.py verify</code>: no finding may rest on a source
-      that is not authoritative for its claim kind.</p>
+    <h2>Source check</h2>
+    <p class="hint">Re-reads every issue on file and checks that each one still rests on
+      the right kind of source: either something we observed ourselves (a link we
+      fetched) or a quote from the vendor's own page. Anything that does not is listed
+      by name. Runs <code>main.py verify</code>.</p>
     <pre class="out" id="verify">click to run…</pre>
-    <button class="act" id="runverify">Run audit</button>
-    <h2>Reviewer corrections the system has learned from</h2>
-    <p class="hint">Half of all triage decisions are held out from learning and used only
-      to score precision — otherwise precision decays into self-assessment.</p>
+    <button class="act" id="runverify">Run the check</button>
+    <h2>Your decisions the system has learned from</h2>
+    <p class="hint">When you accept or reject an issue, that decision feeds back in.
+      Half of them are held back and used only to score how often we are right —
+      otherwise the score becomes us marking our own work.</p>
     <pre class="out" id="feedback">loading…</pre>
   </section>
 
   <section id="tab-digest" hidden>
-    <h2>This week's digest</h2>
+    <h2>This week's report</h2>
     <pre class="out" id="digest">loading…</pre>
   </section>
 </main>
@@ -1108,15 +1126,57 @@ const qs = (extra) => {
    labelled "Runs" and "Run audit", which is a distinction nobody should have to guess
    at — and when the form was dropped from the sidebar entirely, "Runs" became a dead
    end that hides the form and with it the model chooser. */
-const COURSE_TABS = [['findings','Findings'], ['inventory','Inventory'],
-                     ['run','New run'], ['runs','Run history'],
-                     ['digest','Digest']];
-const GLOBAL_TABS = [['run','New run (any scope)'], ['runs','All runs'],
-                     ['trust','Trust & feedback'], ['digest','Roll-up digest']];
+const COURSE_TABS = [['findings','What to fix'], ['inventory','Tools & models used'],
+                     ['run','Check for changes'], ['runs','Past checks'],
+                     ['digest','Weekly report']];
+const GLOBAL_TABS = [['run','Check for changes'], ['runs','Past checks'],
+                     ['trust','Sources & decisions'], ['digest','Weekly report']];
 
 /* The sidebar replaces the top tab bar. Same COURSE_TABS/GLOBAL_TABS, same hash
    routes — only the presentation changed, so nothing about routing moved. */
 const SEV_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
+
+/* ---------- plain words for internal names ----------------------------------------
+   Every label a person reads comes from here, and every name the API speaks stays
+   untouched. The two vocabularies had been the same one, which is why the page could
+   not be handed to a colleague without a walkthrough: "blast radius 65",
+   "watch tier mention-only" and "diff class worsened" are precise, and they are also
+   three phrases nobody outside this repo has ever heard.
+
+   The rule is one-directional on purpose. `watch_tier` stays `watch_tier` in the
+   database, in `Scope.to_cli_args()` and in every URL, so nothing about scoping,
+   replay or the CLI changes; it is only ever rendered through `word()`. A label map is
+   safe to edit, and a renamed API value is not. */
+const WORDS = {
+  tier: {critical: 'watch closely', standard: 'watch normally',
+         'mention-only': 'only mentioned'},
+  // How a finding moved since the last check. "worsened" and "improved" describe the
+  // severity, which is not what a reader assumes the word refers to.
+  diff: {new: 'new', worsened: 'got worse', improved: 'got better',
+         changed: 'changed', unchanged: 'no change', resolved: 'fixed'},
+  // The two directions a finding can point. "regression" and "opportunity" are the
+  // right words for the scorer and the wrong ones for a curriculum reviewer.
+  kind: {regression: 'now broken or outdated', opportunity: 'could be better'},
+  // Source authority. These are the trust tiers from `miw/trust.py`, and the digest's
+  // whole argument rests on the difference between them, so the plain words have to
+  // keep that difference visible.
+  authority: {AUTHORITATIVE: "the vendor's own page", CORROBORATING: 'independent source',
+              LEAD_ONLY: 'unconfirmed', EXCLUDED: 'not usable'},
+  // The drift classes from `miw/analyse/score.py`. Several lists show only the code,
+  // where "S7" told the reader nothing at all; the code stays in the tooltip so it can
+  // still be matched against the scorer and the digest.
+  signal: {S1: 'dead or moved link', S2: 'login or paywall added',
+           S3: 'free tier cut', S4: 'deprecated or abandoned',
+           S5: 'the taught steps changed', S6: 'version moved past what we teach',
+           S7: 'model retired', S8: 'docs rewritten', S9: 'n8n node changed',
+           S10: 'a better option exists', S11: "topic we don't teach yet"},
+  // Pipeline stages, in the order they run.
+  stage: {ingest: 'reading course exports', extract: 'rebuilding the tool list',
+          probe: 'checking links and versions', research: 'reading official pages',
+          analyse: 'ranking the issues', gaps: 'looking for missing topics',
+          report: 'writing the report'},
+};
+const word = (group, key) => (WORDS[group] || {})[key] || key || '';
 
 function renderNav(r) {
   const item = (href, label, on, extra = '') =>
@@ -1149,7 +1209,7 @@ function renderNav(r) {
 
   $('#sideglobal').innerHTML = [
     item('#/', 'All courses', r.scope === 'overview'),
-    item('#/watch', 'Vendor watch', r.scope === 'watch'),
+    item('#/watch', 'Vendor releases', r.scope === 'watch'),
     ...GLOBAL_TABS.map(([v, l]) =>
       item(`#/global/${v}`, l, r.scope === 'global' && r.view === v)),
   ].join('');
@@ -1173,7 +1233,7 @@ function renderPageHead(r) {
     run.textContent = `Run audit · ${COURSE_TITLE || r.slug}`;
   } else {
     t.textContent = r.scope === 'watch' ? 'Vendor watch'
-      : r.scope === 'global' ? 'Across the curriculum' : 'Courses';
+      : r.scope === 'global' ? 'All courses' : 'Courses';
     sub.textContent = r.scope === 'overview'
       ? 'Drift in what the curriculum already teaches.' : '';
     run.hidden = true;
@@ -1380,7 +1440,7 @@ async function renderAddCourse() {
       <span class="chip sig">${esc(String(e.expect_sessions))}</span>
       <span><b>${esc(e.slug)}</b><span class="note"> · ${esc(e.title)}${
         e.workbook ? ' · ' + esc(e.workbook) : ''}</span></span></div>`).join('');
-    $('#ac-registry').innerHTML = `<h2>Registered here</h2>
+    $('#ac-registry').innerHTML = `<h2>Courses set up here</h2>
       <p class="hint">Courses added through this page live in
         <code>${esc(reg.path)}</code>. The four in <code>config/constants.py</code> stay
         hand-owned and win on conflict.</p>
@@ -1483,27 +1543,27 @@ function renderCharts(sum) {
   const probe = sum.probe_counts || {};
   const out = [];
 
-  out.push(bar('Open findings by severity',
+  out.push(bar('Open issues, by urgency',
     SEV_ORDER.map(k => [k, sev[k] || 0, `var(--${SEV_VAR[k]})`]),
-    {lead: sum.findings_total || 0, empty: 'no open findings'}));
+    {lead: sum.findings_total || 0, empty: 'nothing open'}));
 
-  out.push(bar('Can we speak for it officially?', [
-    ['has an authority', sum.with_authority || 0, 'var(--ok)'],
-    ['no authority', sum.without_authority || 0, 'var(--low)'],
+  out.push(bar('Is there an official source we can quote?', [
+    ['yes', sum.with_authority || 0, 'var(--ok)'],
+    ['no', sum.without_authority || 0, 'var(--low)'],
   ], {lead: sum.dependencies || 0,
-      empty: 'no dependencies yet'}));
+      empty: 'nothing tracked yet'}));
 
-  out.push(bar('Watch tier', [
-    ['critical', tiers.critical || 0, 'var(--crit)'],
-    ['standard', tiers.standard || 0, 'var(--med)'],
-    ['mention-only', tiers['mention-only'] || 0, 'var(--low)'],
-  ], {lead: sum.dependencies || 0, empty: 'no dependencies yet'}));
+  out.push(bar('How closely we watch each one', [
+    [word('tier', 'critical'), tiers.critical || 0, 'var(--crit)'],
+    [word('tier', 'standard'), tiers.standard || 0, 'var(--med)'],
+    [word('tier', 'mention-only'), tiers['mention-only'] || 0, 'var(--low)'],
+  ], {lead: sum.dependencies || 0, empty: 'nothing tracked yet'}));
 
-  out.push(bar('Last probe', [
-    ['reachable', probe.ok || 0, 'var(--ok)'],
+  out.push(bar('Last link check', [
+    ['still works', probe.ok || 0, 'var(--ok)'],
     ['gone', probe.broken || 0, 'var(--crit)'],
-    ['inconclusive', probe.unreachable || 0, 'var(--high)'],
-  ], {lead: sum.probed || 0, empty: 'not probed yet'}));
+    ["couldn't tell", probe.unreachable || 0, 'var(--high)'],
+  ], {lead: sum.probed || 0, empty: 'not checked yet'}));
 
   box.innerHTML = out.join('');
 }
@@ -1554,7 +1614,9 @@ function card(f) {
     /* "affects" is also the way in to the detail panel: the summary line is exactly
        where a reviewer asks "where, and what do I change" - so the button sits on the
        answer that prompts the question rather than in a corner of the card. */
-    ['affects', `${locLine(f)} <span class="chip n">blast ${f.blast_radius}</span>
+    ['affects', `${locLine(f)} <span class="chip n" title="A weighted count of where\
+ it is used: a coding question that runs it counts far more than a passing mention.">\
+impact ${f.blast_radius}</span>
        <button class="openbtn" data-detail="${esc(f.finding_id)}"
          style="margin-left:6px">Where &amp; what to change →</button>`],
     ['what to do', esc(f.what_to_act || f.recommendation)],
@@ -1576,14 +1638,21 @@ function card(f) {
       : `all ${f.total_locations || f.local_locations} references are in this course`;
     const elsewhere = (f.also_in || []).map(a =>
       `<a href="#/c/${esc(a.slug)}/findings#c-${esc(f.finding_id)}">${esc(a.course)}</a>
-       (${a.locations} ref${a.locations === 1 ? '' : 's'}, blast ${a.blast_radius})`
+       (${a.locations} use${a.locations === 1 ? '' : 's'}, impact ${a.blast_radius})`
     ).join(' · ');
     proj = `<div class="proj">${esc(share)}; the numbers below are this course's share.
       ${elsewhere ? 'Also taught in ' + elsewhere + '.' : ''}</div>`;
+  } else if (f.projection === 'topic') {
+    /* Not a stale row. A topic gap has no inventory entry by design, and its
+       per-course figures are exact — the sessions below ARE its locations — so telling
+       the reviewer to re-run `extract` would be advice that changes nothing. */
+    proj = `<div class="proj">This is a topic we do not teach yet, so there is no tool
+      to count. The sessions listed below are the ones in this course that already
+      cover the area.</div>`;
   } else if (f.projection === 'unavailable') {
-    proj = `<div class="warn">This dependency is no longer in the inventory, so the
+    proj = `<div class="warn">This tool is no longer in the list of tools used, so the
       figures below are the <b>whole-curriculum</b> totals, not this course's share.
-      Re-run <code>extract</code>.</div>`;
+      Re-run the <code>extract</code> step.</div>`;
   }
 
   /* Severity is global because that is what the store and the precision metric use.
@@ -1596,10 +1665,10 @@ function card(f) {
     <div class="chead">
       <span class="chip ${esc(f.severity)}">${esc(f.severity)}</span>
       ${localSev}
-      <span class="chip sig">${esc(f.signal)}</span>
+      <span class="chip sig" title="${esc(word('signal', f.signal))}">${esc(f.signal)}</span>
       <span class="name">${esc(f.canonical_name)}</span>
       <span class="note">${esc(f.signal_label)}</span>
-      <span class="chip ${f.kind_of_signal === 'opportunity' ? 'opportunity' : 'n'}">${esc(f.kind_of_signal)}</span>
+      <span class="chip ${f.kind_of_signal === 'opportunity' ? 'opportunity' : 'n'}">${esc(word('kind', f.kind_of_signal))}</span>
       ${f.note_source === 'llm' ? `<span class="chip n">note refined${f.note_provider ? ' · ' + esc(f.note_provider) : ''}</span>` : ''}
       ${f._decision ? `<span class="chip ${f._decision === 'accepted' ? 'ok' : 'critical'}">${esc(f._decision)}</span>` : ''}
     </div>
@@ -1745,7 +1814,7 @@ function renderDetail(d) {
     + (f.local_severity && f.local_severity !== f.severity
        ? `<span class="chip n">in this course: ${esc(f.local_severity)}</span>` : '');
   $('#slide-head').innerHTML = `${sev}
-    <span class="chip sig">${esc(f.signal)}</span>
+    <span class="chip sig" title="${esc(word('signal', f.signal))}">${esc(f.signal)}</span>
     <span class="name" id="slide-title">${esc(f.canonical_name || dep.canonical_name)}</span>
     <span class="note">${esc(f.signal_label || '')}</span>
     <button class="x" id="slide-x" aria-label="Close details">&times;</button>`;
@@ -1793,17 +1862,29 @@ function renderDetail(d) {
   }).join('') : ((d.where || []).map(locBlock).join('')
                  || '<div class="empty">No locations recorded.</div>');
 
-  const where = `<h3>Where it is used — ${total} reference${total === 1 ? '' : 's'} ${scope}</h3>
-    ${groups.length > 1 ? '' : cap}${elsewhere}
-    ${grouped}`;
+  /* A topic gap points the other way round. Every other finding's locations are
+     places the curriculum USES something; an S11's locations are the sessions that
+     SHOULD cover it and currently do not, so "Where it is used — 1 reference" reads as
+     the exact opposite of what the finding says. */
+  const isGap = f.signal === 'S11';
+  const where = isGap
+    ? `<h3>Where it belongs — ${total} session${total === 1 ? '' : 's'} ${scope}</h3>
+       <p class="hint">These sessions already cover this area, and none of their
+         outlines mention this topic. Each line points at the workbook row the
+         placement was judged against.</p>
+       ${elsewhere}${grouped}`
+    : `<h3>Where it is used — ${total} reference${total === 1 ? '' : 's'} ${scope}</h3>
+       ${groups.length > 1 ? '' : cap}${elsewhere}
+       ${grouped}`;
 
   /* --- the source. Probe-only findings are labelled, never shown as unsourced. */
   let src;
   if ((d.evidence || []).length) {
     src = (d.evidence || []).map(c => `<div class="ev">
       <a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.source_url)}</a>
-      <span class="chip ${c.tier === 'AUTHORITATIVE' ? 'ok' : 'n'}">${
-        esc(String(c.tier || '').toLowerCase())}</span>
+      <span class="chip ${c.tier === 'AUTHORITATIVE' ? 'ok' : 'n'}"
+            title="trust tier: ${esc(String(c.tier || ''))}">${
+        esc(word('authority', c.tier))}</span>
       <span class="chip n">${esc(c.kind || '')}</span>
       <span class="chip n">read ${esc(String(c.retrieved_at || '').slice(0, 10))}</span>
       ${c.about_alternative ? `<span class="chip n">about ${esc(c.about_alternative)}</span>` : ''}
@@ -1817,7 +1898,7 @@ function renderDetail(d) {
   } else {
     src = '<div class="empty">No evidence recorded.</div>';
   }
-  const source = `<h3>What the source is</h3>${src}`;
+  const source = `<h3>Where this came from</h3>${src}`;
 
   /* --- the dependency itself, so a reviewer can check the vendor pages directly. */
   const links = [
@@ -1826,19 +1907,39 @@ function renderDetail(d) {
   ].filter(Boolean).map(([l, u]) =>
     `<div class="lab">${esc(l)}</div><div><a href="${esc(u)}" target="_blank"
       rel="noopener">${esc(u)}</a></div>`).join('');
-  const about = `<h3>The dependency</h3><div class="kv">
-    <div class="lab">kind</div><div>${esc(dep.kind || '—')}${
-      dep.vendor ? ` · vendor ${esc(dep.vendor)}` : ''}${
-      dep.watch_tier ? ` · <span class="chip n">${esc(dep.watch_tier)}</span>` : ''}</div>
-    ${links}
-    ${dep.registry ? `<div class="lab">registry</div><div class="mono">${esc(dep.registry)}${
-      dep.registry_id ? ' / ' + esc(dep.registry_id) : ''}</div>` : ''}
-    <div class="lab">dep id</div><div><button class="idbtn"
-      data-copy="${esc(dep.dep_id || '')}">${esc(dep.dep_id || '—')}</button></div>
-    </div>`;
+  /* A topic gap has no tool to describe, so the panel describes the TOPIC: which
+     curriculum area it came from, what each vendor calls it, and how strongly the two
+     independent sources agreed. That last number is the finding's whole claim to being
+     an industry topic rather than one vendor's API detail, so it is shown rather than
+     left in the artifact. */
+  const about = isGap
+    ? `<h3>The topic</h3><div class="kv">
+        <div class="lab">curriculum area</div><div>${esc(dep.area_title || '—')}</div>
+        ${(dep.also_documented_as || []).length
+          ? `<div class="lab">also called</div><div>${
+              esc((dep.also_documented_as || []).join(' · '))}</div>` : ''}
+        <div class="lab">documented by</div><div>${esc(dep.vendor || '—')}${
+          dep.corroboration != null
+            ? ` <span class="chip ok" title="How much the two independent sources'\
+ wording agreed. Below 0.4 the topic is not reported at all.">agreement ${
+              esc(String(dep.corroboration))}</span>` : ''}</div>
+        <div class="lab">topic id</div><div><button class="idbtn"
+          data-copy="${esc(dep.dep_id || '')}">${esc(dep.dep_id || '—')}</button></div>
+      </div>`
+    : `<h3>The tool or model</h3><div class="kv">
+        <div class="lab">what it is</div><div>${esc(dep.kind || '—')}${
+          dep.vendor ? ` · from ${esc(dep.vendor)}` : ''}${
+          dep.watch_tier ? ` · <span class="chip n">${
+            esc(word('tier', dep.watch_tier))}</span>` : ''}</div>
+        ${links}
+        ${dep.registry ? `<div class="lab">registry</div><div class="mono">${
+          esc(dep.registry)}${dep.registry_id ? ' / ' + esc(dep.registry_id) : ''}</div>` : ''}
+        <div class="lab">internal id</div><div><button class="idbtn"
+          data-copy="${esc(dep.dep_id || '')}">${esc(dep.dep_id || '—')}</button></div>
+      </div>`;
 
   const alts = (d.alternatives || []).filter(a => (a.claims || []).length);
-  const altBlock = alts.length ? `<h3>Verified alternatives</h3>` + alts.map(a =>
+  const altBlock = alts.length ? `<h3>Replacements we checked</h3>` + alts.map(a =>
     `<div class="kv" style="margin-bottom:8px">
       <div class="lab">${esc(a.name)}</div><div>
         <a href="${esc(a.homepage)}" target="_blank" rel="noopener">${esc(a.homepage)}</a>
@@ -1968,22 +2069,25 @@ function renderAgentRuns(data) {
     one against the vendor's own page.</p>` + runs.map(r => {
     const ev = (r.evidence || []).map(c => `<div class="ev">
         <a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.source_url)}</a>
-        <span class="chip ${c.tier === 'AUTHORITATIVE' ? 'ok' : 'n'}">${esc(String(c.tier || '').toLowerCase())}</span>
+        <span class="chip ${c.tier === 'AUTHORITATIVE' ? 'ok' : 'n'}"
+              title="trust tier: ${esc(String(c.tier || ''))}">${
+          esc(word('authority', c.tier))}</span>
         <span class="chip n">read ${esc(String(c.retrieved_at || '').slice(0, 10))}</span>
         <blockquote>${esc(c.quote)}</blockquote></div>`).join('');
     const courses = (r.findings || []).map(f =>
       `<div class="srow" style="cursor:default">
          <span class="chip ${esc(f.severity)}">${esc(f.severity)}</span>
-         <span class="chip sig">${esc(f.signal)}</span>
+         <span class="chip sig" title="${esc(f.signal)}">${esc(word('signal', f.signal))}</span>
          <span><b>${esc(f.course)}</b>
-           <span class="note"> · blast ${f.blast_radius} · ${f.graded_locations} graded
+           <span class="note"> · impact ${f.blast_radius} · ${f.graded_locations} graded
            · sessions ${(f.sessions || []).join(', ') || '—'}</span></span></div>`).join('');
     const arts = Object.entries(r.artifacts || {}).map(([k, v]) =>
       `<span class="chip n">${esc(k)} ${v}</span>`).join(' ');
     return `<article class="card ${esc(r.severity || 'low')}">
       <div class="chead">
         <span class="chip ${esc(r.severity || 'low')}">${esc(r.severity || '—')}</span>
-        <span class="chip sig">${esc(r.signal || '—')}</span>
+        <span class="chip sig" title="${esc(r.signal || '')}">${
+          esc(word('signal', r.signal) || '—')}</span>
         <span class="name">${esc(r.canonical_name)}</span>
         <span class="chip n">agent run</span>
         ${r.awaiting_review
@@ -2092,10 +2196,10 @@ function renderFindings(data) {
            this is the only list on the page - a standing row that could not be opened
            would put the detail panel out of reach precisely when it is needed. */
         `<div class="srow" data-detail="${esc(s.finding_id)}" role="button" tabindex="0"
-              title="Where it is used, and what to change">
+              title="Where this is, and what to change">
            <span class="chip ${esc(s.local_severity || s.severity)}">${
              esc(s.local_severity || s.severity)}</span>
-           <span class="chip sig">${esc(s.signal)}</span>
+           <span class="chip sig" title="${esc(s.signal)}">${esc(word('signal', s.signal))}</span>
            <span><b>${esc(s.canonical_name)}</b>
              <span class="note"> · ${esc(s.summary)}</span>
              ${s.graded_locations ? `<span class="chip n">${s.graded_locations} graded</span>` : ''}
@@ -2112,10 +2216,11 @@ function renderFindings(data) {
     : '';
 
   const held = data.suppressed_by_reviewer || [];
-  $('#held').innerHTML = held.length ? `<h2>Held back by earlier reviewer decisions</h2>
+  $('#held').innerHTML = held.length ? `<h2>You marked these as not a problem</h2>
     <p class="hint">These recur but a reviewer marked them not actionable. They return
     automatically if the evidence changes.</p>` + held.map(h =>
-      `<div class="card low"><div class="cbody"><div><span class="chip sig">${esc(h.signal)}</span>
+      `<div class="card low"><div class="cbody"><div><span class="chip sig" title="${
+        esc(h.signal)}">${esc(word('signal', h.signal))}</span>
        <b>${esc(h.canonical_name)}</b></div><div class="note">${esc(h.reason)}</div></div></div>`).join('') : '';
   wireTriage();
 }
@@ -2163,14 +2268,15 @@ async function loadInventory() {
     tier:$('#tier').value, authority:$('#authority').value, limit:200}));
   $('#invcount').textContent = `${d.rows.length} of ${d.total} shown`;
   $('#invtable').innerHTML = `<thead><tr>
-      <th>name</th><th>kind</th><th>tier</th><th>taught ver.</th>
-      <th>authority</th><th>courses</th><th>refs</th></tr></thead><tbody>` +
+      <th>name</th><th>what it is</th><th>how closely we watch</th>
+      <th>version taught</th><th>official source</th><th>courses</th>
+      <th>times used</th></tr></thead><tbody>` +
     d.rows.map(r => {
       const auth = r.official_domains.length ? r.official_domains.slice(0,2).join(', ')
         : (r.registry ? r.registry + ' registry' : '<span class="chip n">none</span>');
       return `<tr><td><b>${esc(r.canonical_name)}</b></td>
         <td><span class="chip n">${esc(r.kind)}</span></td>
-        <td>${esc(r.watch_tier)}</td>
+        <td>${esc(word('tier', r.watch_tier))}</td>
         <td class="mono">${esc(r.taught_version || '—')}</td>
         <td class="mono">${auth}</td>
         <td>${esc(r.courses.join(', ') || '—')}</td>
@@ -2201,9 +2307,11 @@ async function loadCourses() {
   const d = await get('/api/courses');
   COURSES = d.courses;
   renderCoursePicker();
+  /* The checkbox VALUE stays the tier name the API and `Scope.to_cli_args()` speak;
+     only its label is translated. Renaming the value would change every saved scope. */
   $('#tiers').innerHTML = d.tiers.map(t =>
     `<label><input type="checkbox" class="tier" value="${esc(t)}"
-      ${t !== 'mention-only' ? 'checked' : ''}> ${esc(t)}</label>`).join('');
+      ${t !== 'mention-only' ? 'checked' : ''}> ${esc(word('tier', t))}</label>`).join('');
   document.querySelectorAll('.course,.tier').forEach(el => el.onchange = preview);
   $('#refinenote').textContent = SUMMARY.llm_provider === 'none'
     ? 'No LLM provider found — notes stay template-composed.'
@@ -2420,7 +2528,7 @@ async function poll(runId, after) {
   /* Findings first, log second: the log is how it ran, these are what it means. */
   renderRunFindings(d.findings, d.run);
   const st = d.run.status;
-  const stage = d.run.stage_now ? ` · ${d.run.stage_now}` : '';
+  const stage = d.run.stage_now ? ` · ${word('stage', d.run.stage_now)}` : '';
   $('#runstatus').innerHTML = (st === 'running' || st === 'queued')
     ? `<span class="spin"></span> ${esc(st)}${esc(stage)}`
     : esc(st) + (d.run.exit_code !== null ? ` (exit ${d.run.exit_code})` : '');
@@ -2547,12 +2655,12 @@ function renderRunFindings(rows, run) {
       it, and what to change.</p>
     <div class="panel" style="padding:0">` + rows.map(r => `
       <div class="srow" data-detail="${esc(r.finding_id)}" role="button" tabindex="0"
-           title="Where it is used, and what to change">
+           title="Where this is, and what to change">
         <span class="chip ${esc(r.severity)}">${esc(r.severity)}</span>
-        <span class="chip sig">${esc(r.signal)}</span>
+        <span class="chip sig" title="${esc(r.signal)}">${esc(word('signal', r.signal))}</span>
         <span><b>${esc(r.name)}</b>
           <span class="note"> · ${esc((r.courses || []).join(', ') || 'no course')}${
-            r.diff_class === 'unchanged' ? ' · unchanged' : ' · ' + esc(r.diff_class)}</span>
+            ' · ' + esc(word('diff', r.diff_class))}</span>
         </span></div>`).join('') + '</div>';
 }
 

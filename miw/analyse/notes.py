@@ -39,7 +39,13 @@ WHY = {
     "S8": "Screenshots and click-paths drift out of date, eroding trust in the material "
           "even where the tool still works.",
     "S10": "A better-suited tool exists; students are learning the second-best option.",
-    "S11": "Course coverage has fallen behind what employers now expect.",
+    # Says only what the evidence establishes. The previous wording - "course coverage
+    # has fallen behind what employers now expect" - asserted a fact about the job
+    # market that no claim on the finding supports, which is exactly the kind of
+    # unsourced sentence `Claim.build` exists to keep out of the digest.
+    "S11": "Two independent vendors document this as part of the area, and no "
+           "session's outline mentions it, so a student finishes the course without "
+           "having met it.",
 }
 
 # Drift classes where merely naming the dependency dates a question. A dead docs link

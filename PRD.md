@@ -2201,3 +2201,181 @@ registry-neighbour nominator was in §26.
   overstating that S4's 72 locations. The panel no longer amplifies it (a URL may
   highlight only if it names the dependency) but the extraction is unchanged, because
   fixing it moves severities.
+
+## 32. S11: the topic we do not teach yet
+
+Everything before this section runs **inside-out**. `extract/inventory.py` derives the
+dependency list *from the course content*, so the probe, the research stage and the
+scorer can only ever examine what is already taught. Their answer to "is our prompting
+session complete?" is structurally always yes — not because it is, but because the
+question cannot reach them. Across four artifacts the measurement was exactly what the
+architecture predicts: `by kind_of_signal: {'regression': 34}`, `S10=0`, `S11=0`, and
+S11 had **no producer at all** — it appeared twice in the codebase, in the `SIGNALS`
+table and in a recommendation template, and nothing raised it.
+
+The request that closed this was concrete: *if a new prompting technique is introduced,
+the system should suggest that it can be included in the Advanced Prompt Engineering
+session.* Note what that asks for beyond detection. "Course coverage has fallen behind"
+is not a task. "Add self-consistency to Intro to Gen AI session 8, whose Key Takeaways
+already list Zero-shot, One-shot, Few-shot and CoT" is a half-day of work with a known
+owner. So the finding has two halves, and they fail in different ways.
+
+### The placement half: the workbook is the only record of what a deck teaches
+
+None of the 24 `Session PPT` decks' outlines appear in the JSON export. The workbook's
+`Course Outline` sheet — already the authority for session *numbering* (§31) — is also
+the only description of what each deck covers. `analyse/curriculum.py` reads it as a
+document per session: title, `Outline`, `Key Takeaways`. All 71 sessions across the
+three workbooks index; PSE has no workbook and therefore contributes none, which is a
+limit of the input rather than of the code.
+
+Placement is IDF-weighted term overlap over that 71-document corpus, multiplied by how
+much the session is *about* the area. Not an embedding, and the reason is not cost: the
+score has to be **explainable in the finding** ("matched on: prompt, chain-of-thought,
+thought"), and a reviewer settling a placement in five seconds needs to see why it was
+proposed. Three rules earned their place by being wrong first:
+
+* **Hyphenated compounds contribute their parts.** `Chain-of-Thought` is one token, so
+  session 8 shared no term with a page describing "Tree of Thoughts" — an analogy a
+  reviewer sees instantly.
+* **A session may only be named on the strength of the topic's own words.** Matching
+  nothing but the area vocabulary gives every session in the area the same score, so
+  the winner was decided by session number. That is how "Tree of Thoughts" was placed
+  in a session about n8n merge nodes.
+* **Below `MIN_PLACEMENT` the finding declines to name a session** and lists the
+  candidates with scores instead. A confidently wrong session number is worse than an
+  honest shrug.
+
+Worked, against the real workbook: a new *technique* reaches session 8 (Advanced Prompt
+Engineering), a new *framework* reaches session 5 (Prompt Engineering Fundamentals), and
+an image-sampling topic reaches session 15. Nothing but the sessions' own outline text
+can separate those three, which is the whole argument for reading the workbook.
+
+### The detection half: corroboration is the precision rule
+
+`probe/frontier.py` reads an official page as an *enumeration* — furniture removed by
+element (`<nav>`, `<footer>`, `role="navigation"`), items bound to headings, and
+`supported=False` when nothing can be bound, never a fallback to text search. Same
+discipline as `probe/catalogue.py`, different shape.
+
+Run on four Google documentation pages alone, that produced **32 findings**, and most of
+them were not teachable topics: *Batch embeddings*, *Migration from
+gemini-embedding-001*, *Start building with embeddings*, *Workarounds for pre-tool text
+requirements*. Real headings, genuinely absent from the curriculum, completely useless.
+The extractor was doing what it was told; the assumption that a docs page's headings
+enumerate an area is about 40% true.
+
+What separates an industry topic from one vendor's API detail is that a **competitor
+documents it too**. So `MIN_CORROBORATION` requires a topic to be named by two sources
+whose authority sets are **disjoint** — enforced structurally, so two Google pages
+cannot corroborate each other. Measured on the Google × Microsoft prompting pair, 0.4
+keeps *Start with clear instructions* ~ *Clear and specific instructions* (0.50),
+*Zero-shot vs few-shot prompts* ~ *Few-shot learning* (0.43) and *Break down prompts
+into components* ~ *Break the task down* (0.40), and drops *Add context* ~ *Add clear
+syntax* (0.25) and everything below. 32 findings became 7.
+
+The cost is recall: *Grounding and code execution* ~ *Provide grounding context* scores
+0.20 and is missed. That is the right direction to fail in. A digest reporting three
+real gaps is read; one reporting thirty of which nine are real is not read twice.
+
+### Three things that would have destroyed trust, and what stops each
+
+* **Reporting a technique the session already teaches.** "Zero-shot vs few-shot
+  prompts" and session 8's "Prompting Techniques (Zero-shot, One-shot, Few-shot, CoT)"
+  normalise to different keys, so a key-equality test called it missing. Coverage is
+  therefore decided two ways — exact key, or *every* distinctive word of the name
+  already present in one session — and across a corroborated cluster, so whichever
+  vendor phrased it closest to the workbook settles it.
+* **A source declaring its own authority.** `Source.subject_of()` deliberately does not
+  call `with_domains_from_urls()`. Folding the page's own host into its authority set
+  would make every entry in `registry/topics.yaml` authoritative about itself, so a
+  newsletter added by mistake would substantiate an `EXISTENCE` claim — a STRICT kind.
+  Caught by a test before it shipped.
+* **Corroboration surviving in name only.** If one of the two citations is refused by
+  the trust layer, the finding is dropped rather than reported on one. `main.py verify`
+  asserts the same invariant from outside: an S11 must carry two substantiating claims
+  on two different hosts.
+
+### Generality, as a reported number rather than a claim
+
+The code is course-agnostic — it indexes every workbook it can map and loops every
+course — but it can only see areas the registry declares, so an undeclared subject
+cluster is invisible in exactly the way an un-taught topic is invisible to the rest of
+the pipeline. `main.py gaps` therefore prints its own blind spot:
+
+```
+71 session(s) indexed from 3 workbook(s); 10 curriculum area(s) declared
+area coverage: 65/71 session(s) fall inside at least one declared area
+6 session(s) are in NO declared area, so no gap can ever be reported for them:
+    AI for Finance s1 — Your Learning Journey
+    Building LLM Applications s1 — Your Learning Journey
+    Building LLM Applications s2 — Cloud IDE Walkthrough
+    Building LLM Applications s3 — Building LLM Applications Using Python | Part 1
+    Building LLM Applications s5 — Building UI for LLM Applications
+    Intro to Gen AI s1 — Your Learning Journey
+```
+
+Four of the six should never be covered. Two are real: the Python and UI sessions are
+software-engineering topics with no Gen-AI area to sit in. n8n is the one deliberate
+hole — nine Intro to Gen AI sessions build n8n workflows, `docs.n8n.io` yields zero
+headings to a plain fetch, and no *independent* vendor documents n8n's node set, so no
+area can corroborate it. n8n drift is caught instead by `probe/n8n_upstream.py` reading
+n8n's own declared breaking changes, which is a regression check, not a gap check.
+
+### Where it sits
+
+A stage of its own, between `analyse` and `report`, because it is the only stage that
+consults neither the inventory nor the probe. It writes its findings into the same
+`findings_<date>.json` the analyser writes — so a gap sorts, diffs, triages and renders
+exactly like every other finding — and its per-topic evidence into a `gaps_<date>.json`
+sidecar, which `verify` reads to re-classify each citation without trusting the tier the
+finding records. That is the arrangement the probe artifact already provides for
+provider widening.
+
+The synthetic `kind="topic"` dependency it builds is **never written to the inventory**.
+The inventory records what the curriculum uses, and a topic we do not teach is precisely
+not that; adding it would corrupt the one count the whole system reports on.
+
+## 33. The UI reads without a glossary
+
+> "the naming in the UI is a bit confusing and I'm not able to make others understand"
+
+The page's labels and the system's internal names had been the same vocabulary, so
+reading it required knowing the codebase. On screen, with no explanation anywhere: *blast
+radius 65*, *watch tier mention-only*, *diff class worsened*, *S7*, *AUTHORITATIVE*,
+*regression*, and a stage list reading `ingest / extract / probe / research / analyse /
+report`. Every one of those is the right word for the code and the wrong word for a
+curriculum reviewer being shown the tool for the first time.
+
+The fix is one `WORDS` map and a `word(group, key)` helper, and it is deliberately
+**one-directional**. `watch_tier` is still `watch_tier` in the database, in
+`Scope.to_cli_args()` and in every URL; the checkbox `value` attributes and the filter
+options are untouched. Only the text beside them changed. A label is safe to edit and a
+wire value is not, and `tests/test_ui_contract.py` now asserts both halves of that: the
+plain words are present, and every internal value still is.
+
+| Was | Is |
+|---|---|
+| Findings · Inventory · Digest | What to fix · Tools & models used · Weekly report |
+| New run · Run history · Run audit | Check for changes · Past checks · Start check |
+| Trust & feedback · Vendor watch | Sources & decisions · Vendor releases |
+| Stages: probe / research / analyse | Check every link and version · Read the official pages · Rank the issues and say what to do |
+| blast radius 65 | impact 65, with the weighting explained on hover |
+| watch tier: mention-only | only mentioned |
+| diff class: worsened / unchanged | got worse / no change |
+| regression / opportunity | now broken or outdated / could be better |
+| AUTHORITATIVE / LEAD_ONLY | the vendor's own page / unconfirmed |
+| S7 (bare, in four lists) | model retired, with `S7` on hover |
+
+Two things kept their precise names on purpose. The drift codes stay visible — a
+reviewer comparing the page against the digest or the scorer needs them — but the plain
+phrase is now the label and the code is the tooltip. And "Tavily" stays spelled out on
+the research step, because the search spend is the one cost a reader must see *before*
+pressing the button; plainer wording must not hide a vendor that bills.
+
+A topic gap also needed its own words, because it points the opposite way to every other
+finding. Its locations are not places the curriculum *uses* something, they are sessions
+that *should cover it and do not*, so the panel says "Where it belongs", the projection
+note explains that there is no tool to count, and the detail block describes the topic —
+area, what each vendor calls it, how strongly the two agreed — instead of a vendor and a
+registry id.

@@ -1,0 +1,222 @@
+# MIW curriculum-topic registry - human-owned.
+#
+# This file is the ONLY inbound source for S11 ("curriculum topic gap"), and it exists
+# because of a structural limit in the rest of the system: `extract/inventory.py` builds
+# the dependency list FROM the course content, so every other stage can only examine
+# what is already taught. A technique the curriculum has never mentioned has no
+# dependency row, so it is never probed, never researched, and can never become a
+# finding. Detecting "what we teach is incomplete" needs an input that does not come
+# from the courses. That input is this file.
+#
+# A `source` is an official page that ENUMERATES an area - a docs page whose headings
+# are the list of things that exist. It is read structurally by
+# `miw/probe/frontier.py`: furniture elements are removed by tag, items are headings
+# (and only optionally list items), and a page that cannot be bound reports
+# `supported: false` rather than falling back to a text search.
+#
+# A topic must be named by TWO INDEPENDENT sources to be reported at all, where
+# independent means their `official_domains` are disjoint - so two Google pages cannot
+# corroborate each other. That rule exists because it was measured: reading four Google
+# pages on their own produced 32 findings, most of them API mechanics rather than
+# teachable topics ("Batch embeddings", "Migration from gemini-embedding-001"). What
+# distinguishes an industry topic from one vendor's implementation detail is that a
+# competitor documents it too. See `MIN_CORROBORATION` in `miw/analyse/gaps.py`.
+#
+# So EVERY area needs at least two sources. An area with one reports nothing and says
+# "no second opinion" - which is honest, and is not the same as "the area is complete".
+#
+# Trust is unchanged and is not negotiable here. Each source declares the
+# `official_domains` that speak for it, and the resulting claim is
+# `ClaimKind.EXISTENCE`, which `miw/trust.py` lists in STRICT_KINDS - so it must rest
+# on an AUTHORITATIVE source or the finding is dropped. A blog post claiming a new
+# technique exists cannot raise an S11.
+#
+# WHAT IS NOT HERE, AND WHY (measured 11 Sep 2026, not assumed):
+#   platform.openai.com/docs/guides/prompt-engineering  - client-rendered; a plain
+#       fetch returns a shell with 0 headings. Nothing to enumerate.
+#   docs.anthropic.com/.../prompt-engineering/overview  - fetches fine, but the page is
+#       a meta-guide ("when to prompt engineer"), not a list of techniques; its
+#       technique list lives in per-technique child pages with no index we can bind.
+#   www.promptingguide.ai/techniques                    - client-rendered, AND
+#       LEAD_ONLY: it is not the official source for anything, so even a clean parse
+#       could only nominate, never substantiate.
+#   docs.n8n.io/...                                     - fetches fine, 0 headings a
+#       plain fetch can see. This one is a real coverage hole rather than a nuisance:
+#       Intro to Gen AI builds n8n workflows in nine sessions, and there is no second
+#       INDEPENDENT vendor documenting n8n's own node set, so no area can corroborate
+#       it. n8n drift is caught instead by `probe/n8n_upstream.py`, which reads n8n's
+#       declared breaking changes - that is a regression check (S9), not a gap check.
+#   cloud.google.com/vertex-ai/.../rag-overview         - parses, but its h2s are
+#       "Supported regions" and "Delete RAG Engine"; and it is Google, so it could not
+#       corroborate the Gemini embeddings page anyway (same authority set).
+#
+# COVERAGE. `python3 main.py gaps` prints how many indexed sessions fall inside at
+# least one declared area and lists those that do not, so this file's blind spots are a
+# reported number rather than something a reader has to infer. Sessions that SHOULD
+# never be covered ("Your Learning Journey", "Cloud IDE Walkthrough") are expected to
+# appear there; a subject cluster appearing there is a missing area.
+#
+# PSE has no workbook, so it contributes no sessions to the index at all and can never
+# receive a gap finding. That is a limit of the input, not of this file.
+# Add a source only after checking it parses. `python3 main.py gaps --dry-run` prints
+# the item list a source yields without writing anything.
+
+areas:
+
+- area_id: prompting-techniques
+  title: Prompting techniques
+  # Which sessions belong to this area is decided by the sessions' OWN words, matched
+  # against these terms - never by a hand-kept list of session numbers, because a
+  # renumbered session must not silently leave its area. For Intro to Gen AI this
+  # currently selects sessions 4, 5, 8, 10, 11, 15 and 20, and placement then ranks
+  # them: session 5 teaches prompt FRAMEWORKS (RCAFT/STAR/RISEN), session 8 teaches
+  # prompt TECHNIQUES (Zero-shot/One-shot/Few-shot/CoT).
+  scope_terms: [prompt, prompting, prompt engineering, prompting technique]
+  sources:
+  - url: https://ai.google.dev/gemini-api/docs/prompting-strategies
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    # h2 is this page's topic level; h3 below it is sub-detail ("Input", "Constraints").
+    levels: [2]
+    # Page-specific furniture that reads as a topic. Vendor quirks belong here, where a
+    # human can see them, not in the extractor's global stop list.
+    exclude: [Gemini 3, Topic-specific prompt guides]
+  - url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/prompt-engineering
+    subject: Microsoft Azure AI Foundry
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Basics, Scenario-specific guidance, Non chat scenarios, Space efficiency]
+
+- area_id: tool-use-and-function-calling
+  title: Tool use and function calling
+  scope_terms: [function calling, tool, tools, agent, agents, workflow]
+  sources:
+  - url: https://ai.google.dev/gemini-api/docs/function-calling
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    levels: [2]
+    exclude: [Notes and limitations, How function calling works]
+  - url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/function-calling
+    subject: Microsoft Azure AI Foundry
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Function calling support, Using function calling responsibly]
+
+- area_id: image-generation
+  title: Image generation
+  scope_terms: [image generation, image, diffusion, text-to-image]
+  sources:
+  - url: https://ai.google.dev/gemini-api/docs/image-generation
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    levels: [2]
+    exclude: [Model selection, Optional configurations, Prompting guide and strategies]
+  - url: https://learn.microsoft.com/en-us/azure/ai-services/openai/dall-e-quickstart
+    subject: Microsoft Azure OpenAI
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Quotas and limits, Responsible AI and Image Generation, Models and capabilities]
+
+- area_id: embeddings-and-retrieval
+  title: Embeddings and retrieval
+  scope_terms: [embedding, embeddings, vector, retrieval, rag, semantic search]
+  sources:
+  - url: https://ai.google.dev/gemini-api/docs/embeddings
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    levels: [2]
+    exclude: [Use cases, Model versions, Responsible use notice, Storing embeddings]
+  - url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/understand-embeddings
+    subject: Microsoft Azure AI Foundry
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+
+- area_id: agents-and-orchestration
+  title: AI agents and orchestration
+  scope_terms: [agent, agents, multi agent, orchestration, crew, memory agent]
+  sources:
+  - url: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/overview
+    subject: Microsoft Azure AI Foundry
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Agent Service at a glance, Enterprise capabilities, Publishing and sharing,
+              Security privacy and compliance, Model support]
+  - url: https://ai.google.dev/gemini-api/docs/agents
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    levels: [2]
+    exclude: [Limits, Security and best practices]
+
+- area_id: structured-output
+  title: Structured output
+  scope_terms: [structured output, json, schema, output format, parser]
+  sources:
+  - url: https://ai.google.dev/gemini-api/docs/structured-output
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    levels: [2]
+    exclude: [Structured output examples]
+  - url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/structured-outputs
+    subject: Microsoft Azure AI Foundry
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Set up, API support]
+
+- area_id: evaluation-and-observability
+  title: Evaluation and observability
+  scope_terms: [evaluation, evaluate, observability, metric, metrics, langsmith,
+                tracing, benchmark]
+  sources:
+  - url: https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/evaluation-metrics-built-in
+    subject: Microsoft Azure AI Foundry
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Azure OpenAI graders, Evaluation levels, Combining evaluators]
+  - url: https://huggingface.co/docs/evaluate/en/types_of_evaluations
+    subject: Hugging Face
+    official_domains: [huggingface.co]
+    levels: [2]
+
+- area_id: fine-tuning
+  title: Fine-tuning and adaptation
+  scope_terms: [fine-tuning, fine tuning, finetune, training, adapter, lora, peft]
+  sources:
+  - url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/fine-tuning-considerations
+    subject: Microsoft Azure AI Foundry
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Key benefits of fine-tuning]
+  - url: https://huggingface.co/docs/transformers/en/peft
+    subject: Hugging Face
+    official_domains: [huggingface.co]
+    levels: [2]
+
+- area_id: responsible-ai-and-safety
+  title: Responsible AI, safety and guardrails
+  scope_terms: [responsible ai, ai ethics, ethics, safety, guardrail, guardrails,
+                moderation, bias]
+  sources:
+  - url: https://ai.google.dev/gemini-api/docs/safety-guidance
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    levels: [2]
+  - url: https://learn.microsoft.com/en-us/azure/ai-services/content-safety/overview
+    subject: Microsoft Azure AI Services
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Service limits, Security, Where it's used]
+
+- area_id: speech-and-audio-generation
+  title: Speech and audio generation
+  scope_terms: [audio, speech, text-to-speech, tts, voice, f5-tts]
+  sources:
+  - url: https://ai.google.dev/gemini-api/docs/speech-generation
+    subject: Google Gemini API
+    official_domains: [ai.google.dev, google.dev, developers.google.com]
+    levels: [2]
+    exclude: [Before you begin, Supported models, Supported languages, Prompting guide]
+  - url: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech
+    subject: Microsoft Azure AI Services
+    official_domains: [learn.microsoft.com, microsoft.com, azure.com]
+    levels: [2]
+    exclude: [Sample code, Pricing note, Responsible AI, Key features]
