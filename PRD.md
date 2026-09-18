@@ -3694,3 +3694,114 @@ it, and that is a separate piece of work with its own measurement.
 ### Gates
 
 692 tests, eval 4/4, `verify` clean, workflow re-run end to end.
+
+---
+
+## 39. Say where it went, and judge whether it fits
+
+Two things follow from §38, and the second was the more useful of the pair.
+
+### Fit now runs in the weekly pipeline
+
+`research_dependency` judged fit only when `use_model` was set — the `--nominate` flag.
+But that flag gates model *nomination*: a call per dependency to invent candidates. Fit
+is a call per **already-verified** candidate, of which the whole 2026-09-18 run produced
+eleven. Tying them together is why a default run verified alternatives, never asked
+whether any of them did the taught job, and then printed *"Candidate replacement"* on the
+strength of `verified` alone.
+
+`judge_fit` is its own parameter, defaults to **on**, runs only when there are verified
+alternatives and a provider is available, and writes `does_taught_job` from the opinion so
+the scorer and the UI read one field. `research --no-fit` turns it off.
+
+The first live run is the interesting part. Both candidates came back **assessed and
+declined**:
+
+> Wellsaid — *"the provided quotes contain only billing structure information and do not
+> disclose what Wellsaid does, pricing tiers, free options, or feature alignment with
+> audio generation tasks."*
+
+That is the judge working. R4 gathers `PRICING` and `AVAILABILITY` claims from the
+candidate's own site, and for some candidates that is capability text (`"OAuth, API keys,
+and token refresh — handled for every API"`) and for others it is a billing table. Where
+it is a billing table there is nothing to judge, and abstaining is the right answer.
+
+So the wording distinguishes three states rather than two, because *"we looked and the
+evidence did not establish it"* is a more useful fact than *"nobody looked"* — a reviewer
+can close the first in a minute:
+
+| | |
+|---|---|
+| recommendable | "Candidate replacement: X — free path confirmed." |
+| assessed, declined | "One lead, X. **Fit was assessed and could not be established**: the quotes describe billing only." |
+| never assessed | "One lead to look at: X. Nobody has assessed whether it does the taught job." |
+| self-promoted | "One lead, X, but it was named by **its own comparison page**." |
+
+### Where did the page go?
+
+> *"ideally the agent should do the same for all the urls if they are not working or
+> diverted to new urls"*
+
+Finding Composio's new dashboard took four fetches by hand. A dead-link finding that says
+"repoint or replace it" and stops hands that back to the reviewer every week, for every
+broken link. `miw/probe/successor.py` does it instead, in the stage that already makes
+HTTP requests and costs nothing — no model, no search.
+
+Candidates, strongest first and all deterministic: the **redirect target** the server
+itself named; the **same path on the primary domain** (a vendor consolidating subdomains,
+`mcp.composio.dev/x` → `composio.dev/x`); the path **walked up** a segment at a time; and
+the **front door**, last and labelled as an admission rather than an answer. Six tries
+maximum.
+
+Two rules make the answer safe to act on. **Only a URL we fetched ourselves, that
+answered 200, on a domain the dependency already owns** — a candidate on somebody else's
+host is a guess about where a vendor moved its content, and a wrong guess sends a student
+somewhere the course never intended. And **never silently**: every suggestion carries the
+rule that produced it, so "the server redirected here" is never read as the same strength
+of answer as "the deep page is gone, this is its section".
+
+The redirect target is a *candidate*, never an answer: `mcp.composio.dev/dashboard`
+redirects to `composio.dev/toolkits/dashboard`, which also 404s. Checking it is the point.
+
+Live results for every dead link in the artifact:
+
+```
+docs.langchain.com/.../document_loaders/pypdfloader
+    -> docs.langchain.com/oss/python/integrations/document_loaders   [trimmed]
+       "Document loader integrations - Docs by LangChain"
+mcp.composio.dev/dashboard      -> composio.dev/toolkits                  [home]
+api.stability.ai/v2beta/...     -> platform.stability.ai/docs/api-reference [home]
+earth-ai.com/technology         -> earth-ai.com/                          [home]
+xxxxx.gradio.live               -> not a link at all
+abc123.ngrok.io                 -> not a link at all
+```
+
+### The two that were never links
+
+`xxxxx.gradio.live` and `abc123.ngrok.io` have been reported as dead links every week and
+neither has ever been a page: they are the shape of a tunnel URL a *student* generates.
+There is nothing to repoint, and the finding has to change its instruction rather than
+add a clause to it:
+
+> **Not a broken link:** `https://abc123.ngrok.io` is an example address a student
+> generates for themselves. Remove the hyperlink in the 1 place it appears and show it as
+> sample text.
+
+Detection takes two independent tests, because either alone is wrong: an **ephemeral
+tunnel host** (`ngrok.io`, `gradio.live`, `trycloudflare.com`, `loca.lt`, …) **and** a
+label that reads as a stand-in (`xxxxx`, `abc123`, `your-…`). A real ngrok URL exists for
+somebody, and `abc123.example.com` might be a real host. A placeholder spends **no**
+requests: there is no page to look for.
+
+### And a suite that had quietly gone online
+
+Moving fit out from behind `--nominate` made exactly one previously-offline test start
+calling the model, and the only symptom was the suite getting slower. `tests/conftest.py`
+now fails any test that reaches `miw.llm.complete`, with the offline switch named in the
+message. It is not a hypothetical constraint here: there is no API key, the provider is
+the local `claude` CLI, and a suite that shells out to it per run stops being a suite
+anybody runs.
+
+### Gates
+
+708 tests, eval 4/4, `verify` clean.

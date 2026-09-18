@@ -349,6 +349,7 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f = ensure(signal)
             f.probe_signals.append(sig)
             f.affected_urls = list(probe.affected_urls)
+            f.successors = list(probe.successors)
             f.latest_version = probe.latest_version or ""
             if not f.summary:
                 f.summary = _probe_summary(sig, dep, probe)
@@ -769,6 +770,14 @@ def recommend(dep: Dependency, f: Finding) -> str:
         elif a.self_promoted:
             alt_txt = (f" One lead, {a.name}{where_alt}, but it was named by its own "
                        f"comparison page - marketing, not a recommendation.")
+        elif a.opinion is not None:
+            # Assessed, and the assessment declined. That is a different fact from "no
+            # assessment was made" and a more useful one: it says the candidate's own
+            # pages do not establish that it does the taught job, which is a gap a
+            # reviewer can close in a minute by looking, or accept as a no.
+            why = (a.opinion.one_line or "").rstrip(".")
+            alt_txt = (f" One lead, {a.name}{where_alt}. Fit was assessed and could not "
+                       f"be established{': ' + why if why else ''}.")
         else:
             alt_txt = (f" One lead to look at: {a.name}{where_alt} - {free}"
                        f"{'; signup required' if a.signup_required else ''}. "
@@ -782,13 +791,34 @@ def recommend(dep: Dependency, f: Finding) -> str:
         if len(f.affected_urls) > 1:
             url_note += f" (+{len(f.affected_urls) - 1} more)"
         url_note += "."
+    # Where it went. The probe already tried the vendor's own site and recorded what
+    # answered, so the action can name a URL instead of asking the reviewer to go and
+    # find one - which is the step they were doing by hand every week.
+    move_note, placeholder = "", False
+    for sc in f.successors or []:
+        if sc.get("placeholder"):
+            placeholder = True
+            break
+        if sc.get("url"):
+            move_note = (f" Now live at {sc['url']} ({sc.get('note', '')}) - confirm it "
+                         f"is the page the session meant.")
+            break
+
+    # The lead sentence has to change, not just gain a clause: "repoint or replace the
+    # dead link" is the wrong instruction when there is no link to repoint.
+    s1 = (f"Not a broken link: {f.affected_urls[0] if f.affected_urls else 'this URL'} "
+          f"is an example address a student generates for themselves. Remove the "
+          f"hyperlink in the {len(f.locations)} place(s) it appears and show it as "
+          f"sample text."
+          if placeholder else
+          f"Repoint or replace the dead link in the {len(f.locations)} place(s) "
+          f"{dep.canonical_name} is linked.{url_note}{move_note}")
 
     base = {
         # `len(f.locations)`, not `dep.link_locations`: the two now measure the same
         # thing, and reading it off the finding means the sentence can never again
         # disagree with the list printed under it.
-        "S1": f"Repoint or replace the dead link in the {len(f.locations)} place(s) "
-              f"{dep.canonical_name} is linked.{url_note}",
+        "S1": s1,
         "S2": f"Check whether the taught step for {dep.canonical_name} still works "
               f"without an account; if not, rewrite the step or swap the tool.{url_note}",
         "S3": f"Re-check {dep.canonical_name}'s free tier against what the session "

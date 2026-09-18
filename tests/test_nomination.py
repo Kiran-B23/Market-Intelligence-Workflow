@@ -279,7 +279,10 @@ def test_a_vendor_named_successor_found_on_the_rotation_keeps_its_citation():
                       lambda *a, **k: SearchOutcome(disabled=True)), \
          patch.object(search, "discover_alternatives",
                       lambda *a, **k: SearchOutcome(disabled=True)):
-        res = agent.research_dependency(dep, probe, in_discovery_slice=True)
+        # `judge_fit=False`: this is about the nomination ladder, and fit is a model
+        # call. Every test in this suite is offline by construction.
+        res = agent.research_dependency(dep, probe, in_discovery_slice=True,
+                                        judge_fit=False)
 
     assert res.discovery_reason == "rotation"
     assert [(n.name, n.verdict) for n in res.nominations] == [("BetterTool",

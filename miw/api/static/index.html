@@ -577,6 +577,18 @@
   .candhead a{font-size:12px}
   .cand .note{margin-top:3px; line-height:1.55}
   .risks{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:var(--s2)}
+  /* Where a dead link went. Old above, new below, so the substitution reads at a
+     glance rather than as two URLs to compare character by character. */
+  .move{
+    margin:0 0 var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r);
+    background:var(--sunk); border:1px solid var(--rule);
+  }
+  .move .mono{font-size:12px; overflow-wrap:anywhere}
+  .move s{color:var(--muted); text-decoration-color:var(--crit)}
+  .move .arr{color:var(--faint)}
+  .move .note{margin-top:5px}
+  .move.ph{background:var(--high-wash);
+           border-color:color-mix(in srgb,var(--high) 26%,transparent)}
   /* A lead that nominated itself is not shown in the accent - the accent reads as
      endorsement, and the whole point is that nothing endorsed this. */
   .cand.selfpromo{background:var(--sunk);
@@ -2420,7 +2432,29 @@ function renderDetail(d) {
       </div>
     </div>` : '';
 
+  /* Where the dead link went, when the probe found it first-hand. This is the step a
+     reviewer was doing by hand every week: open the 404, try the obvious candidates on
+     the vendor's own site, see which answers. Each row says which rule produced it, so
+     "the server redirected here" and "the deep page is gone, this is its section" are
+     never read as the same strength of answer. */
+  const moves = (f.successors || []).map(sc => sc.placeholder
+    ? `<div class="move ph"><b>Not a link.</b> <span class="mono">${esc(sc.dead)}</span>
+        is an example address a student generates for themselves — show it as sample
+        text rather than a hyperlink.</div>`
+    : (sc.url ? `<div class="move">
+        <div class="mono"><s>${esc(sc.dead)}</s></div>
+        <div class="mono"><span class="arr">&rarr;</span>
+          <a href="${esc(sc.url)}" target="_blank" rel="noopener">${esc(sc.url)}</a></div>
+        <div class="note">${esc(sc.note || '')}${
+          sc.title ? ` · “${esc(sc.title)}”` : ''} — we fetched it and it answered 200;
+          confirm it is the page the session meant.</div></div>`
+      : `<div class="move none"><span class="mono">${esc(sc.dead)}</span>
+          <div class="note">Nothing on ${esc(dep.canonical_name || '')}'s own domains
+            answered for this path${sc.tried ? ` (${sc.tried} tried)` : ''}. The page
+            has to be found by hand, or the link removed.</div></div>`)).join('');
+
   const change = `<h3>What needs to change</h3>
+    ${moves}
     <div class="kv">
       <div class="lab">action</div><div>${esc(ch.what_to_act || ch.recommendation || '—')}</div>
       <div class="lab">why</div><div>${esc(ch.why_to_act || '—')}</div>

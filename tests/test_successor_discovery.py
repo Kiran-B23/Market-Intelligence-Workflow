@@ -369,3 +369,67 @@ def test_the_wording_never_calls_an_unassessed_lead_a_replacement():
     f = findings_for(dep, None, _research(dep, _verified_alt()))[0]
     assert "Candidate replacement" not in f.recommendation
     assert "Nobody has assessed whether it does the taught job" in f.recommendation
+
+
+# ---------------------------------------------------- fit runs outside --nominate
+#
+# `research_dependency` judged fit only when `use_model` was set, which is the
+# `--nominate` flag - and that flag gates model NOMINATION, a call per dependency to
+# invent candidates. Fit is a call per already-verified candidate, of which the whole
+# 2026-09-18 run produced eleven. Tying them together meant a default run verified
+# alternatives, never judged whether any of them did the taught job, and then printed
+# "Candidate replacement" on the strength of `verified` alone.
+
+def test_fit_is_judged_without_asking_for_model_nomination(monkeypatch):
+    from miw.research import agent, fit
+    from miw.schema import AlternativeOpinion
+
+    called = []
+
+    def fake_assess(dep, alt, taught_job=""):
+        called.append(alt.name)
+        return AlternativeOpinion(fit_score=0.8, does_taught_job=True,
+                                  one_line="does the taught job")
+
+    monkeypatch.setattr(fit, "assess", fake_assess)
+    monkeypatch.setattr("miw.llm.available_provider", lambda: "claude_code")
+
+    dep, res = _gather(TWO_SENTENCE)
+    assert res.alternatives, "fixture must produce a verified alternative"
+    # Re-run the fit step the way `research_dependency` does.
+    for alt in res.alternatives:
+        if alt.verified and alt.opinion is None:
+            alt.opinion = fit.assess(dep, alt)
+            if alt.opinion is not None:
+                alt.does_taught_job = alt.opinion.does_taught_job
+    assert called == ["DeepWiki"]
+    assert res.alternatives[0].does_taught_job is True
+    assert res.alternatives[0].recommendable
+
+
+def test_the_fit_gate_is_separate_from_the_nomination_gate():
+    import inspect
+
+    from miw.research import agent
+    src = inspect.getsource(agent.research_dependency)
+    assert "judge_fit" in src
+    assert "if judge_fit and res.alternatives:" in src
+    sig = inspect.signature(agent.research_dependency)
+    assert sig.parameters["judge_fit"].default is True
+    assert sig.parameters["use_model"].default is False
+
+
+def test_an_assessment_that_declined_reads_differently_from_no_assessment():
+    """"We looked and the evidence did not establish it" is a more useful fact than
+    "nobody looked", and a reviewer can close the first in a minute."""
+    from miw.schema import AlternativeOpinion
+
+    dep = _dep("OldTool", "oldtool.com")
+    alt = _verified_alt()
+    alt.opinion = AlternativeOpinion(
+        fit_score=None, does_taught_job=None,
+        one_line="the quotes describe billing only and do not say what it does")
+    f = findings_for(dep, None, _research(dep, alt))[0]
+    assert "Fit was assessed and could not be established" in f.recommendation
+    assert "billing only" in f.recommendation
+    assert "Candidate replacement" not in f.recommendation

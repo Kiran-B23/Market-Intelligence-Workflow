@@ -113,6 +113,14 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             res.detail = "no URL known for this dependency"
         else:
             res_from_urls(res, obs, prev_hash)
+            # Where did it go? A finding that says "repoint or replace the dead link"
+            # and stops hands the reviewer's whole job back to them: they open the URL,
+            # see the 404, and then try the obvious candidates on the vendor's own site
+            # by hand. This is the stage that already makes HTTP requests and the one
+            # that costs nothing, so it does that instead - bounded to six tries per
+            # dead URL, all on domains the dependency already owns.
+            if "url_gone" in res.signals or "domain_parked" in res.signals:
+                res.successors = _successors_for(dep, res, obs)
 
     # --- flap protection ----------------------------------------------------
     # Two-run confirmation exists to stop a transient network failure reading as a dead
@@ -290,6 +298,32 @@ def _probe_n8n_node(dep: Dependency, res: ProbeResult, prev_version: str) -> Non
     if dep.taught_version and res.latest_version:
         res.flag("node_present_at_taught_version")
     res.status = "ok"
+
+
+
+def _successors_for(dep: Dependency, res: ProbeResult, obs) -> list[dict]:
+    """The live page that replaced each dead URL, where one can be found first-hand."""
+    from miw.probe.successor import find_successor
+
+    finals = {o.url: o.final_url for o in obs}
+    out: list[dict] = []
+    for dead in res.affected_urls[:4]:
+        s = find_successor(dead, final_url=finals.get(dead, ""),
+                           homepage=dep.homepage,
+                           official_domains=dep.official_domains)
+        if s.placeholder:
+            # Not a broken link: a URL the course prints as an example, which a student
+            # generates for themselves. `abc123.ngrok.io` and `xxxxx.gradio.live` are
+            # both in the inventory and both were reported as dead links every week.
+            # There is nothing to repoint, and saying so is the finding.
+            out.append({"dead": dead, "placeholder": True})
+        elif s.found:
+            out.append({"dead": dead, "url": s.found.url, "rule": s.found.rule,
+                        "note": s.found.note, "title": s.found.title,
+                        "tried": len(s.tried)})
+        else:
+            out.append({"dead": dead, "tried": len(s.tried)})
+    return out
 
 
 def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str) -> None:

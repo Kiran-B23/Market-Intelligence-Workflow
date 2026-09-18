@@ -273,6 +273,12 @@ class ProbeResult:
     # The specific URLs that triggered this result. A finding is about these, not
     # about every place the dependency is mentioned.
     affected_urls: list[str] = field(default_factory=list)
+    # Where a dead link went, when we could find it ourselves. One entry per broken
+    # URL: {"dead": ..., "url": ..., "rule": ..., "note": ..., "title": ...}, or
+    # {"dead": ..., "placeholder": true} for a URL the course prints as an example
+    # rather than links to. First-hand, like everything else the probe records: each
+    # one is a page we fetched that answered 200 on a domain this dependency owns.
+    successors: list[dict] = field(default_factory=list)
     detail: str = ""
     evidence_url: str = ""
     consecutive_failures: int = 0
@@ -572,6 +578,9 @@ class Finding:
     probe_signals: list[str] = field(default_factory=list)
     affected_urls: list[str] = field(default_factory=list)
     latest_version: str = ""
+    # Carried from the probe: where each dead URL went, or that it was never a link.
+    # Shape as `ProbeResult.successors`.
+    successors: list[dict] = field(default_factory=list)
     screenshots_at_risk: int = 0
     questions_executing: int = 0
     questions_mentioning: int = 0

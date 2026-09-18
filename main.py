@@ -387,6 +387,7 @@ def cmd_research(args) -> int:
                            max_deps=args.limit or settings.RESEARCH_MAX_DEPS,
                            scope=scope, dep_state=state.dep_state(),
                            use_model=getattr(args, "nominate", False),
+                           judge_fit=not getattr(args, "no_fit", False),
                            progress=progress)
     # Stamp the rotation clock so next week picks up where this run left off.
     state.mark_researched([r.dep_id for r in results], utcnow())
@@ -1647,6 +1648,13 @@ def build_parser() -> argparse.ArgumentParser:
     # the model only adds candidates, and every one still faces the same ladder.
     rs.add_argument("--nominate", action="store_true",
                     help="also ask a model for candidate replacements (costs LLM calls)")
+    # On by default, unlike `--nominate`, because it is bounded by a number that is
+    # already small - one call per VERIFIED candidate, and the whole 2026-09-18 run
+    # produced eleven - and because without it "verified" gets printed as "candidate
+    # replacement" with nothing behind it.
+    rs.add_argument("--no-fit", action="store_true",
+                    help="skip the model's fit judgement on verified candidates; "
+                         "they then report as leads with fit unassessed")
     an = sub.add_parser("analyse", help="score findings and diff against last run")
     _add_scope_args(an)
     an.add_argument("--refine", action="store_true",

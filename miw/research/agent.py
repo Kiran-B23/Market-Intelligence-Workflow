@@ -134,7 +134,8 @@ def _verify_candidate(name: str, dom: str, nominated_by: str) -> Alternative:
 
 def research_dependency(dep: Dependency, probe: Optional[ProbeResult] = None,
                         *, in_discovery_slice: bool = False,
-                        use_model: bool = False) -> ResearchResult:
+                        use_model: bool = False,
+                        judge_fit: bool = True) -> ResearchResult:
     reason = alternatives_reason(probe, in_discovery_slice)
     kinds = kinds_for(probe, dep)
     if reason == "rotation" and ClaimKind.DEPRECATION not in kinds:
@@ -245,14 +246,30 @@ def research_dependency(dep: Dependency, probe: Optional[ProbeResult] = None,
             elif nom.refuted:
                 res.refuted.append(f"{nom.name}: {nom.verdict_detail}")
 
-        # Fit is a JUDGEMENT, so it is only asked once the facts are settled, and only
-        # for candidates whose own pages already substantiated something. It never
-        # becomes a Claim and never enters the note-refinement prompt.
-        if use_model:
-            from miw.research import fit
+    # Fit is a JUDGEMENT, so it is only asked once the facts are settled, and only for
+    # candidates whose own pages already substantiated something. It never becomes a
+    # Claim and never enters the note-refinement prompt.
+    #
+    # Deliberately NOT behind `use_model`, and deliberately outside the nomination
+    # block. `use_model` gates model NOMINATION, which spends a call per dependency to
+    # invent candidates; this spends one call per already-verified candidate, of which
+    # the whole 2026-09-18 run produced eleven. Tying them together meant a default run
+    # verified alternatives, never judged whether any of them did the taught job, and
+    # then printed "Candidate replacement" - because `verified` only ever meant "this
+    # company exists and publishes a pricing page".
+    if judge_fit and res.alternatives:
+        from miw.llm import available_provider
+        from miw.research import fit
+        if available_provider():
             for alt in res.alternatives:
-                if alt.verified:
+                if alt.verified and alt.opinion is None:
                     alt.opinion = fit.assess(dep, alt)
+                    # Carry the judgement onto the field the scorer and the UI read.
+                    # `AlternativeOpinion` is the model's reasoning and stays where a
+                    # reader can see whose opinion it is; `does_taught_job` is the one
+                    # bit the rest of the system acts on.
+                    if alt.opinion is not None:
+                        alt.does_taught_job = alt.opinion.does_taught_job
 
     # De-duplicate vendor-named successors against discovered ones.
     seen, alts = set(), []
@@ -269,7 +286,7 @@ def research_all(deps: Iterable[Dependency], probes: dict[str, ProbeResult], *,
                  max_deps: int = settings.RESEARCH_MAX_DEPS,
                  rotation_slice: int = settings.ROTATION_SLICE,
                  discovery_slice: int = settings.DISCOVERY_SLICE,
-                 use_model: bool = False,
+                 use_model: bool = False, judge_fit: bool = True,
                  scope=None, dep_state: Optional[dict] = None,
                  progress=None) -> list[ResearchResult]:
     """Research everything the probe flagged, plus a rotating slice of critical deps.
@@ -325,7 +342,7 @@ def research_all(deps: Iterable[Dependency], probes: dict[str, ProbeResult], *,
     for i, dep in enumerate(todo, 1):
         res = research_dependency(dep, probes.get(dep.dep_id),
                                   in_discovery_slice=dep.dep_id in discovery,
-                                  use_model=use_model)
+                                  use_model=use_model, judge_fit=judge_fit)
         out.append(res)
         if progress:
             progress(i, len(todo), dep, res)
