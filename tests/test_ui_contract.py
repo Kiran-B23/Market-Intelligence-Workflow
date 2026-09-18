@@ -128,7 +128,10 @@ def test_both_finding_lists_share_one_row():
     """They had separate markup and drifted, and the copy people actually read was the
     one showing a bare name with no action."""
     assert PAGE.count("function findingRow(r)") == 1
-    assert PAGE.count("standing.map(findingRow)") == 1
+    # The settled list renders through the same function - twice, because it opens
+    # collapsed and expands in place - and the run page through it as well.
+    assert PAGE.count("settled.map(findingRow)") == 1
+    assert PAGE.count("settled.slice(0, SHOW).map(findingRow)") == 1
     assert PAGE.count("rows.map(findingRow)") == 1
 
 
@@ -154,7 +157,12 @@ def test_an_unresolvable_location_explains_itself_rather_than_rendering_blank():
 
 def test_a_probe_only_finding_is_labelled_not_left_looking_unsourced():
     assert "d.probe_only" in PAGE
-    assert "Observed directly by our own probe" in PAGE
+    # The wording is now a labelled Probe / Response / Checked block plus the sentence
+    # that explains why nothing external is quoted. What the test guards is that a
+    # probe-only finding SAYS where it came from rather than rendering as unsourced.
+    assert "observation is ours" in PAGE
+    assert '<div class="lab">Probe</div>' in PAGE
+    assert '<div class="lab">Response</div>' in PAGE
 
 
 def test_the_excerpt_is_escaped_per_segment_so_offsets_stay_valid():

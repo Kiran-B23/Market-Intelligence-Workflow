@@ -361,6 +361,13 @@ def findings(course: str = "") -> dict:
                                               if l.get("session_no")}),
                           "courses": r.get("courses", []),
                           "affects": r.get("affects", []),
+                          # What the row needs to show the observation in one line and
+                          # to say what this run did to it. Omitting them left the
+                          # settled list - which is most of the page - with a bare name
+                          # where the raised list had the evidence and the status.
+                          "affected_urls": r.get("affected_urls") or [],
+                          "probe_signals": r.get("probe_signals") or [],
+                          "diff_class": r.get("diff_class", "unchanged"),
                           "blast_radius": r.get("blast_radius", 0)}
                          for r in standing],
             "resolved": data.get("resolved", []),
