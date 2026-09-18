@@ -3805,3 +3805,116 @@ anybody runs.
 ### Gates
 
 708 tests, eval 4/4, `verify` clean.
+
+---
+
+## 40. 202 dependencies nothing could be said about
+
+An architectural review asked what the system structurally cannot see. The largest
+answer by a distance:
+
+```
+440 dependencies
+ 157  have official domains
+ 122  have a registry
+ 202  have NEITHER  ->  under `miw.trust`, no claim about them can ever be authoritative
+```
+
+All 202 were `kind: tool`, all `watch_tier: mention-only`, and all `review_status:
+from_sheet` — a **name** lifted from the workbook's tool sheet with no vendor ever
+attached. They were not obscure. They were the curriculum's spine:
+
+```
+Telegram    229 locations   Google Docs    119   Whisper     94   ChromaDB  69
+Claude Code 150             Google Sheets  117   LinkedIn    98   Colab     67
+```
+
+The system was reporting in detail on Composio's dashboard while saying nothing
+whatsoever about Whisper. The failure is silent by construction: a mute dependency
+simply never appears in a finding, so its absence looks like health.
+
+### Proposing is recall; the fetch is the evidence
+
+45 vendors proposed by hand, then every one **verified by fetching**: the domain has to
+resolve, answer 200, and the page has to **name the tool**. That last test is what makes
+this evidence rather than a guess, and it is the same rule
+`nominate.adjudicate` already runs — *"never guess a domain from the name; a guessed host
+that happens to answer is invented evidence"*.
+
+First pass: **33/45**. The twelve failures were worth more than the successes.
+
+**Three were a bug in our own fetcher.** `cursor.com`, `v0.app` and `windsurf.com` all
+returned `ContentDecodingError`. `requests` advertises whatever codecs are installed —
+here `br` and `zstd` — and urllib3 2.0.7 then fails to decode what these servers send.
+Pinning `Accept-Encoding: gzip, deflate` makes all three answer 200 in 600KB–1MB. The
+same error had been marking **elevenlabs.io and deepwiki.com `unreachable` in the weekly
+probe**. A healthy vendor reported as unreachable is the same class of error as a dead
+one reported as healthy, and this one was silent.
+
+**Six were 403s** — alive but refusing us, which `net.Fetch` and the nomination ladder
+both already treat as unverifiable rather than refuted. Retried against a host the vendor
+publishes docs on, five confirmed: `developer.linkedin.com`, `help.gamma.app`,
+`docs.perplexity.ai`, `canva.dev`, `developers.make.com`. **Julius AI 403s everywhere and
+was not written.**
+
+One confirmation is itself a finding: **`windsurf.com` now redirects to
+`devin.ai/desktop`** and `docs.windsurf.com` to `docs.devin.ai`. A taught IDE has been
+absorbed into another product. Both domains are recorded, and the next run will report
+the redirect as the S5 it is.
+
+`review_status` gained two values so a reviewer can see how each authority set came to be
+believed: **`verified`** (proposed externally, confirmed by fetching) and **`not-a-tool`**.
+
+### Eight of them were never tools
+
+QLoRA is a fine-tuning technique from a paper. `InMemorySaver` is a LangGraph class. RSS
+Feed is a format. PaySim and the Cifer dataset are data files; the SEBI booklet is a PDF.
+Seeding a vendor for any of them would be inventing one. They are marked `not-a-tool`
+with the reason in `notes`, which turns an unexplained silence into a recorded decision —
+and stops the next person redoing this analysis.
+
+Four more were one tool wearing several spellings. `Murf AI`, `Murf.AI` and `murf` were
+three entries, and `alias_index()` keeps the **first** per alias — so the entry that won
+was the mute one, not the one with the domains. Folded, along with `gemini-api`/`gemini`
+into Google and `groq-api` into Groq. A test now fails on any alias claimed twice.
+
+### And seeding a domain turned out to be only half of it
+
+37 entries seeded, and **33 of them were still never probed** — `watch_tier: mention-only`,
+and `cmd_probe` defaults to `critical,standard`.
+
+The tier's documented purpose is *"how much research budget this dependency earns"*.
+Research is Tavily searches, model calls and the many fetches `official.gather` makes per
+dependency. A **probe** is one request per referenced URL. Rationing the probe by the
+research tier is a category error — the same one already found and patched for n8n nodes,
+where the patch was written as a special case.
+
+Measured the moment the mute set got vendors: **48 dependencies had an authoritative
+domain and were never probed**, among them **Hugging Face at blast radius 56, the largest
+in the set**, plus Telegram, Colab and Claude Code. The whole extra cost is 48 fetches,
+about a minute. So the tier no longer gates the probe at all; the n8n special case is
+gone, replaced by one rule — *probe anything there is something to probe against* — and
+`_has_something_to_probe` keeps out the entries with no domain, no registry and no URL,
+for which a slot would only record what the inventory already says.
+
+### Measured
+
+```
+dependencies              440 -> 436     four duplicates folded as aliases
+can be spoken for         238 -> 275
+mute                      202 -> 161
+probed per run            232 -> 275
+registry review status    from_sheet 215 -> 166 · verified 0 -> 37 · not-a-tool 0 -> 8
+```
+
+Six new invariants hold the ground: every status is one we document, a `verified` entry
+carries a homepage inside its own authority set, a `not-a-tool` entry gives its reason and
+claims no vendor, no two entries claim one alias, the mute count is a ratchet that may
+only fall, and the eight heaviest taught tools are spoken for by name.
+
+### What is still mute, and why that is now legible
+
+161, none of them large: RSS Feed (a format), QLoRA (a technique), Julius AI (403
+everywhere), Claude Skills (a product feature belonging under Anthropic), and a long tail
+of one- and two-mention names from the workbook. The next pass is a smaller and much
+duller job than this one, which is the point.

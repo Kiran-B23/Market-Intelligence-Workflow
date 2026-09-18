@@ -136,12 +136,14 @@ def test_artifact_words_cover_every_object_type_the_extractor_emits():
         assert artifact_word(ot) != "place"
 
 
-def test_a_free_probe_is_not_rationed_by_a_research_budget():
-    """`watch_tier` rations research. An n8n node probe reads one cached source tree.
+def test_the_probe_is_not_rationed_by_a_research_budget():
+    """`watch_tier` rations RESEARCH - searches, model calls, the many fetches
+    `official.gather` makes. A probe is one request per referenced URL.
 
-    Nine of the 41 taught nodes are `mention-only`, so a tiered probe skipped them
-    entirely - and a reference table listing a node n8n has removed then stood for ever
-    with nothing looking at it.
+    Measured the moment the mute dependencies were given vendors: 48 had an
+    authoritative domain and were never probed because nothing executes them, Hugging
+    Face at blast radius 56 among them. A dependency with nothing to probe against is
+    still skipped - that is what `_has_something_to_probe` is for.
     """
     from miw.probe.runner import probe_all
     from miw.scope import Scope
@@ -150,9 +152,18 @@ def test_a_free_probe_is_not_rationed_by_a_research_budget():
     mention_node = Dependency(kind="n8n_node", canonical_name="n8n-nodes-base.code",
                               registry="n8n", watch_tier="mention-only",
                               locations=[loc("n8n_mention", "OBJECTIVE_QUESTIONS")])
+    # Spoken for, but nothing executes it: probed anyway, because there is an authority
+    # to check it against. This is Telegram, Hugging Face and Google Colab.
     mention_tool = Dependency(kind="tool", canonical_name="SomeTool",
+                              homepage="https://sometool.example",
+                              official_domains=["sometool.example"],
                               watch_tier="mention-only",
                               locations=[loc("prose_name", "OBJECTIVE_QUESTIONS")])
+    # Nothing to probe against at all: still skipped, because a slot spent here only
+    # records "no URL known", which the inventory already says.
+    voiceless = Dependency(kind="tool", canonical_name="QLoRA",
+                           watch_tier="mention-only",
+                           locations=[loc("prose_name", "OBJECTIVE_QUESTIONS")])
     wired = Dependency(kind="n8n_node", canonical_name="n8n-nodes-base.gmail",
                        registry="n8n", watch_tier="critical",
                        locations=[loc("n8n_workflow", "OBJECTIVE_QUESTIONS")])
@@ -160,15 +171,15 @@ def test_a_free_probe_is_not_rationed_by_a_research_budget():
     seen = []
     state = State(":memory:") if _state_takes_path() else State()
     try:
-        probe_all([mention_node, mention_tool, wired], state,
+        probe_all([mention_node, mention_tool, wired, voiceless], state,
                   scope=Scope(tiers={"critical", "standard"}),
                   progress=lambda i, n, r: seen.append(r.canonical_name))
     finally:
         state.close()
-    # the mention-only n8n node is probed anyway; the mention-only TOOL is not
-    assert "n8n-nodes-base.code" in seen
+    assert "n8n-nodes-base.code" in seen      # mention-only node, probe is free
     assert "n8n-nodes-base.gmail" in seen
-    assert "SomeTool" not in seen
+    assert "SomeTool" in seen                 # mention-only, but it has an authority
+    assert "QLoRA" not in seen                # nothing to probe it against
 
 
 def test_the_tier_lift_does_not_widen_any_other_filter():
@@ -177,8 +188,9 @@ def test_the_tier_lift_does_not_widen_any_other_filter():
 
     from miw.probe import runner
     src = inspect.getsource(runner.probe_all)
-    assert 'if scope.tiers and (not scope.kinds or "n8n_node" in scope.kinds):' in src
-    assert 'd.kind == "n8n_node"' in src
+    assert "if scope.tiers:" in src
+    assert "dataclasses.replace(scope, tiers=set(), limit=None)" in src
+    assert "_has_something_to_probe(d)" in src
 
 
 def _state_takes_path() -> bool:

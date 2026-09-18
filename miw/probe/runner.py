@@ -402,6 +402,18 @@ def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str) -
     res.status = "ok"
 
 
+
+def _has_something_to_probe(dep: Dependency) -> bool:
+    """Is there an authority to check this against at all?
+
+    A dependency with no domain, no registry and no referenced URL has nothing the
+    probe can do. Including it would spend a scheduling slot to record
+    `inconclusive: no URL known`, which is what the inventory already says.
+    """
+    return bool(dep.official_domains or dep.registry or dep.referenced_urls
+                or dep.homepage or dep.kind == "n8n_node")
+
+
 def probe_all(deps: Iterable[Dependency], state: State, *,
               scope=None, progress=None) -> list[ProbeResult]:
     """Probe the dependencies a scope selects.
@@ -417,21 +429,27 @@ def probe_all(deps: Iterable[Dependency], state: State, *,
     deps = list(deps)
     todo = scope.select(deps)
 
-    # `watch_tier` rations RESEARCH budget - fetches, searches, model calls. An n8n node
-    # costs none of that: `_probe_n8n_node` reads one cached copy of n8n's source tree
-    # and its parsed rules, so every node after the first is free. Excluding the
-    # mention-only ones on budget grounds therefore buys nothing and loses something
-    # real - nine of the 41 taught nodes are named only in a display-name reference
-    # table, and a table listing a node n8n has removed is still wrong. They are
-    # reported at `low` (`score.findings_for`), not silently dropped.
+    # `watch_tier` rations RESEARCH budget - Tavily searches, model calls, the many
+    # fetches `official.gather` makes per dependency. Applying it to the PROBE is a
+    # category error: a probe is one request per referenced URL, and for an n8n node it
+    # is a read of a source tree already in memory.
     #
-    # Only the TIER constraint is lifted. Course, session, kind, dep-id and limit still
-    # apply, so `--course X` or `--kinds model` cannot be widened by this.
-    if scope.tiers and (not scope.kinds or "n8n_node" in scope.kinds):
+    # It cost real coverage. Measured on the live inventory the moment the mute
+    # dependencies were given vendors: 48 dependencies had an authoritative domain and
+    # were never probed because nothing executes them, and they included Hugging Face
+    # at blast radius 56 - the largest in the set - plus Telegram, Google Colab, Claude
+    # Code and every n8n node the curriculum only names. The whole extra cost is ~48
+    # fetches, about a minute.
+    #
+    # So the tier no longer gates the probe. A dependency is probed when there is
+    # something to probe it with; whether a student EXECUTES it still decides the
+    # research budget, which is where the money is. Course, session, kind, dep-id and
+    # limit all still apply, so `--course X` or `--kinds model` cannot be widened here.
+    if scope.tiers:
         untiered = dataclasses.replace(scope, tiers=set(), limit=None)
         picked = {d.dep_id for d in todo}
         todo += [d for d in untiered.select(deps)
-                 if d.kind == "n8n_node" and d.dep_id not in picked]
+                 if d.dep_id not in picked and _has_something_to_probe(d)]
     out = []
     for i, dep in enumerate(todo, 1):
         out.append(probe_dependency(dep, state))

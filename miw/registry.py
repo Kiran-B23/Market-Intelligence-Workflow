@@ -6,9 +6,22 @@ authoritative about it. `miw.trust` reads nothing else.
 
 Entries are bootstrapped from the curriculum itself (see `bootstrap.py`): a link the
 content author wrote to `console.groq.com` is itself the assertion that `groq.com` is
-Groq's official home. Bootstrapped entries carry `review_status: derived`; a human
-promotes them to `approved`. Nothing about that status gates monitoring — it exists so
-a reviewer can see what was inferred rather than stated.
+Groq's official home. Nothing about `review_status` gates monitoring — it exists so a
+reviewer can see how each authority set came to be believed:
+
+    derived     inferred from a link the curriculum itself contains
+    from_sheet  a NAME lifted from the workbook's tool sheet, with no vendor attached.
+                An entry stuck here is mute: `miw.trust` has no domain to accept, so it
+                can never produce a deprecation, pricing or version finding.
+    verified    a vendor proposed from OUTSIDE the curriculum and then confirmed by
+                fetching: the domain resolved, answered 200, and the page named the
+                tool. Proposing is recall; the fetch is what makes it evidence, and a
+                proposal that could not be confirmed was not written.
+    approved    a human has checked it.
+    not-a-tool  deliberately unmonitored, with the reason in `notes` - a technique, a
+                dataset, a file format, a library class. These have no vendor to be
+                wrong about, and inventing one for them would be the same error as
+                guessing a domain.
 
 The safe-failure direction is deliberate: a dependency with no official domain simply
 has no authoritative source, so under `miw.trust` it can never produce a
@@ -141,6 +154,10 @@ class Registry:
             "# actually publishes on.\n"
             "#\n"
             "# review_status: derived = inferred from the curriculum's own links;\n"
+            "#                from_sheet = a name from the workbook, no vendor yet - MUTE;\n"
+            "#                verified = proposed externally, confirmed by fetching the\n"
+            "#                           vendor's own page (it answered 200 and named the tool);\n"
+            "#                not-a-tool = deliberately unmonitored, reason in notes;\n"
             "#                approved = a human has checked it.\n"
             f"# {len(rows)} entries.\n\n"
             + yaml.safe_dump({"tools": rows}, sort_keys=False, allow_unicode=True, width=100)

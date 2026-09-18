@@ -210,7 +210,16 @@ def fetch(url: str, *, timeout: float = 20.0, retries: int = 2,
         # look" apart from "the tool is gone". Conflating them would invent findings.
         return Fetch(url=url, error="disallowed_by_robots")
 
-    h = {"User-Agent": USER_AGENT, "Accept-Language": "en"}
+    # `Accept-Encoding` is pinned rather than left to `requests`, which advertises
+    # whatever codecs happen to be installed - here `br` and `zstd`, because brotli and
+    # zstandard are in the environment. urllib3 2.0.7 then fails to decode what several
+    # real servers send back and raises `ContentDecodingError`, which this module
+    # reports as a transport failure. Measured: cursor.com, v0.app, windsurf.com and
+    # elevenlabs.io were all recorded `unreachable` while every one of them answers 200
+    # in 600KB-1MB of gzip. A healthy vendor reported as unreachable is the same class
+    # of error as a dead one reported as healthy, and it was silent.
+    h = {"User-Agent": USER_AGENT, "Accept-Language": "en",
+         "Accept-Encoding": "gzip, deflate"}
     if headers:
         h.update(headers)
 

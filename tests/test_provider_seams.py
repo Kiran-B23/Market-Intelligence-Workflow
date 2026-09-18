@@ -163,3 +163,21 @@ def test_a_rejected_rewrite_leaves_the_deterministic_triad_intact():
         assert notes.refine(dep, f) is False
     assert (f.what_to_act, f.why_to_act, f.when_to_act) == before
     assert f.note_source == "template"
+
+
+def test_the_fetcher_only_advertises_encodings_it_can_decode():
+    """`requests` advertises whatever codecs are installed. urllib3 2.0.7 then fails to
+    decode what several real servers send for `br`/`zstd` and raises
+    ContentDecodingError, which this module reports as a transport failure.
+
+    Measured before the fix: cursor.com, v0.app, windsurf.com, elevenlabs.io and
+    deepwiki.com were all recorded `unreachable`, and every one of them answers 200 in
+    600KB-1MB of gzip. A healthy vendor reported as unreachable is the same class of
+    error as a dead one reported as healthy, and this one was silent for weeks.
+    """
+    import inspect
+
+    from miw import net
+    src = inspect.getsource(net.fetch)
+    assert '"Accept-Encoding": "gzip, deflate"' in src
+    assert "br" not in src.split('"Accept-Encoding"')[1].split("}")[0]

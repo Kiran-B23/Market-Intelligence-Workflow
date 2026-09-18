@@ -6,8 +6,12 @@
 # actually publishes on.
 #
 # review_status: derived = inferred from the curriculum's own links;
+#                from_sheet = a name from the workbook, no vendor yet - MUTE;
+#                verified = proposed externally, confirmed by fetching the
+#                           vendor's own page (it answered 200 and named the tool);
+#                not-a-tool = deliberately unmonitored, reason in notes;
 #                approved = a human has checked it.
-# 474 entries.
+# 470 entries.
 
 tools:
 - canonical_name: all-minilm-l6-v2
@@ -395,6 +399,19 @@ tools:
   - voyageai.com
   vendor: Voyage AI
   review_status: derived
+- canonical_name: Whisper
+  kind: model
+  aliases:
+  - Whisper
+  homepage: https://openai.com/index/whisper/
+  official_domains:
+  - github.com
+  - openai.com
+  - platform.openai.com
+  vendor: OpenAI
+  review_status: verified
+  capability: speech-recognition
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: whisper-large-v3
   kind: model
   homepage: https://platform.openai.com/docs/models
@@ -961,6 +978,20 @@ tools:
   review_status: approved
   notes: 'declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U | retyped tool->package:
     verified present on PyPI, so its authority is the registry, not a website'
+- canonical_name: anthropic
+  kind: package
+  aliases:
+  - anthropic
+  homepage: https://www.anthropic.com
+  official_domains:
+  - anthropic.com
+  - claude.com
+  - docs.anthropic.com
+  - docs.claude.com
+  vendor: Anthropic
+  review_status: verified
+  capability: llm-api
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: assemblyai
   kind: package
   registry: pypi
@@ -1518,6 +1549,16 @@ tools:
   - assemblyai.com
   review_status: derived
   capability: speech-recognition
+- canonical_name: Base44
+  kind: service
+  aliases:
+  - Base44
+  homepage: https://base44.com
+  official_domains:
+  - base44.com
+  vendor: Base44
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Bertscore
   kind: service
   aliases:
@@ -1527,6 +1568,16 @@ tools:
   official_domains:
   - bertscore.com
   review_status: derived
+- canonical_name: Canva
+  kind: service
+  aliases:
+  - Canva
+  homepage: https://www.canva.com
+  official_domains:
+  - canva.com
+  vendor: Canva
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Chatgpt
   kind: service
   aliases:
@@ -1548,6 +1599,18 @@ tools:
   - trychroma.com
   review_status: derived
   capability: vector-db
+- canonical_name: ChromaDB
+  kind: service
+  aliases:
+  - ChromaDB
+  homepage: https://www.trychroma.com
+  official_domains:
+  - docs.trychroma.com
+  - trychroma.com
+  vendor: Chroma
+  review_status: verified
+  capability: vector-db
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Claude
   kind: service
   aliases:
@@ -1623,6 +1686,18 @@ tools:
   official_domains:
   - deepmind.google
   review_status: derived
+- canonical_name: DeepSeek
+  kind: service
+  aliases:
+  - DeepSeek
+  homepage: https://www.deepseek.com
+  official_domains:
+  - api-docs.deepseek.com
+  - deepseek.com
+  - platform.deepseek.com
+  vendor: DeepSeek
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: DeepWiki
   kind: service
   aliases:
@@ -1708,6 +1783,27 @@ tools:
   official_domains:
   - gamma.app
   review_status: derived
+- canonical_name: Gamma AI
+  kind: service
+  aliases:
+  - Gamma AI
+  homepage: https://gamma.app
+  official_domains:
+  - gamma.app
+  vendor: Gamma
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Gemini Guided Learning
+  kind: service
+  aliases:
+  - Gemini Guided Learning
+  homepage: https://gemini.google.com
+  official_domains:
+  - gemini.google.com
+  - google.com
+  vendor: Google
+  review_status: verified
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Genspark
   kind: service
   aliases:
@@ -1738,6 +1834,20 @@ tools:
   - github.com
   review_status: derived
   capability: source-control
+- canonical_name: Gmail
+  kind: service
+  aliases:
+  - Gmail
+  homepage: https://workspace.google.com/products/gmail/
+  official_domains:
+  - developers.google.com
+  - google.com
+  - mail.google.com
+  - workspace.google.com
+  vendor: Google
+  review_status: verified
+  capability: productivity
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Gold-API
   kind: service
   aliases:
@@ -1752,6 +1862,8 @@ tools:
   kind: service
   aliases:
   - Google
+  - gemini
+  - gemini-api
   - google.com
   homepage: https://google.com
   official_domains:
@@ -1775,6 +1887,75 @@ tools:
   - ai.google.dev
   - google.dev
   review_status: derived
+- canonical_name: Google Calendar
+  kind: service
+  aliases:
+  - Google Calendar
+  homepage: https://workspace.google.com/products/calendar/
+  official_domains:
+  - calendar.google.com
+  - developers.google.com
+  - google.com
+  - workspace.google.com
+  vendor: Google
+  review_status: verified
+  capability: productivity
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Colab
+  kind: service
+  aliases:
+  - Google Colab
+  homepage: https://colab.research.google.com
+  official_domains:
+  - colab.research.google.com
+  - google.com
+  - research.google.com
+  vendor: Google
+  review_status: verified
+  capability: ide
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Docs
+  kind: service
+  aliases:
+  - Google Docs
+  homepage: https://workspace.google.com/products/docs/
+  official_domains:
+  - developers.google.com
+  - docs.google.com
+  - google.com
+  - workspace.google.com
+  vendor: Google
+  review_status: verified
+  capability: productivity
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Drive
+  kind: service
+  aliases:
+  - Google Drive
+  homepage: https://workspace.google.com/products/drive/
+  official_domains:
+  - developers.google.com
+  - drive.google.com
+  - google.com
+  - workspace.google.com
+  vendor: Google
+  review_status: verified
+  capability: productivity
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+- canonical_name: Google Sheets
+  kind: service
+  aliases:
+  - Google Sheets
+  homepage: https://workspace.google.com/products/sheets/
+  official_domains:
+  - developers.google.com
+  - google.com
+  - sheets.google.com
+  - workspace.google.com
+  vendor: Google
+  review_status: verified
+  capability: productivity
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Gradio
   kind: service
   aliases:
@@ -1790,6 +1971,7 @@ tools:
   kind: service
   aliases:
   - Groq
+  - groq-api
   - groq.com
   homepage: https://groq.com
   official_domains:
@@ -1808,6 +1990,16 @@ tools:
   - huggingface.co
   review_status: derived
   capability: model-hub
+- canonical_name: Hugging Face Spaces
+  kind: service
+  aliases:
+  - Hugging Face Spaces
+  homepage: https://huggingface.co/spaces
+  official_domains:
+  - huggingface.co
+  vendor: Hugging Face
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Ibm
   kind: service
   aliases:
@@ -1851,6 +2043,17 @@ tools:
   - smith.langchain.com
   review_status: derived
   capability: agent-framework
+- canonical_name: LinkedIn
+  kind: service
+  aliases:
+  - LinkedIn
+  homepage: https://www.linkedin.com
+  official_domains:
+  - developer.linkedin.com
+  - linkedin.com
+  vendor: LinkedIn
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Llama
   kind: service
   aliases:
@@ -1898,6 +2101,18 @@ tools:
   - learn.microsoft.com
   - microsoft.com
   review_status: derived
+- canonical_name: Mistral
+  kind: service
+  aliases:
+  - Mistral
+  homepage: https://mistral.ai
+  official_domains:
+  - console.mistral.ai
+  - docs.mistral.ai
+  - mistral.ai
+  vendor: Mistral AI
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Mistral AI
   kind: service
   aliases:
@@ -1921,6 +2136,7 @@ tools:
 - canonical_name: Murf.AI
   kind: service
   aliases:
+  - Murf AI
   - Murf.AI
   - murf.ai
   homepage: https://murf.ai
@@ -2031,6 +2247,16 @@ tools:
   official_domains:
   - otter.ai
   review_status: derived
+- canonical_name: Otter AI
+  kind: service
+  aliases:
+  - Otter AI
+  homepage: https://otter.ai
+  official_domains:
+  - otter.ai
+  vendor: Otter.ai
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Paytm
   kind: service
   aliases:
@@ -2049,6 +2275,18 @@ tools:
   official_domains:
   - perplexity.ai
   review_status: derived
+- canonical_name: Pinecone
+  kind: service
+  aliases:
+  - Pinecone
+  homepage: https://www.pinecone.io
+  official_domains:
+  - docs.pinecone.io
+  - pinecone.io
+  vendor: Pinecone
+  review_status: verified
+  capability: vector-db
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Pipedream
   kind: service
   aliases:
@@ -2068,6 +2306,17 @@ tools:
   official_domains:
   - promptbase.com
   review_status: derived
+- canonical_name: ProtectAI
+  kind: service
+  aliases:
+  - ProtectAI
+  homepage: https://protectai.com
+  official_domains:
+  - huggingface.co
+  - protectai.com
+  vendor: Protect AI
+  review_status: verified
+  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: PyPI
   kind: service
   aliases:
@@ -2087,6 +2336,17 @@ tools:
   - docs.python.org
   - python.org
   review_status: derived
+- canonical_name: Qdrant
+  kind: service
+  aliases:
+  - Qdrant
+  homepage: https://qdrant.tech
+  official_domains:
+  - qdrant.tech
+  vendor: Qdrant
+  review_status: verified
+  capability: vector-db
+  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Quizgecko
   kind: service
   aliases:
@@ -2134,6 +2394,17 @@ tools:
   - render.com
   review_status: derived
   capability: deployment
+- canonical_name: Replit
+  kind: service
+  aliases:
+  - Replit
+  homepage: https://replit.com
+  official_domains:
+  - docs.replit.com
+  - replit.com
+  vendor: Replit
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Scraperapi
   kind: service
   aliases:
@@ -2168,6 +2439,18 @@ tools:
   - serper.dev
   review_status: derived
   capability: search-api
+- canonical_name: Slack
+  kind: service
+  aliases:
+  - Slack
+  homepage: https://slack.com
+  official_domains:
+  - api.slack.com
+  - slack.com
+  vendor: Slack
+  review_status: verified
+  capability: messaging
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Smithery
   kind: service
   aliases:
@@ -2230,6 +2513,31 @@ tools:
   - tavily.com
   review_status: derived
   capability: search-api
+- canonical_name: Tavily Search
+  kind: service
+  aliases:
+  - Tavily Search
+  homepage: https://tavily.com
+  official_domains:
+  - docs.tavily.com
+  - tavily.com
+  vendor: Tavily
+  review_status: verified
+  notes: declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
+    U
+- canonical_name: Telegram
+  kind: service
+  aliases:
+  - Telegram
+  homepage: https://telegram.org
+  official_domains:
+  - core.telegram.org
+  - telegram.org
+  - web.telegram.org
+  vendor: Telegram
+  review_status: verified
+  capability: messaging
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Tensorflow
   kind: service
   aliases:
@@ -2271,6 +2579,18 @@ tools:
   - twelvedata.com
   review_status: derived
   capability: market-data
+- canonical_name: V0 by Vercel
+  kind: service
+  aliases:
+  - V0 by Vercel
+  homepage: https://v0.app
+  official_domains:
+  - v0.app
+  - v0.dev
+  - vercel.com
+  vendor: Vercel
+  review_status: verified
+  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Vercel
   kind: service
   aliases:
@@ -2348,13 +2668,6 @@ tools:
   - Anki
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: anthropic
-  kind: tool
-  aliases:
-  - anthropic
-  review_status: from_sheet
-  capability: llm-api
-  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Anthropic Claude Opus 4.8
   kind: tool
   aliases:
@@ -2371,7 +2684,11 @@ tools:
   kind: tool
   aliases:
   - Automatic1111
-  review_status: from_sheet
+  homepage: https://github.com/AUTOMATIC1111/stable-diffusion-webui
+  official_domains:
+  - github.com
+  vendor: AUTOMATIC1111
+  review_status: verified
   capability: image-generation
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: BandLab
@@ -2384,12 +2701,6 @@ tools:
   kind: tool
   aliases:
   - Bark
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Base44
-  kind: tool
-  aliases:
-  - Base44
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Beautiful.ai
@@ -2417,12 +2728,6 @@ tools:
   - Bolt
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Canva
-  kind: tool
-  aliases:
-  - Canva
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Canvas
   kind: tool
   aliases:
@@ -2447,19 +2752,13 @@ tools:
   - Chirp
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: ChromaDB
-  kind: tool
-  aliases:
-  - ChromaDB
-  review_status: from_sheet
-  capability: vector-db
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Cifer Fraud Detection Dataset
   kind: tool
   aliases:
   - Cifer Fraud Detection Dataset
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: dataset — a published data file, not a service'
 - canonical_name: CivitAI
   kind: tool
   aliases:
@@ -2476,7 +2775,13 @@ tools:
   kind: tool
   aliases:
   - Claude Code
-  review_status: from_sheet
+  homepage: https://claude.com/product/claude-code
+  official_domains:
+  - anthropic.com
+  - claude.com
+  - docs.claude.com
+  vendor: Anthropic
+  review_status: verified
   capability: ide
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Claude Haiku 4.5
@@ -2501,8 +2806,9 @@ tools:
   kind: tool
   aliases:
   - Claude Skills
-  review_status: from_sheet
-  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: product feature — documented under Anthropic''s own entry'
 - canonical_name: Claude Sonnet 4.6
   kind: tool
   aliases:
@@ -2563,7 +2869,12 @@ tools:
   kind: tool
   aliases:
   - Cursor IDE
-  review_status: from_sheet
+  homepage: https://cursor.com
+  official_domains:
+  - cursor.com
+  - docs.cursor.com
+  vendor: Cursor
+  review_status: verified
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: DALL-E
   kind: tool
@@ -2577,12 +2888,6 @@ tools:
   - Deepgram
   review_status: from_sheet
   capability: speech-recognition
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: DeepSeek
-  kind: tool
-  aliases:
-  - DeepSeek
-  review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: deepseek-ai
   kind: tool
@@ -2681,18 +2986,6 @@ tools:
   - Fooocus
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Gamma AI
-  kind: tool
-  aliases:
-  - Gamma AI
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: gemini
-  kind: tool
-  aliases:
-  - gemini
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Gemini 2.5
   kind: tool
   aliases:
@@ -2735,25 +3028,12 @@ tools:
   - Gemini CLI
   review_status: from_sheet
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Gemini Guided Learning
-  kind: tool
-  aliases:
-  - Gemini Guided Learning
-  review_status: from_sheet
-  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Gemini Nano Banana
   kind: tool
   aliases:
   - Gemini Nano Banana
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: gemini-api
-  kind: tool
-  aliases:
-  - gemini-api
-  review_status: from_sheet
-  capability: llm-api
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Gemini-TTS
   kind: tool
   aliases:
@@ -2772,13 +3052,6 @@ tools:
   - GitHub Models
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Gmail
-  kind: tool
-  aliases:
-  - Gmail
-  review_status: from_sheet
-  capability: productivity
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Google AI Studio
   kind: tool
   aliases:
@@ -2789,55 +3062,25 @@ tools:
   kind: tool
   aliases:
   - Google Antigravity
-  review_status: from_sheet
+  homepage: https://antigravity.google
+  official_domains:
+  - antigravity.google
+  - google.com
+  vendor: Google
+  review_status: verified
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Google Calendar
-  kind: tool
-  aliases:
-  - Google Calendar
-  review_status: from_sheet
-  capability: productivity
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Google Chrome
   kind: tool
   aliases:
   - Google Chrome
   review_status: from_sheet
   notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Google Colab
-  kind: tool
-  aliases:
-  - Google Colab
-  review_status: from_sheet
-  capability: ide
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Google Docs
-  kind: tool
-  aliases:
-  - Google Docs
-  review_status: from_sheet
-  capability: productivity
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Google Drive
-  kind: tool
-  aliases:
-  - Google Drive
-  review_status: from_sheet
-  capability: productivity
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Google Gemini 3.1 Pro
   kind: tool
   aliases:
   - Google Gemini 3.1 Pro
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Google Sheets
-  kind: tool
-  aliases:
-  - Google Sheets
-  review_status: from_sheet
-  capability: productivity
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Google Speech-to-Text
   kind: tool
   aliases:
@@ -2880,12 +3123,6 @@ tools:
   - Grok
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: groq-api
-  kind: tool
-  aliases:
-  - groq-api
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: GST Ready Reckoner
   kind: tool
   aliases:
@@ -2914,12 +3151,6 @@ tools:
   kind: tool
   aliases:
   - Hugging Face Diffusers
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Hugging Face Spaces
-  kind: tool
-  aliases:
-  - Hugging Face Spaces
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: HuggingFace Hub
@@ -2962,8 +3193,9 @@ tools:
   kind: tool
   aliases:
   - InMemorySaver
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: library class — a LangGraph checkpointer, part of langgraph'
 - canonical_name: Interactive Brokers
   kind: tool
   aliases:
@@ -3010,13 +3242,12 @@ tools:
   kind: tool
   aliases:
   - Langflow
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: LinkedIn
-  kind: tool
-  aliases:
-  - LinkedIn
-  review_status: from_sheet
+  homepage: https://www.langflow.org
+  official_domains:
+  - docs.langflow.org
+  - langflow.org
+  vendor: Langflow
+  review_status: verified
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Llama 4
   kind: tool
@@ -3034,7 +3265,11 @@ tools:
   kind: tool
   aliases:
   - LM Studio
-  review_status: from_sheet
+  homepage: https://lmstudio.ai
+  official_domains:
+  - lmstudio.ai
+  vendor: LM Studio
+  review_status: verified
   notes: declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
     U
 - canonical_name: Local Storage
@@ -3065,7 +3300,11 @@ tools:
   kind: tool
   aliases:
   - MeloTTS
-  review_status: from_sheet
+  homepage: https://github.com/myshell-ai/MeloTTS
+  official_domains:
+  - github.com
+  vendor: MyShell
+  review_status: verified
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Meta Llama
   kind: tool
@@ -3109,12 +3348,6 @@ tools:
   - Miro AI
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Mistral
-  kind: tool
-  aliases:
-  - Mistral
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Mistral Large 3
   kind: tool
   aliases:
@@ -3137,12 +3370,6 @@ tools:
   kind: tool
   aliases:
   - Molmo
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Murf AI
-  kind: tool
-  aliases:
-  - Murf AI
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: MusicGen
@@ -3203,7 +3430,11 @@ tools:
   kind: tool
   aliases:
   - OpenVoice V2
-  review_status: from_sheet
+  homepage: https://github.com/myshell-ai/OpenVoice
+  official_domains:
+  - github.com
+  vendor: MyShell
+  review_status: verified
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: OpenWeather API
   kind: tool
@@ -3217,12 +3448,6 @@ tools:
   - Opus 4
   review_status: from_sheet
   notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Otter AI
-  kind: tool
-  aliases:
-  - Otter AI
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Paperspace
   kind: tool
   aliases:
@@ -3233,21 +3458,15 @@ tools:
   kind: tool
   aliases:
   - PaySim
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: dataset — a synthetic transaction simulator from a paper'
 - canonical_name: PIIMiddleware
   kind: tool
   aliases:
   - PIIMiddleware
   review_status: from_sheet
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Pinecone
-  kind: tool
-  aliases:
-  - Pinecone
-  review_status: from_sheet
-  capability: vector-db
-  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Polygon.io
   kind: tool
   aliases:
@@ -3258,7 +3477,12 @@ tools:
   kind: tool
   aliases:
   - PowerPoint
-  review_status: from_sheet
+  homepage: https://www.microsoft.com/microsoft-365/powerpoint
+  official_domains:
+  - microsoft.com
+  - office.com
+  vendor: Microsoft
+  review_status: verified
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Prettier
   kind: tool
@@ -3266,31 +3490,19 @@ tools:
   - Prettier
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: ProtectAI
-  kind: tool
-  aliases:
-  - ProtectAI
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: protectai/deberta-v3-base-prompt-injection-v2
   kind: tool
   aliases:
   - protectai/deberta-v3-base-prompt-injection-v2
   review_status: from_sheet
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Qdrant
-  kind: tool
-  aliases:
-  - Qdrant
-  review_status: from_sheet
-  capability: vector-db
-  notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: QLoRA
   kind: tool
   aliases:
   - QLoRA
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: technique — a fine-tuning method from a paper, with no vendor or release'
 - canonical_name: Quadratic
   kind: tool
   aliases:
@@ -3357,12 +3569,6 @@ tools:
   - Replicate
   review_status: from_sheet
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Replit
-  kind: tool
-  aliases:
-  - Replit
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Reuters
   kind: tool
   aliases:
@@ -3385,8 +3591,9 @@ tools:
   kind: tool
   aliases:
   - RSS Feed
-  review_status: from_sheet
-  notes: declared in Intro to Generative AI - Course Contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: format — a syndication standard, not a product anyone ships'
 - canonical_name: RunPod
   kind: tool
   aliases:
@@ -3409,8 +3616,9 @@ tools:
   kind: tool
   aliases:
   - SEBI Financial Education Booklet
-  review_status: from_sheet
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: document — a regulator''s PDF, not a tool'
 - canonical_name: Semantic Kernel
   kind: tool
   aliases:
@@ -3429,13 +3637,6 @@ tools:
   - SFTTrainer
   review_status: from_sheet
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Slack
-  kind: tool
-  aliases:
-  - Slack
-  review_status: from_sheet
-  capability: messaging
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Sonnet 4.5
   kind: tool
   aliases:
@@ -3464,8 +3665,9 @@ tools:
   kind: tool
   aliases:
   - Stable Diffusion 3.5
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
+  watch_tier: mention-only
+  review_status: not-a-tool
+  notes: 'deliberately unmonitored: model — belongs to the Stability AI entry'
 - canonical_name: Stable Diffusion 4
   kind: tool
   aliases:
@@ -3488,7 +3690,12 @@ tools:
   kind: tool
   aliases:
   - Streamlit
-  review_status: from_sheet
+  homepage: https://streamlit.io
+  official_domains:
+  - docs.streamlit.io
+  - streamlit.io
+  vendor: Streamlit
+  review_status: verified
   capability: deployment
   notes: declared in llm_apps_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: StudyFetch
@@ -3508,20 +3715,6 @@ tools:
   aliases:
   - Tacotron 2
   review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Tavily Search
-  kind: tool
-  aliases:
-  - Tavily Search
-  review_status: from_sheet
-  notes: declared in Building LLM Applications - Course Contents.xlsx / Entity Ids - Tools & Versions
-    U
-- canonical_name: Telegram
-  kind: tool
-  aliases:
-  - Telegram
-  review_status: from_sheet
-  capability: messaging
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Tensor.Art
   kind: tool
@@ -3552,12 +3745,6 @@ tools:
   kind: tool
   aliases:
   - Udio
-  review_status: from_sheet
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: V0 by Vercel
-  kind: tool
-  aliases:
-  - V0 by Vercel
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: V3
@@ -3614,13 +3801,6 @@ tools:
   - Whimsical
   review_status: from_sheet
   notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
-- canonical_name: Whisper
-  kind: tool
-  aliases:
-  - Whisper
-  review_status: from_sheet
-  capability: speech-recognition
-  notes: declared in gen_ai_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: wikipedia
   kind: tool
   aliases:
@@ -3631,7 +3811,14 @@ tools:
   kind: tool
   aliases:
   - Windsurf
-  review_status: from_sheet
+  homepage: https://windsurf.com
+  official_domains:
+  - devin.ai
+  - docs.devin.ai
+  - docs.windsurf.com
+  - windsurf.com
+  vendor: Windsurf
+  review_status: verified
   notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
 - canonical_name: Yahoo Finance
   kind: tool
