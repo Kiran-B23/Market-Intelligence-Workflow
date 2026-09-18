@@ -26,7 +26,21 @@ def _loc_line(f: Finding) -> str:
         by_course.setdefault(l.course, [])
         if tag not in by_course[l.course]:
             by_course[l.course].append(tag)
-    return "; ".join(f"**{c}** ({', '.join(t[:6])})" for c, t in by_course.items())
+    where = "; ".join(f"**{c}** ({', '.join(t[:6])})" for c, t in by_course.items())
+    # What has to be opened, not just where. `f.locations` is now the places the SIGNAL
+    # reaches, so this is a count a reviewer can plan around rather than every mention
+    # of the dependency. The unit name is deliberately absent: this curriculum's MCQ
+    # bank sits in a unit called "Coding Practice", and printing it labelled 25 of 43
+    # findings as coding work when none of them was.
+    from config.constants import ARTIFACT_ORDER, artifact_word
+    counts: dict[str, int] = {}
+    for l in f.locations:
+        counts[l.object_type] = counts.get(l.object_type, 0) + 1
+    kinds = ", ".join(f"{n} {artifact_word(t, n != 1)}"
+                      for t in ARTIFACT_ORDER if (n := counts.get(t, 0)))
+    if not where and not f.locations_scoped:
+        return "_affected places not determined — confirm by hand_"
+    return f"{where}{f' — {kinds}' if kinds else ''}"
 
 
 def _finding_block(f: Finding) -> list[str]:

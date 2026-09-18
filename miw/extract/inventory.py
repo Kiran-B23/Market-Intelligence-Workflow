@@ -174,12 +174,12 @@ class InventoryBuilder:
         return dep
 
     def _locate(self, dep: Dependency, r: ContentRecord, evidence: str,
-                field_path: Optional[str] = None) -> None:
+                field_path: Optional[str] = None, url: str = "") -> None:
         loc = Location(
             course=r.course, topic_name=r.topic_name, unit_id=r.unit_id,
             unit_name=r.unit_name, content_id=r.content_id,
             field_path=field_path or r.field_path, evidence_source=evidence,
-            object_type=r.object_type, session_no=r.session_no,
+            object_type=r.object_type, session_no=r.session_no, url=url,
         )
         before = len(dep.locations)
         dep.merge_location(loc)
@@ -216,7 +216,7 @@ class InventoryBuilder:
                 dep.official_domains = sorted(set(dep.official_domains) | {d})
             if url not in dep.referenced_urls:
                 dep.referenced_urls.append(url)
-            self._locate(dep, r, f"link:{syntax}")
+            self._locate(dep, r, f"link:{syntax}", url=url)
 
     def _packages(self, r: ContentRecord) -> None:
         pairs: list[tuple[str, str, str]] = []

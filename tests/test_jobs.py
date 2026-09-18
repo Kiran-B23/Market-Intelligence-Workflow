@@ -18,7 +18,8 @@ def test_scoped_stages_are_declared():
     `report` IS scoped, but only in which per-course digest it writes — see the test
     below. That is the load-bearing distinction.
     """
-    assert jobs.SCOPED == {"probe", "research", "analyse", "gaps", "decks", "report"}
+    assert jobs.SCOPED == {"probe", "research", "analyse", "gaps", "changes",
+                           "decks", "report"}
     assert "ingest" not in jobs.SCOPED and "extract" not in jobs.SCOPED
 
 

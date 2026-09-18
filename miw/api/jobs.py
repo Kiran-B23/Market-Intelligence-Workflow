@@ -48,12 +48,18 @@ DB = ROOT / "state" / "jobs.db"
 # `decks` sits after `extract` because `gaps` reads the artifact it writes. It is NOT in
 # `run-weekly`: 85 fetches of 0.6-14MB against a throttling host is a curriculum-revision
 # cadence, not a weekly one, and the 7-day cache means a re-run is nearly free anyway.
-STAGES = ("ingest", "extract", "decks", "probe", "research", "analyse", "gaps", "report")
+# `changes` sits beside `gaps` because it merges into the same findings artifact, but
+# it is a separate stage because it is a separate question: `gaps` asks what the
+# curriculum does not teach yet, `changes` asks what a vendor we already use has added.
+# They used to be one checkbox, which meant a reviewer who wanted one paid for both and
+# could not tell which had produced what.
+STAGES = ("ingest", "extract", "decks", "probe", "research", "analyse", "gaps",
+          "changes", "report")
 # Which stages accept scope flags. `ingest`/`extract` rebuild the whole inventory:
 # scoping them would silently shrink it and break every other course's findings.
 # `report` is scoped only in what it WRITES - it always reads the whole merged findings
 # artifact and always re-renders the roll-up, then writes the named course's digest.
-SCOPED = {"probe", "research", "analyse", "gaps", "decks", "report"}
+SCOPED = {"probe", "research", "analyse", "gaps", "changes", "decks", "report"}
 
 # Which scope flags each stage's argparse actually declares. `report` takes ONLY
 # `--course` (main.py applies `_add_scope_args` to probe/research/analyse/run-weekly,
@@ -68,7 +74,7 @@ SCOPED = {"probe", "research", "analyse", "gaps", "decks", "report"}
 # `gaps` is course-scoped in the same narrow sense: tier, kind and dep-id describe
 # dependencies, and a topic gap is about a SESSION, so those flags would parse and then
 # silently do nothing.
-COURSE_ONLY = {"report", "gaps", "decks"}
+COURSE_ONLY = {"report", "gaps", "changes", "decks"}
 
 
 def _stage_args(stage: str, sc) -> list:
@@ -452,7 +458,7 @@ class JobRunner:
                     cmd.append("--refine")
                 self.event(run_id, stage, f"$ {' '.join(cmd[2:])}")
                 code = self._stream(run_id, stage, cmd)
-                if stage in ("analyse", "gaps") and code in (0, 1):
+                if stage in ("analyse", "gaps", "changes") and code in (0, 1):
                     # Immediately after, while `examined_this_run` in the artifact is
                     # still this stage's. Any later analyse overwrites it.
                     #

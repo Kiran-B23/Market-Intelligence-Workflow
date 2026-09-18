@@ -211,6 +211,15 @@
   .hint,.note{color:var(--muted); font-size:12.5px; line-height:1.6; max-width:74ch}
   .note{font-size:12px}
   .hint{margin:0 0 16px}
+  .hint.warn{color:var(--ink); border-left:2px solid var(--high); padding-left:10px}
+  /* Counts per artifact type: what the reviewer has to open, and how many of each. */
+  .kinds{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px}
+  .kind{
+    font-size:12px; padding:4px 9px; border-radius:var(--r-sm);
+    border:1px solid var(--rule); background:var(--sunk); white-space:nowrap;
+  }
+  .kind b{font-weight:650}
+  .faff{font-size:12px; color:var(--soft); margin-top:4px}
   .cnt{color:var(--faint); font-family:var(--mono); font-size:11px}
   .flabel{
     display:block; font-size:10.5px; font-weight:650; letter-spacing:.07em;
@@ -492,6 +501,18 @@
   .inline{flex-direction:row; flex-wrap:wrap; gap:12px}
   .checks label,.inline label{display:flex; align-items:center; gap:7px; cursor:pointer}
   .checks label.dim{opacity:.45}
+  /* The three jobs. Buttons rather than radios: picking one is an action that changes
+     the boxes below, and a radio would imply the choice is itself submitted. */
+  .jobs{display:flex; flex-direction:column; gap:7px}
+  .jobs .job{
+    display:flex; flex-direction:column; gap:2px; text-align:left; cursor:pointer;
+    font:inherit; padding:9px 11px; border-radius:var(--r-sm);
+    border:1px solid var(--rule2); background:var(--surface); color:var(--ink);
+  }
+  .jobs .job:hover{border-color:var(--rule)}
+  .jobs .job b{font-size:13px; font-weight:620}
+  .jobs .job span{font-size:11.5px; color:var(--muted); line-height:1.4}
+  .jobs .job.on{border-color:var(--accent); box-shadow:inset 2px 0 0 var(--accent)}
   input[type=checkbox]{accent-color:var(--accent); width:14px; height:14px; cursor:pointer}
   .ti{
     width:100%; font:inherit; font-size:13px; padding:7px 10px;
@@ -1079,7 +1100,27 @@
                being shown this page cannot be expected to know what "extract" or
                "analyse" produce, and the small grey name keeps the real one visible for
                anyone reading the log underneath. -->
-          <legend>Steps to run</legend>
+          <legend>What do you want to find out?</legend>
+          <!-- Three questions, not seven steps. A curriculum lead asks "what is
+               broken", "what is missing" or "what is new"; the pipeline stages below
+               are the mechanism, and they stay visible and editable, but nobody should
+               have to know which of them answers which question. Picking a job ticks
+               the boxes, so the two views can never disagree. -->
+          <div class="jobs" id="jobs">
+            <button type="button" class="job" data-stages="probe,research,analyse,report">
+              <b>Find what's broken</b>
+              <span>Dead links, paywalls, retired models, n8n nodes that changed</span>
+            </button>
+            <button type="button" class="job" data-stages="gaps,report">
+              <b>Find what's missing</b>
+              <span>Topics the official docs cover and no session teaches</span>
+            </button>
+            <button type="button" class="job" data-stages="changes,report">
+              <b>Find what's new</b>
+              <span>What a vendor we already use has added, and newly launched tools</span>
+            </button>
+          </div>
+          <span class="flabel" style="margin-top:16px">Steps to run</span>
           <div class="checks" id="stages">
             <label><input type="checkbox" value="ingest"> Re-read the course exports
               <span class="cnt">ingest</span></label>
@@ -1093,6 +1134,8 @@
               <span class="cnt">analyse</span></label>
             <label><input type="checkbox" value="gaps"> Look for topics we don't teach yet
               <span class="cnt">gaps · reads the course workbook</span></label>
+            <label><input type="checkbox" value="changes"> Look for what's new from vendors we use
+              <span class="cnt">changes · reads vendor catalogues and launch feeds</span></label>
             <label><input type="checkbox" value="report" checked> Write the report
               <span class="cnt">report</span></label>
           </div>
@@ -1347,6 +1390,7 @@ const WORDS = {
           decks: 'reading the slide decks',
           probe: 'checking links and versions', research: 'reading official pages',
           analyse: 'ranking the issues', gaps: 'looking for missing topics',
+          changes: 'looking for what vendors added',
           report: 'writing the report'},
 };
 const word = (group, key) => (WORDS[group] || {})[key] || key || '';
@@ -2086,15 +2130,46 @@ function renderDetail(d) {
      SHOULD cover it and currently do not, so "Where it is used — 1 reference" reads as
      the exact opposite of what the finding says. */
   const isGap = f.signal === 'S11';
+
+  /* What the reviewer has to open, counted by artifact type. The session grouping
+     above answers "when"; this answers "what kind of work", and they are different
+     questions - a quiz question needs rewording, a deck needs a screenshot re-shot,
+     a coding practice needs its solution re-run. The unit name cannot tell them apart:
+     this curriculum's MCQ bank sits in a unit called "Coding Practice". */
+  const kinds = (d.artifact_groups || []);
+  const kindline = kinds.length ? `<div class="kinds">` + kinds.map(g =>
+      `<span class="kind"><b>${g.count}</b> ${esc(g.label)}${
+        g.sessions.length ? `<span class="note"> · ${
+          g.sessions.length > 3 ? `${g.sessions.length} sessions`
+                                : 's' + g.sessions.join(', s')}</span>` : ''}</span>`
+    ).join('') + `</div>` : '';
+
+  /* Everywhere the dependency is named that this particular change does NOT reach.
+     Shown, not hidden: "Composio is named in 6 other places" is useful to a reviewer,
+     and it is the honest way to show the difference between where a tool appears and
+     where this change lands. Before this split, those places were listed as if the
+     finding applied to them. */
+  const mentions = d.mentions_total || 0;
+  const mline = mentions ? `<p class="hint">${esc(f.canonical_name)} is also named in
+      ${mentions} other place${mentions === 1 ? '' : 's'}${
+        (d.mentions_groups || []).length
+          ? ' (' + d.mentions_groups.map(g => `${g.count} ${esc(g.label)}`).join(', ') + ')'
+          : ''} that this change does not affect.</p>` : '';
+
+  const unscoped = d.locations_scoped === false
+    ? `<p class="hint warn">We could not establish which places this change reaches, so
+        nothing below is claimed as affected — confirm by hand.</p>` : '';
+
   const where = isGap
     ? `<h3>Where it belongs — ${total} session${total === 1 ? '' : 's'} ${scope}</h3>
        <p class="hint">These sessions already cover this area, and none of their
          outlines mention this topic. Each line points at the workbook row the
          placement was judged against.</p>
        ${elsewhere}${grouped}`
-    : `<h3>Where it is used — ${total} reference${total === 1 ? '' : 's'} ${scope}</h3>
+    : `<h3>What this affects — ${total} place${total === 1 ? '' : 's'} ${scope}</h3>
+       ${unscoped}${kindline}
        ${groups.length > 1 ? '' : cap}${elsewhere}
-       ${grouped}`;
+       ${grouped}${mline}`;
 
   /* --- the source. Probe-only findings are labelled, never shown as unsourced. */
   let src;
@@ -2413,6 +2488,11 @@ function findingRow(r) {
     wheres.push('session' + (r.sessions.length === 1 ? ' ' : 's ') + r.sessions.join(', '));
   }
   if (r.diff_class) wheres.push(word('diff', r.diff_class));
+  /* What has to be opened, named by artifact type. "Coding Practice" used to appear
+     here via the unit name on 25 of 43 findings, none of which pointed at a coding
+     question - the MCQ bank lives in a unit with that name. This reads `object_type`,
+     which is recorded rather than chosen. */
+  const affects = (r.affects || []).map(a => `${a.count} ${a.label}`).join(' · ');
   return `<div class="frow" data-detail="${esc(r.finding_id)}"
           role="button" tabindex="0" title="Open the full detail">
     <div class="fhead">
@@ -2422,6 +2502,7 @@ function findingRow(r) {
       ${r.graded_locations ? `<span class="chip high">${r.graded_locations} graded</span>` : ''}
       <span class="note">${esc(wheres.join(' · '))}</span>
     </div>
+    ${affects ? `<div class="faff">${esc(affects)}</div>` : ''}
     ${r.summary ? `<div class="fwhat">${esc(r.summary)}</div>` : ''}
     ${r.action ? `<div class="fdo"><span class="lab">Do this</span>${esc(r.action)}</div>` : ''}
   </div>`;
@@ -2946,7 +3027,27 @@ loadLLM();      // the rail is always visible, so populate it once at startup
 /* Recompute the Tavily note when the stage boxes move, so unchecking `research`
    visibly removes the only cost a keyless run would otherwise still incur. */
 document.querySelectorAll('#stages input').forEach(
-  i => i.addEventListener('change', tavilyNote));
+  i => i.addEventListener('change', () => { tavilyNote(); syncJob(); }));
+
+/* The three jobs and the stage boxes are two views of one choice. Clicking a job ticks
+   its stages; editing the stages clears the job unless the set still matches one, so
+   the page never shows a job as selected while the boxes say something else. */
+function applyJob(btn) {
+  const want = new Set((btn.dataset.stages || '').split(',').filter(Boolean));
+  document.querySelectorAll('#stages input').forEach(i => { i.checked = want.has(i.value); });
+  tavilyNote(); syncJob();
+}
+function syncJob() {
+  const on = Array.from(document.querySelectorAll('#stages input'))
+    .filter(i => i.checked).map(i => i.value).sort().join(',');
+  document.querySelectorAll('#jobs .job').forEach(b => {
+    const mine = (b.dataset.stages || '').split(',').filter(Boolean).sort().join(',');
+    b.classList.toggle('on', mine === on);
+  });
+}
+document.querySelectorAll('#jobs .job').forEach(
+  b => b.addEventListener('click', () => applyJob(b)));
+syncJob();
 
 $('#runbtn').onclick = startRun;
 $('#cancelbtn').onclick = async () => {

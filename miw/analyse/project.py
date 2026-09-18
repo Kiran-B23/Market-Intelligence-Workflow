@@ -16,13 +16,14 @@ tell that course's owner how much work they have.
 
 Two traps this module exists to avoid:
 
-1. **`Finding.locations` is truncated.** `score.py` stores `dep.locations[:12]`.
-   `llama-3.3-70b-versatile` has 18; projecting off the finding shows Building LLM
-   Applications with 9 instead of 15. So the projection joins back to the inventory
-   dependency by `dep_id` and never reads `f.locations`.
-2. **Prose embeds the course.** `score.recommend()` interpolates
-   `f.locations[0].course` and `notes.compose()` interpolates `len(f.courses)`, so the
-   triad is course-contaminated and must be re-derived, not carried over.
+1. **`Finding.locations` is both scoped and truncated.** It holds only the places the
+   *signal* reaches (`score.scope_locations`), capped at 12. `llama-3.3-70b-versatile`
+   has 18 locations; projecting off the finding shows Building LLM Applications with 9
+   instead of 15. So the projection joins back to the inventory dependency by `dep_id`,
+   never reads `f.locations`, and re-runs the scoping against this course's slice.
+2. **Prose embeds the course.** `score.where_line()` names a course and
+   `notes.compose()` interpolates `len(f.courses)`, so the triad is
+   course-contaminated and must be re-derived, not carried over.
 
 An invariant worth keeping (and asserted in the tests): the per-course blast radii sum
 to the global one, because the weights are additive over locations and locations
@@ -42,7 +43,7 @@ from miw.schema import Dependency, Finding
 VENDOR_FACTS = ("finding_id", "dep_id", "canonical_name", "signal", "signal_label",
                 "kind_of_signal", "severity", "diff_class", "summary", "probe_signals",
                 "claims", "alternatives", "latest_version", "raised_at",
-                "affected_urls")
+                "affected_urls", "locations_scoped")
 
 
 def course_dependency(dep: Dependency, course: str) -> Dependency:

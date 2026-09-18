@@ -292,7 +292,10 @@ def test_the_shared_package_id_is_never_a_highlight_term(tmp_path, monkeypatch):
     (out / "inventory.json").write_text(json.dumps({"dependencies": [to_jsonable(node_dep)]}))
     (out / "findings_2026-01-01.json").write_text(json.dumps({
         "analysed_at": "2026-01-01", "coverage": {},
-        "findings": [{**FINDING, "dep_id": node_dep.dep_id,
+        # S1, because the location below is a link and `score.scope_locations` only
+        # shows a finding the places its own signal can reach - an S7 about a retired
+        # model id does not reach an `a href`.
+        "findings": [{**FINDING, "signal": "S1", "dep_id": node_dep.dep_id,
                       "canonical_name": node_dep.canonical_name}]}))
     monkeypatch.setattr(api, "OUT", out)
     courses = tmp_path / "courses"; courses.mkdir()
@@ -381,3 +384,68 @@ def test_a_negative_offset_is_clamped_rather_than_wrapping(wired):
 def test_an_unknown_session_returns_an_empty_page_not_an_error(wired):
     d = api.finding_detail("f-1", course="intro_to_gen_ai", session="999")
     assert d["locations_shown"] == 0 and d["where"] == []
+
+
+# --------------------------------------------------------------------- scoping
+#
+# The panel used to read `dep.locations` - every place the dependency is named - under a
+# finding about one specific event. Measured on the 2026-09-18 run: Composio's dead
+# dashboard URL showed 12 locations of which 6 were links and 6 were a quiz question
+# saying the word "Composio"; Ngrok showed 9 of which 2 were links.
+
+DEAD_URL = "https://mcp.composio.dev/dashboard"
+
+
+def _composio_wired(tmp_path, monkeypatch):
+    dep = Dependency(
+        kind="tool", canonical_name="Composio",
+        official_domains=["composio.dev"], referenced_urls=[DEAD_URL],
+        locations=[
+            Location(course=INTRO, topic_name="T", unit_id="u-1",
+                     unit_name="Coding Practice", content_id="q-1", field_path=PATH,
+                     evidence_source="link:a_href", object_type="OBJECTIVE_QUESTIONS",
+                     session_no=24, url=DEAD_URL),
+            Location(course=INTRO, topic_name="T", unit_id="u-1",
+                     unit_name="Coding Practice", content_id="q-2", field_path=PATH,
+                     evidence_source="prose_name", object_type="OBJECTIVE_QUESTIONS",
+                     session_no=24),
+            Location(course=INTRO, topic_name="T", unit_id="u-1",
+                     unit_name="Coding Practice", content_id="q-3", field_path=PATH,
+                     evidence_source="prose_name", object_type="OBJECTIVE_QUESTIONS",
+                     session_no=24),
+            Location(course=INTRO, topic_name="T", unit_id="u-1", unit_name="Workbook",
+                     content_id="s-1", field_path=PATH, evidence_source="sheet_declared",
+                     object_type="SHEET"),
+        ])
+    out = tmp_path / "out"; out.mkdir()
+    (out / "inventory.json").write_text(json.dumps({"dependencies": [to_jsonable(dep)]}))
+    (out / "findings_2026-01-01.json").write_text(json.dumps({
+        "analysed_at": "2026-01-01", "coverage": {},
+        "findings": [{**FINDING, "signal": "S1", "dep_id": dep.dep_id,
+                      "canonical_name": dep.canonical_name,
+                      "affected_urls": [DEAD_URL], "locations": []}]}))
+    monkeypatch.setattr(api, "OUT", out)
+    return dep
+
+
+def test_the_panel_shows_only_what_the_signal_reaches(tmp_path, monkeypatch):
+    _composio_wired(tmp_path, monkeypatch)
+    d = api.finding_detail("f-1")
+    assert d["locations_total"] == 1              # the one link at the dead URL
+    assert d["mentions_total"] == 3               # two prose hits and the sheet row
+    assert d["where"][0]["url"] == DEAD_URL
+
+
+def test_the_panel_names_the_artifact_type_not_the_unit(tmp_path, monkeypatch):
+    """The unit here is literally called "Coding Practice" and holds quiz questions."""
+    _composio_wired(tmp_path, monkeypatch)
+    d = api.finding_detail("f-1")
+    assert [g["label"] for g in d["artifact_groups"]] == ["quiz question"]
+    labels = {g["label"] for g in d["mentions_groups"]}
+    assert labels == {"quiz questions", "tracking sheet row"}
+
+
+def test_the_places_it_does_not_affect_are_kept_not_discarded(tmp_path, monkeypatch):
+    _composio_wired(tmp_path, monkeypatch)
+    d = api.finding_detail("f-1")
+    assert sum(g["count"] for g in d["mentions_groups"]) == d["mentions_total"] == 3

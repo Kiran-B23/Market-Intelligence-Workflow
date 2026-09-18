@@ -3264,3 +3264,163 @@ that *should cover it and do not*, so the panel says "Where it belongs", the pro
 note explains that there is no tool to count, and the detail block describes the topic —
 area, what each vendor calls it, how strongly the two agreed — instead of a vendor and a
 registry id.
+
+---
+
+## 35. A finding may only claim the places its own signal reaches
+
+Five complaints were raised against the 2026-09-18 run. Every one was checked against the
+artifact rather than against the code's intent, and every one held. Three of them turned
+out to be the same bug.
+
+| Complaint | Measured |
+|---|---|
+| Composio's *name* is blamed for a *URL* problem | 12 locations shown, 6 of them links, 6 of them a quiz question saying the word |
+| The issue and its session are hard to find; MCQ and coding are not separated | `object_type` was recorded on every location and never shown |
+| Everything says "Coding Practice" | **25 of 43** findings, and **not one** pointed at a coding question |
+| Too many n8n findings, and no version check | 11 findings from 7 rules; 2 printed a template literal; 1 was a false positive |
+| No way to run gaps, issues or new concepts separately | one checkbox ran three signals |
+
+### The bug behind three of them
+
+`score.py` built every finding with `locations=dep.locations[:12]` — **the dependency's**
+footprint, truncated, regardless of what the finding was about. The asymmetry was visible
+in the same file: `recommend()` already scoped its sentence, with a comment saying why.
+
+```python
+# Scope the action to the links actually affected, not to every mention of the
+# dependency: "repoint the dead link in 845 locations" is false when one URL broke.
+"S1": f"Repoint or replace the dead link in the {dep.link_locations} place(s) ..."
+```
+
+The sentence was scoped in Phase 2. The list printed underneath it never was. So the
+Composio finding said "the 6 place(s) Composio is linked" directly above twelve rows,
+four of which were a quiz question that merely names the tool.
+
+`scope_locations()` closes it with one rule per signal, stated as *what evidence could
+this event invalidate*:
+
+| | reaches |
+|---|---|
+| S1 dead link · S2 paywall · S8 docs rewritten | `link:*`, narrowed to the links pointing at the broken URL |
+| S3 pricing · S4 deprecation · S10 alternative | everywhere, because money and death change the instruction itself |
+| S5 UX change | links, plus anything that *depicts* the UI — decks and reading material |
+| S6 version drift | where a version is pinned or the thing is executed |
+| S7 model retired | `model_id`, and the workbook row |
+| S9 n8n break | the workflows that wire the node |
+
+Two disciplines carried over from elsewhere in the system. A signal that reaches nothing
+**refuses** — `locations_scoped=False`, an explicit "affected places not determined",
+never the dependency's whole footprint dressed as a measurement. And the remainder is
+**kept**, not discarded: "Composio is also named in 55 other places this change does not
+affect" is useful, and it is the honest way to show the difference.
+
+The narrowing to a specific URL needed a field that did not exist. `Location` now carries
+the `url` of a `link:*` reference, declared `compare=False` so the dedupe key stays the
+*place* — folding the URL in would have turned one paragraph with three deep links into
+three locations and inflated every count downstream. Measured before and after: 9,061
+locations, unchanged.
+
+Measured after:
+
+```
+             locations shown      of the dependency's
+Composio      12  ->   2                   57
+Ngrok          9  ->   1                    9
+Stability AI  10  ->   3                   10
+LangChain     59  ->   1                   59
+```
+
+### "Coding Practice" was a unit name
+
+`recommend()` printed `f.locations[0].unit_name`. In this curriculum the unit holding the
+MCQ bank is called *Coding Practice*, so 25 of 43 findings announced coding work, and the
+true count of findings pointing at a coding question was **zero**. The same three lines
+also printed the unit name twice when a location had no session number, and took
+`locations[0]` from extract order, so "starts at" named an arbitrary member of an
+unordered set.
+
+The artifact type was recorded all along. `ARTIFACT_WORDS` maps the CMS's `object_type`
+to the words a curriculum reviewer uses — quiz question, coding practice, reading
+material, slide deck, tracking sheet row — and `where_line()` leads with the count, ranks
+the exemplar by whether the location *executes* the dependency (`Dependency._executes`,
+which already encoded that distinction for S7), and drops the duplicate. The finding row,
+the detail panel, the refinement prompt and the digest all read the same map, so they
+cannot drift apart:
+
+> Repoint or replace the dead link in the 2 place(s) Composio is linked. Affected URL:
+> `https://mcp.composio.dev/dashboard`. **Affects 2 quiz questions** — starting with the
+> quiz question in Intro to Gen AI / session 25.
+
+Findings saying "Coding Practice" where no coding question exists: **25 → 0**.
+
+### n8n: three defects, not one
+
+*Fan-out.* n8n's `wait-node-subworkflow-v2` names 16 node types; the curriculum teaches
+four, and a finding's identity is `(dependency, signal)`, so the reviewer was handed the
+same paragraph four times. `miw/analyse/merge.py` folds a rule's findings into one,
+carried by the node with the widest footprint, the rest in `also_affects`. The carrier
+keeps an id that already existed, so the absorbed ones retire through the ordinary path
+rather than needing a migration. It runs before `classify_finding`, because a diff class
+computed for a finding about to be absorbed is a diff class about nothing.
+
+*A template literal reached the report.* Two findings read `${removedNodeName} node
+removed`: `_ts_string` lifts a TypeScript template literal and nothing interpolated it.
+The binding is known at match time — we know which node matched — so `BreakingRule.render()`
+fills it in, strips any expression it cannot resolve, and `has_placeholder` lets the probe
+**refuse** a rule whose meaning did not survive parsing rather than print it raw.
+
+*No version gating — the false positive.* `BreakingRule` carries n8n's *app* version
+(v2, v3) and no field for the *node* versions a rule breaks; n8n implements that test in
+code and the range survives only as prose. So *"AI Agent versions below 2 are removed"*
+was raised against a node the curriculum teaches at typeVersion **2.2**. `version_bound`
+reads the range off the rule's own wording and `affects_version()` returns **True / False
+/ None**, where None means *the rule does not say* and is never treated as a synonym for
+either. Suppressions are flagged (`n8n_rule_not_applicable:<rule_id>`) rather than
+dropped in silence: "we checked and you are fine" is itself worth being able to audit.
+
+A fourth defect surfaced while testing the third. `rules_mentioning` used a bare substring
+test, so *"In-memory binary data storage is removed"* — whose description says instances
+"must **switch** to filesystem" — was raised against the **Switch** node. The node leaf is
+an ordinary English verb. A mention now counts only when the term appears as a word and
+within three words of "node", which is how n8n writes these ("the Code node", "AI Agent
+nodes on versions below 2"); measured on the rule corpus, that admits every genuine
+phrasing and rejects every incidental verb. And `breaking_change_possible` — a rule that
+names no node types at all — is now capped at `low` absolutely rather than stepped down
+relatively, because its own detail line says the course may not be affected and a
+relative step still landed on `high`.
+
+```
+S9 findings   14 -> 8      4 merged · 2 version-gated away · 1 word-collision removed
+template literals in any finding field   2 -> 0
+```
+
+### Three questions, three jobs
+
+The run form offered seven pipeline stages, one of which — `gaps` — silently ran three
+independent signals. `gaps` now asks only "what does the curriculum not teach yet" (S11);
+`changes` is its own stage and asks "what has a vendor we already use added, and what have
+the launch feeds nominated" (S12 + nominations). Above the stage boxes the page offers the
+three questions a curriculum lead actually asks, and picking one ticks the boxes, so the
+two views cannot disagree:
+
+| | stages | signals |
+|---|---|---|
+| Find what's broken | probe · research · analyse · report | S1–S9 |
+| Find what's missing | gaps · report | S11 |
+| Find what's new | changes · report | S12 + nominations |
+
+The split has one hazard, and it bit during development. Both halves write into one
+sidecar, `gaps_<date>.json`, and `verify` reads the newest one for the authority sets
+behind every standing S11 — so the first changes-only run published a sidecar with zero
+topics while three gap findings were standing. Each half now writes only its own keys
+(`gap_topics`, `newer_topics`), `topics` is derived from both, a legacy sidecar is
+attributed to the half that is *not* running, and the retirement mandate is
+`{"S11"} if do_gaps else set()` union `{"S12"} if do_changes else set()` — a run has no
+right to retire a signal it never looked for.
+
+### Gates
+
+612 → 649 tests (37 new, one per measured defect), eval 4/4 at 100%, `main.py verify`
+clean, and the artifact re-measured end to end: extract, a full 232-dependency probe,
+analyse, gaps, changes and report.

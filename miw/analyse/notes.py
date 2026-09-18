@@ -193,10 +193,20 @@ def _fmt_alternatives(f: Finding) -> str:
 
 
 def _fmt_locations(f: Finding) -> str:
+    """Affected places for the refinement prompt, named by artifact type.
+
+    The unit name alone is misleading in this curriculum - the unit holding the MCQ
+    bank is called "Coding Practice" - so the model was being told a quiz question was
+    a coding exercise and then asked to write advice about it.
+    """
+    from config.constants import artifact_word
     out = []
     for l in f.locations[:8]:
         where = f"session {l.session_no}" if l.session_no else l.evidence_source
-        out.append(f"- {l.course} / {where} / {l.unit_name[:60]}")
+        out.append(f"- {artifact_word(l.object_type)} - {l.course} / {where} "
+                   f"/ {l.unit_name[:60]}")
+    if not out and not f.locations_scoped:
+        return "- not determined (this change's reach could not be established)"
     return "\n".join(out) or "- unknown"
 
 

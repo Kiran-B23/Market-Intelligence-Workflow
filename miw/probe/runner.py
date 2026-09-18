@@ -188,6 +188,45 @@ def _probe_pricing(dep: Dependency, res: ProbeResult, state: State) -> None:
                        now=utcnow())
 
 
+
+def _applicable(rules, node: str, dep: Dependency, res: ProbeResult) -> list[dict]:
+    """The rules that can still be true of the version this course teaches.
+
+    Two filters, both of which used to be missing:
+
+    * **typeVersion.** A rule that states the node versions it breaks is checked
+      against `dep.taught_version` - the typeVersion the course's workflow JSON
+      declares. `AI Agent versions below 2 are removed` was being raised against a node
+      taught at 2.2, which is not below 2. Suppressed rules are counted in a probe
+      signal rather than dropped in silence, because "we checked and you are fine" is
+      itself worth being able to audit.
+    * **Placeholders.** n8n writes some titles as TypeScript template literals, and two
+      findings shipped reading "${removedNodeName} node removed". The binding is known
+      here, so it is filled in; a rule whose placeholder cannot be resolved is refused
+      rather than printed raw, because a finding whose own title did not parse is not a
+      finding.
+    """
+    out = []
+    for r in rules:
+        verdict = r.affects_version(dep.taught_version)
+        if verdict is False:
+            res.flag(f"n8n_rule_not_applicable:{r.rule_id}")
+            continue
+        title, description = r.render(node)
+        if "${" in title + description:
+            res.flag(f"n8n_rule_unparsed:{r.rule_id}")
+            continue
+        d = dict(r.__dict__)
+        d["title"], d["description"] = title, description
+        # What the gate concluded, carried so the finding can say it out loud: a rule
+        # that stated no version range is a weaker claim than one we checked.
+        d["version_bound"] = ("".join(r.version_bound) if r.version_bound else "")
+        d["version_checked"] = verdict is not None
+        d["taught_version"] = dep.taught_version or ""
+        out.append(d)
+    return out
+
+
 def _probe_n8n_node(dep: Dependency, res: ProbeResult, prev_version: str) -> None:
     """Does the taught node still exist, and has n8n declared a break against it?
 
@@ -222,29 +261,30 @@ def _probe_n8n_node(dep: Dependency, res: ProbeResult, prev_version: str) -> Non
         res.evidence_url = "https://github.com/n8n-io/n8n/tree/master/packages"
         return
 
-    named = rules_for_node(up["rules"], node)
+    named = _applicable(rules_for_node(up["rules"], node), node, dep, res)
     if named:
         res.status = "changed"
         res.flag("breaking_change_declared")
-        res.declared_changes = [r.__dict__ for r in named]
+        res.declared_changes = named
         r = named[0]
         res.detail = (f"n8n declares a breaking change affecting this node: "
-                      f"{r.title} (n8n {r.n8n_version}, vendor severity {r.severity})")
-        res.evidence_url = r.doc_url or "https://docs.n8n.io/release-notes/"
+                      f"{r['title']} (n8n {r['n8n_version']}, vendor severity "
+                      f"{r['severity']})")
+        res.evidence_url = r["doc_url"] or "https://docs.n8n.io/release-notes/"
         return
 
     leaf = node.rsplit(".", 1)[-1]
     human = re.sub(r"(?<!^)(?=[A-Z])", " ", leaf).lower()
-    cap = rules_mentioning(up["rules"], [leaf, human])
+    cap = _applicable(rules_mentioning(up["rules"], [leaf, human]), node, dep, res)
     if cap:
         res.status = "changed"
         res.flag("breaking_change_possible")
-        res.declared_changes = [r.__dict__ for r in cap]
+        res.declared_changes = cap
         r = cap[0]
         res.detail = (f"n8n declares a breaking change that may affect this node: "
-                      f"{r.title} (n8n {r.n8n_version}). It names no node types, so "
-                      f"whether the course is affected needs a human check.")
-        res.evidence_url = r.doc_url or "https://docs.n8n.io/release-notes/"
+                      f"{r['title']} (n8n {r['n8n_version']}). It names no node types, "
+                      f"so whether the course is affected needs a human check.")
+        res.evidence_url = r["doc_url"] or "https://docs.n8n.io/release-notes/"
         return
 
     if dep.taught_version and res.latest_version:

@@ -468,6 +468,7 @@ def _load_research(day=None):
 
 def cmd_analyse(args) -> int:
     from miw.analyse import notes
+    from miw.analyse.merge import merge_n8n_breaks
     from miw.analyse.score import (findings_for, fingerprint_of,
                                    screenshots_at_risk)
     from miw.schema import dump, to_jsonable, utcnow
@@ -486,32 +487,42 @@ def cmd_analyse(args) -> int:
         print(f"  scope: {scope.describe()} -> {len(deps)} dependencies")
     raised, still_open, suppressed, by_reviewer, seen_ids = [], [], 0, [], set()
     by_dep = {d.dep_id: d for d in deps}
+
+    built = []
     for dep in deps:
-        for f in findings_for(dep, probes.get(dep.dep_id), research.get(dep.dep_id)):
-            seen_ids.add(f.finding_id)
-            fp = fingerprint_of(f)
-            f.screenshots_at_risk = screenshots_at_risk(
-                f, _INVENTORY_EXTRAS.get("unit_images") or {})
-            f.diff_class = state.classify_finding(
-                finding_id=f.finding_id, dep_id=f.dep_id, signal=f.signal,
-                severity=f.severity, fingerprint=fp, now=now)
-            if f.diff_class == "unchanged":
-                # Still open, just not news. It belongs in the artifact - the digest
-                # filters it, not the store. Dropping it here made a finding vanish
-                # from disk the moment a later scoped run re-examined its dependency
-                # and found nothing new.
-                suppressed += 1
-                still_open.append(f)
-                continue
-            # A reviewer said this exact situation is not actionable. Held back only
-            # while the fingerprint matches: new evidence earns another look.
-            why_held = triage.suppressed(state, f.finding_id, fp)
-            if why_held:
-                by_reviewer.append({"finding_id": f.finding_id,
-                                    "canonical_name": f.canonical_name,
-                                    "signal": f.signal, "reason": why_held})
-                continue
-            raised.append(f)
+        built += findings_for(dep, probes.get(dep.dep_id), research.get(dep.dep_id))
+
+    # One upstream event, one finding. Runs before the state loop below: a diff class
+    # computed for a finding that is about to be absorbed is a diff class about nothing.
+    built, absorbed = merge_n8n_breaks(built, by_dep)
+    if absorbed:
+        print(f"  merged {absorbed} finding(s) into the n8n rule that caused them")
+
+    for f in built:
+        seen_ids.add(f.finding_id)
+        fp = fingerprint_of(f)
+        f.screenshots_at_risk = screenshots_at_risk(
+            f, _INVENTORY_EXTRAS.get("unit_images") or {})
+        f.diff_class = state.classify_finding(
+            finding_id=f.finding_id, dep_id=f.dep_id, signal=f.signal,
+            severity=f.severity, fingerprint=fp, now=now)
+        if f.diff_class == "unchanged":
+            # Still open, just not news. It belongs in the artifact - the digest
+            # filters it, not the store. Dropping it here made a finding vanish
+            # from disk the moment a later scoped run re-examined its dependency
+            # and found nothing new.
+            suppressed += 1
+            still_open.append(f)
+            continue
+        # A reviewer said this exact situation is not actionable. Held back only
+        # while the fingerprint matches: new evidence earns another look.
+        why_held = triage.suppressed(state, f.finding_id, fp)
+        if why_held:
+            by_reviewer.append({"finding_id": f.finding_id,
+                                "canonical_name": f.canonical_name,
+                                "signal": f.signal, "reason": why_held})
+            continue
+        raised.append(f)
 
     # The artifact records every open finding with its diff class; the reporter decides
     # what is worth showing. Keeping those two jobs separate is what lets a scoped run
@@ -600,109 +611,34 @@ def _nomination_tally(research) -> dict:
             "blocked": blocked, "rejected": rejected, "examples": examples}
 
 
-def cmd_gaps(args) -> int:
-    """S11: what the curriculum does not teach yet.
+def _find_changes(args, state):
+    """What a vendor we already use has added, and what the launch feeds nominate.
 
-    The only stage that runs OUTSIDE-IN. Every other stage starts from the dependency
-    inventory, which is extracted from the course content and therefore contains only
-    what is already taught - so no other stage can ever notice that a session is
-    incomplete. This one starts from `registry/topics.yaml`, reads official
-    documentation as an enumeration of an area, and reports the part of that
-    enumeration that appears in no session's outline.
-
-    It writes its findings into the same `findings_<date>.json` the analyser writes, so
-    a gap sorts, schedules, triages and renders exactly like every other finding. The
-    per-topic evidence goes to a `gaps_<date>.json` sidecar, which `verify` reads to
-    re-classify each citation without trusting the tier the artifact records - the same
-    arrangement the probe artifact provides for provider widening.
+    The other half of `gaps`, and a separate function because it is a separate
+    question. It reads catalogues and feeds; it needs neither the workbooks nor
+    `registry/topics.yaml`, so it works for a course that has no workbook at all.
     """
-    from miw.analyse.curriculum import (CurriculumIndex, deck_bodies, merge_bodies,
-                                        session_bodies)
-    from miw.analyse.gaps import area_coverage, find_gaps, load_areas
     from miw.analyse.newer import find_newer
+    from miw.registry import Registry
     from miw.research.launch import read_launches
-    from miw.analyse.score import fingerprint_of
-    from miw.artifacts import merge_by_dep
-    from miw.schema import dump, to_jsonable, utcnow
-    from miw.state import State
-    from miw import triage
 
-    outlines, problems = _outlines_by_course()
-    for pr in problems:
-        print(f"  WARNING: {pr}")
-    if not outlines:
-        print("no workbook could be mapped to a course, so no session has a "
-              "description to compare against; nothing to do", file=sys.stderr)
-        return 2
-    # Everything the sessions actually contain, not just the workbook's summary of
-    # them. The coverage check used to see 0.4% of the curriculum text already on disk.
-    decks = deck_bodies()
-    bodies = merge_bodies(session_bodies(), decks)
-    index = CurriculumIndex.from_outlines(outlines, bodies)
-    areas = load_areas(getattr(args, "topics", None) or "registry/topics.yaml")
-    summary_chars = sum(len(d.outline) + len(d.key_takeaways) + len(d.session_name)
-                        for d in index.docs)
-    body_chars = sum(len(d.body) for d in index.docs)
-    with_body = sum(1 for d in index.docs if d.body)
-    print(f"  {len(index.docs)} session(s) indexed from {len(outlines)} workbook(s); "
-          f"{len(areas)} curriculum area(s) declared")
-    deck_chars = sum(len(t) for (c, n), t in decks.items()
-                     if any(d.course == c and d.session_no == n for d in index.docs))
-    print(f"  coverage reads {summary_chars + body_chars:,} char(s): "
-          f"{summary_chars:,} of deck summary + {body_chars - deck_chars:,} of course "
-          f"content + {deck_chars:,} of slide text "
-          f"({with_body}/{len(index.docs)} session(s) have content)")
-    if not decks:
-        print("  NOTE: no deck artifact found — run `python3 main.py decks` so the "
-              "coverage check can see what the slides actually say")
-    if not areas:
-        print("  registry/topics.yaml declares no area with a source; nothing to do")
-        return 0
-
-    # How much of the curriculum the declared areas can see at all. Printed before any
-    # fetching, because a reader needs to know the denominator before they read the
-    # numerator - "6 gaps found" means something different across 58 sessions than
-    # across 71.
-    cov = area_coverage(areas, index)
-    print(f"  area coverage: {cov['in_an_area']}/{cov['sessions']} session(s) fall "
-          f"inside at least one declared area")
-    if cov["not_in_any_area"]:
-        print(f"  {len(cov['not_in_any_area'])} session(s) are in NO declared area, so "
-              f"no gap can ever be reported for them:")
-        for line in cov["not_in_any_area"]:
-            print(f"      {line}")
-
-    scope = _scope_from(args, default_tiers=())
-    courses = sorted(scope.courses) if scope.courses else []
-    if courses:
-        print(f"  scope: {', '.join(courses)}")
-
-    # Placement always runs across EVERY course, even when the run is scoped, and the
-    # scope then filters what gets written. A topic gap's identity is the topic, not the
-    # course - the same row carries the sessions it belongs in across all of them - so a
-    # scoped run that placed only within its own course replaced the global row with a
-    # narrower one and silently deleted the other courses' placements. This is the same
-    # rule the other scoped stages already follow: scope chooses what to LOOK at, and
-    # for `report` what to WRITE, never what a finding is allowed to say.
-    rep = find_gaps(areas, index)
-    st = rep.stats
-
-    # The other half of "is what we teach still complete?": what a vendor we already use
-    # has ADDED since we last looked. Same stage because it is the same question, but a
-    # different enumerator — a catalogue rather than a documentation page — and it needs
-    # neither the workbook nor the areas, so it works for a course with no workbook.
-    # One connection for the whole stage, closed at the end. This used to open an
-    # anonymous `State()` here and another below, leaving the first unclosed — every
-    # other call site in this file binds and closes, and a leaked SQLite handle under
-    # WAL is the kind of thing that only shows up when something else needs the lock.
-    state, now = State(), utcnow()
     newer = find_newer(_load_inventory(), state,
                        persist=not getattr(args, "dry_run", False))
+    # Nominated tools. Two cheap JSON requests, and the output is a list somebody scans
+    # rather than anything scored - see `miw/research/launch.py` for the measurement
+    # that settled that. A feed being down must not fail the stage.
+    reg = Registry.load()
+    launches = read_launches(
+        capabilities={e.capability for e in reg.entries.values() if e.capability},
+        taught={e.canonical_name for e in reg.entries.values()})
+    return newer, launches
+
+
+def _report_changes(newer, launches, dry: bool) -> None:
     ns = newer.stats
-    print(f"  newer options: {ns.sources_read} catalogue(s) read, {ns.appeared} entry "
-          f"(entries) appeared since the last check -> {ns.findings} finding(s)")
+    print(f"  newer options: {ns.sources_read} catalogue(s) read, {ns.appeared} "
+          f"entry (entries) appeared since the last check -> {ns.findings} finding(s)")
     if ns.seeded:
-        dry = getattr(args, "dry_run", False)
         print(f"  FIRST LOOK at {', '.join(ns.seeded)} — nothing raised, because there "
               f"is no earlier catalogue to compare against. "
               + ("No baseline was written: this is a dry run."
@@ -723,21 +659,139 @@ def cmd_gaps(args) -> int:
               f"family we teach, {ns.not_offerable} quote-only pricing")
     print(f"  never covered: {len(newer.never_covered)} catalogue entr(ies) no session "
           f"teaches — browsable, never a finding, never in the digest")
-
-    # Nominated tools. Two cheap JSON requests, and the output is a list somebody scans
-    # rather than anything scored — see `miw/research/launch.py` for the measurement
-    # that settled that. A feed being down must not fail the stage.
-    from miw.registry import Registry
-    reg = Registry.load()
-    launches = read_launches(
-        capabilities={e.capability for e in reg.entries.values() if e.capability},
-        taught={e.canonical_name for e in reg.entries.values()})
     print(f"  new launches: {len(launches.launches)} nomination(s) in capabilities we "
           f"teach, from {launches.fetched} feed item(s) "
           f"({launches.off_topic} off-topic, {launches.no_url} with no product URL) "
           f"— browsable, never a finding")
     for err in launches.errors:
         print(f"  FEED UNREADABLE: {err}")
+
+
+def cmd_changes(args, _unused=None) -> int:
+    """`gaps`, asking only "what is new?" - S12 and the launch nominations.
+
+    A curriculum lead asks three different questions - what is broken, what is missing,
+    what is new - and used to have one checkbox that ran two of them together and no
+    way to say which had produced what. This is the third question on its own.
+    """
+    return cmd_gaps(args, only=("changes",))
+
+
+def cmd_gaps(args, only=None) -> int:
+    """S11: what the curriculum does not teach yet.
+
+    The only stage that runs OUTSIDE-IN. Every other stage starts from the dependency
+    inventory, which is extracted from the course content and therefore contains only
+    what is already taught - so no other stage can ever notice that a session is
+    incomplete. This one starts from `registry/topics.yaml`, reads official
+    documentation as an enumeration of an area, and reports the part of that
+    enumeration that appears in no session's outline.
+
+    It writes its findings into the same `findings_<date>.json` the analyser writes, so
+    a gap sorts, schedules, triages and renders exactly like every other finding. The
+    per-topic evidence goes to a `gaps_<date>.json` sidecar, which `verify` reads to
+    re-classify each citation without trusting the tier the artifact records - the same
+    arrangement the probe artifact provides for provider widening.
+    """
+    from miw.analyse.curriculum import (CurriculumIndex, deck_bodies, merge_bodies,
+                                        session_bodies)
+    from miw.analyse.gaps import (GapReport, area_coverage, find_gaps,
+                                  load_areas)
+    from miw.analyse.newer import NewerReport
+    from miw.research.launch import LaunchReport
+    from miw.analyse.score import fingerprint_of
+    from miw.artifacts import merge_by_dep
+    from miw.schema import dump, to_jsonable, utcnow
+    from miw.state import State
+    from miw import triage
+
+    # Which of the two questions this run is asking. They share a stage because they
+    # share an artifact and a merge discipline, not because they are one job: "what do
+    # we not teach yet" reads the workbook and official documentation, "what has a
+    # vendor added" reads catalogues and needs neither. Bundling them meant a reviewer
+    # who wanted one paid for both and could not say which had produced what.
+    want = set(only or getattr(args, "only", None) or ("gaps", "changes"))
+    do_gaps, do_changes = "gaps" in want, "changes" in want
+
+    outlines, problems = ({}, [])
+    if do_gaps:
+        outlines, problems = _outlines_by_course()
+    for pr in problems:
+        print(f"  WARNING: {pr}")
+    if do_gaps and not outlines:
+        print("no workbook could be mapped to a course, so no session has a "
+              "description to compare against; nothing to do", file=sys.stderr)
+        return 2
+    # Everything the sessions actually contain, not just the workbook's summary of
+    # them. The coverage check used to see 0.4% of the curriculum text already on disk.
+    decks, areas, index, cov = {}, [], None, {}
+    if do_gaps:
+        decks = deck_bodies()
+        bodies = merge_bodies(session_bodies(), decks)
+        index = CurriculumIndex.from_outlines(outlines, bodies)
+        areas = load_areas(getattr(args, "topics", None) or "registry/topics.yaml")
+        summary_chars = sum(len(d.outline) + len(d.key_takeaways) + len(d.session_name)
+                            for d in index.docs)
+        body_chars = sum(len(d.body) for d in index.docs)
+        with_body = sum(1 for d in index.docs if d.body)
+        print(f"  {len(index.docs)} session(s) indexed from {len(outlines)} workbook(s); "
+              f"{len(areas)} curriculum area(s) declared")
+        deck_chars = sum(len(t) for (c, n), t in decks.items()
+                         if any(d.course == c and d.session_no == n for d in index.docs))
+        print(f"  coverage reads {summary_chars + body_chars:,} char(s): "
+              f"{summary_chars:,} of deck summary + {body_chars - deck_chars:,} of course "
+              f"content + {deck_chars:,} of slide text "
+              f"({with_body}/{len(index.docs)} session(s) have content)")
+        if not decks:
+            print("  NOTE: no deck artifact found — run `python3 main.py decks` so the "
+                  "coverage check can see what the slides actually say")
+        if not areas:
+            print("  registry/topics.yaml declares no area with a source; nothing to do")
+            return 0
+
+        # How much of the curriculum the declared areas can see at all. Printed before any
+        # fetching, because a reader needs to know the denominator before they read the
+        # numerator - "6 gaps found" means something different across 58 sessions than
+        # across 71.
+        cov = area_coverage(areas, index)
+        print(f"  area coverage: {cov['in_an_area']}/{cov['sessions']} session(s) fall "
+              f"inside at least one declared area")
+        if cov["not_in_any_area"]:
+            print(f"  {len(cov['not_in_any_area'])} session(s) are in NO declared area, so "
+                  f"no gap can ever be reported for them:")
+            for line in cov["not_in_any_area"]:
+                print(f"      {line}")
+
+    scope = _scope_from(args, default_tiers=())
+    courses = sorted(scope.courses) if scope.courses else []
+    if courses:
+        print(f"  scope: {', '.join(courses)}")
+
+    # Placement always runs across EVERY course, even when the run is scoped, and the
+    # scope then filters what gets written. A topic gap's identity is the topic, not the
+    # course - the same row carries the sessions it belongs in across all of them - so a
+    # scoped run that placed only within its own course replaced the global row with a
+    # narrower one and silently deleted the other courses' placements. This is the same
+    # rule the other scoped stages already follow: scope chooses what to LOOK at, and
+    # for `report` what to WRITE, never what a finding is allowed to say.
+    rep = find_gaps(areas, index) if do_gaps else GapReport()
+    st = rep.stats
+
+    # The other half of "is what we teach still complete?": what a vendor we already use
+    # has ADDED since we last looked. Same stage because it is the same question, but a
+    # different enumerator — a catalogue rather than a documentation page — and it needs
+    # neither the workbook nor the areas, so it works for a course with no workbook.
+    # One connection for the whole stage, closed at the end. This used to open an
+    # anonymous `State()` here and another below, leaving the first unclosed — every
+    # other call site in this file binds and closes, and a leaked SQLite handle under
+    # WAL is the kind of thing that only shows up when something else needs the lock.
+    state, now = State(), utcnow()
+    newer, launches = NewerReport(), LaunchReport()
+    if do_changes:
+        newer, launches = _find_changes(args, state)
+        _report_changes(newer, launches, getattr(args, "dry_run", False))
+    ns = newer.stats
+
     rep.findings += newer.findings
     rep.rows += newer.rows
     rep.considered |= newer.considered
@@ -748,16 +802,17 @@ def cmd_gaps(args) -> int:
         print(f"  scope: {len(kept)} of {len(rep.findings)} gap(s) touch "
               f"{', '.join(courses)}; the rest are left exactly as they were")
         rep.findings = kept
-    print(f"  read {st.sources_read} official source(s); {st.items_enumerated} item(s) "
-          f"enumerated, {st.excluded} excluded by the registry")
-    print(f"  {st.candidates} topic(s) corroborated by two independent sources; "
-          f"{st.already_taught} already taught, {st.unplaced} could not be placed")
-    for pr in st.sources_unsupported:
-        print(f"  NOT READ: {pr}")
-    for pr in st.uncorroborated_areas:
-        print(f"  NO SECOND OPINION: {pr}")
-    for pr in st.uncitable:
-        print(f"  NOT CITEABLE: {pr}")
+    if do_gaps:
+        print(f"  read {st.sources_read} official source(s); {st.items_enumerated} "
+              f"item(s) enumerated, {st.excluded} excluded by the registry")
+        print(f"  {st.candidates} topic(s) corroborated by two independent sources; "
+              f"{st.already_taught} already taught, {st.unplaced} could not be placed")
+        for pr in st.sources_unsupported:
+            print(f"  NOT READ: {pr}")
+        for pr in st.uncorroborated_areas:
+            print(f"  NO SECOND OPINION: {pr}")
+        for pr in st.uncitable:
+            print(f"  NOT CITEABLE: {pr}")
 
     if getattr(args, "dry_run", False):
         # Print what would be raised and write nothing. This is how a new source in
@@ -798,7 +853,10 @@ def cmd_gaps(args) -> int:
         # raises it — and in both cases `considered` will not contain it, so the row
         # would stand for ever and `verify` would later fail on evidence the sidecar no
         # longer carries.
-        owned = {"S11", "S12"}
+        # Only the signals this run actually produced. A run that asked for changes
+        # alone has looked at no topic area, so it has no mandate to retire an S11 -
+        # and retiring one it never examined would silently delete a standing gap.
+        owned = ({"S11"} if do_gaps else set()) | ({"S12"} if do_changes else set())
         examined |= {f.get("dep_id") for f in (on_file.get("findings") or [])
                      if f.get("signal") in owned and f.get("dep_id")}
     raised, held = [], []
@@ -817,23 +875,56 @@ def cmd_gaps(args) -> int:
     state.close()
 
     side = OUT / f"gaps_{_today()}.json"
-    dump(side, {"generated_at": now, "areas": [a.area_id for a in areas],
-                "scope": scope.to_dict(), "topics": rep.rows,
-                # The browsable half. In the sidecar rather than the findings artifact
-                # because it is explicitly NOT news: no severity, no due date, never
-                # diffed, never reported. A curriculum lead can still look at it.
-                "never_covered": newer.never_covered,
-                # Nominated, never verified, never scored. In the sidecar with the other
-                # browsable half for the same reason: a launch is not something that
-                # happened to the curriculum.
-                "launches": [to_jsonable(l) for l in launches.launches],
-                "launch_stats": {"fetched": launches.fetched,
-                                 "off_topic": launches.off_topic,
-                                 "no_url": launches.no_url,
-                                 "already_taught": launches.already_taught,
-                                 "errors": launches.errors},
-                "newer_stats": to_jsonable(ns),
-                "coverage": cov, "stats": to_jsonable(st)})
+    # Written key by key, not wholesale. Each half of this stage owns its own keys, and
+    # a run of one half must leave the other's alone - `verify` reads `topics` for the
+    # authority sets behind every standing S11, so a changes-only run that overwrote
+    # the sidecar with an empty `topics` would make every gap finding read as unsourced.
+    # Today's sidecar if this stage already ran today, otherwise the most recent one.
+    # `verify` reads the NEWEST `gaps_*.json`, so a changes-only run on a fresh day that
+    # started from `{}` would publish a sidecar with no topic authority sets and every
+    # standing S11 would re-classify as unsourced.
+    prior = {}
+    if side.exists():
+        try:
+            prior = json.load(open(side))
+        except (json.JSONDecodeError, OSError):
+            prior = {}
+    else:
+        prior = _read_latest("gaps_*.json")
+    doc = dict(prior)
+    # An artifact written before this split carries `topics` with no half keys. Attribute
+    # the whole of it to the half that is NOT running - the only reading that cannot
+    # lose a row - and do it BEFORE either half writes, or the half that runs will have
+    # already created its key and the carry-forward will not fire.
+    if "gap_topics" not in doc and "newer_topics" not in doc and doc.get("topics"):
+        doc["newer_topics" if do_gaps else "gap_topics"] = doc["topics"]
+    doc.update({"generated_at": now, "scope": scope.to_dict()})
+    if do_gaps:
+        doc.update({"areas": [a.area_id for a in areas],
+                    "gap_topics": [r for r in rep.rows if r not in newer.rows],
+                    "coverage": cov, "stats": to_jsonable(st)})
+    if do_changes:
+        doc.update({
+            # The browsable half. In the sidecar rather than the findings artifact
+            # because it is explicitly NOT news: no severity, no due date, never
+            # diffed, never reported. A curriculum lead can still look at it.
+            "never_covered": newer.never_covered,
+            # Nominated, never verified, never scored. In the sidecar with the other
+            # browsable half for the same reason: a launch is not something that
+            # happened to the curriculum.
+            "launches": [to_jsonable(l) for l in launches.launches],
+            "launch_stats": {"fetched": launches.fetched,
+                             "off_topic": launches.off_topic,
+                             "no_url": launches.no_url,
+                             "already_taught": launches.already_taught,
+                             "errors": launches.errors},
+            "newer_stats": to_jsonable(ns),
+            "newer_topics": newer.rows})
+    # `topics` is what `verify` and the UI read, and it is the two halves together. It
+    # is derived rather than written by either half, so neither can delete the other's
+    # rows by running alone.
+    doc["topics"] = (doc.get("gap_topics") or []) + (doc.get("newer_topics") or [])
+    dump(side, doc)
     merge_by_dep(
         findings_path, new_rows=[to_jsonable(f) for f in raised], examined=examined,
         meta={"gaps_at": _today(), "gaps_run_at": now,
@@ -1520,7 +1611,12 @@ def cmd_run_weekly(args) -> int:
                         # findings artifact the reporter reads. `cmd_gaps` reads its
                         # two extra options through `getattr`, so the shared `args`
                         # namespace needs nothing added for it.
-                        ("gaps", cmd_gaps, args), ("report", cmd_report, args)):
+                        # Explicitly one half each. `run-weekly` shares one args
+                        # namespace across every stage and it carries no `--only`, so
+                        # without this both calls would run both halves.
+                        ("gaps", lambda a: cmd_gaps(a, only=("gaps",)), args),
+                        ("changes", cmd_changes, args),
+                        ("report", cmd_report, args)):
         print(f"\n=== {name} ===")
         rc = fn(a)
         if rc not in (0, 1):
@@ -1568,6 +1664,22 @@ def build_parser() -> argparse.ArgumentParser:
                     help="curriculum-topic registry to read")
     gp.add_argument("--dry-run", action="store_true",
                     help="print what would be raised and write nothing")
+    # Three questions, three commands. `gaps` used to run this one AND the catalogue
+    # diff in a single step, so a reviewer who wanted one paid for both and could not
+    # tell which had produced what. `--also-changes` keeps the old single-command
+    # behaviour available for anyone scripting against it.
+    gp.set_defaults(only=("gaps",))
+    gp.add_argument("--also-changes", dest="only", action="store_const",
+                    const=("gaps", "changes"),
+                    help="run the catalogue diff in the same pass (the old behaviour)")
+
+    ch = sub.add_parser("changes",
+                        help="what a vendor we already use has added, and what the "
+                             "launch feeds nominate (S12)")
+    _add_scope_args(ch)
+    ch.add_argument("--dry-run", action="store_true",
+                    help="print what would be raised and write nothing")
+    ch.set_defaults(only=("changes",))
     tr = sub.add_parser("triage", help="record a reviewer decision on a finding")
     tr.add_argument("finding_id", nargs="?", help="finding id (prefix is enough)")
     tr.add_argument("--list", action="store_true", help="list findings and precision")
@@ -1625,7 +1737,8 @@ def main() -> int:
             "verify": cmd_verify, "triage": cmd_triage, "serve": cmd_serve,
             "watch": cmd_watch, "resolve-packages": cmd_resolve_packages,
             "run-weekly": cmd_run_weekly, "agent": cmd_agent,
-            "gaps": cmd_gaps, "decks": cmd_decks}[args.cmd](args)
+            "gaps": cmd_gaps, "changes": cmd_changes,
+            "decks": cmd_decks}[args.cmd](args)
 
 
 if __name__ == "__main__":

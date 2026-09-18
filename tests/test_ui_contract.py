@@ -375,7 +375,11 @@ def test_the_form_says_research_spends_tavily_searches():
 
 
 def test_unchecking_research_updates_that_note():
-    assert "addEventListener('change', tavilyNote)" in PAGE
+    # The handler also keeps the three job buttons in step with the boxes, so it is a
+    # small arrow function rather than a bare reference - what matters is that moving a
+    # stage box recomputes the note.
+    assert "tavilyNote(); syncJob();" in PAGE
+    assert "document.querySelectorAll('#stages input').forEach(" in PAGE
 
 
 # ------------------------------- the run form has to be findable

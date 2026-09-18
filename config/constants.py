@@ -77,3 +77,38 @@ INTERNAL_HOSTS = (
 # Hosts that are real dependencies but whose per-URL health is not a curriculum
 # signal on its own (a single dead Google Slides deck is a content bug, not tool drift).
 INFRA_HOSTS = ("docs.google.com", "drive.google.com", "amazonaws.com")
+
+
+# What the reviewer actually has to open. `object_type` is the CMS's own word for the
+# kind of content object a location sits in; these are the words a curriculum reviewer
+# uses for the same thing.
+#
+# This exists because `recommend()` used to print the location's `unit_name`, and in
+# this curriculum the unit holding the MCQ bank is called "Coding Practice". The result
+# was 25 of 43 findings announcing "Starts at ... / Coding Practice" while every one of
+# them pointed at a quiz question and not one pointed at a coding question. The unit's
+# name is a label someone chose; the artifact type is a fact we recorded.
+ARTIFACT_WORDS = {
+    "OBJECTIVE_QUESTIONS": "quiz question",
+    "CODING_QUESTIONS": "coding practice",
+    "LEARNING_RESOURCE": "reading material",
+    "SESSION_PPT": "slide deck",
+    "SHEET": "tracking sheet row",
+    "UNIT_TAG": "unit tag",
+}
+ARTIFACT_WORDS_PLURAL = {
+    "OBJECTIVE_QUESTIONS": "quiz questions",
+    "CODING_QUESTIONS": "coding practices",
+    "LEARNING_RESOURCE": "reading materials",
+    "SESSION_PPT": "slide decks",
+    "SHEET": "tracking sheet rows",
+    "UNIT_TAG": "unit tags",
+}
+# The order a reviewer works in: the things that break a student first.
+ARTIFACT_ORDER = ("CODING_QUESTIONS", "OBJECTIVE_QUESTIONS", "LEARNING_RESOURCE",
+                  "SESSION_PPT", "SHEET", "UNIT_TAG")
+
+
+def artifact_word(object_type: str, plural: bool = False) -> str:
+    table = ARTIFACT_WORDS_PLURAL if plural else ARTIFACT_WORDS
+    return table.get(object_type, "place" + ("s" if plural else ""))

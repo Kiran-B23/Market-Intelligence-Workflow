@@ -63,6 +63,13 @@ class Location:
     evidence_source: str
     object_type: str = ""
     session_no: Optional[int] = None
+    # The exact URL this location references, for `link:*` evidence. Deliberately
+    # `compare=False`: the dedupe key is the *place*, and folding the URL into it would
+    # turn one paragraph carrying three deep links into three locations and inflate
+    # every count downstream. So a location keeps the first URL seen at that spot -
+    # enough to make the row an address a reviewer can open, without changing what a
+    # location means.
+    url: str = field(default="", compare=False)
 
     @property
     def is_graded(self) -> bool:
@@ -476,7 +483,18 @@ class Finding:
     blast_radius: int = 0
     graded_locations: int = 0
     courses: list[str] = field(default_factory=list)
+    # The places this SIGNAL reaches - not every place the dependency is named. A dead
+    # dashboard URL cannot make a quiz question that merely says "Composio" wrong, and
+    # attributing the dependency's whole footprint to every signal was what made a
+    # 6-link finding list 12 locations. `miw.analyse.score.scope_locations` does the
+    # split; the remainder is kept below rather than discarded, because "named in 6
+    # other places we did not flag" is useful and "12 locations" was not.
     locations: list[Location] = field(default_factory=list)
+    mention_locations: list[Location] = field(default_factory=list)
+    # False when no rule could establish which places this signal reaches. The finding
+    # still ships - the evidence is unaffected - but it must say so rather than show
+    # the dependency's whole footprint and let a reviewer assume it was measured.
+    locations_scoped: bool = True
     claims: list[Claim] = field(default_factory=list)
     alternatives: list[Alternative] = field(default_factory=list)
     probe_signals: list[str] = field(default_factory=list)
@@ -486,6 +504,11 @@ class Finding:
     questions_executing: int = 0
     questions_mentioning: int = 0
     question_ids: list[str] = field(default_factory=list)
+    # Other dependencies this same upstream event hits, folded in by
+    # `miw.analyse.merge`. One n8n breaking-change rule names many node types; a
+    # reviewer needs one piece of work with a list of nodes attached, not the same
+    # paragraph once per node.
+    also_affects: list[str] = field(default_factory=list)
     finding_id: str = ""
     raised_at: str = field(default_factory=utcnow)
     kind_of_signal: str = "regression"   # regression | opportunity

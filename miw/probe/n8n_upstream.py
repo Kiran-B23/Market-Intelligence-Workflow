@@ -129,6 +129,89 @@ class BreakingRule:
     def targets_specific_nodes(self) -> bool:
         return bool(self.node_types)
 
+    # --- node typeVersion gating ------------------------------------------
+    #
+    # A rule carries n8n's APP version (v2, v3) but no field for the NODE versions it
+    # breaks - n8n implements that test in code, and the range survives only as prose:
+    # "AI Agent versions below 2 are removed". With nothing reading that prose, the
+    # rule was raised against a node the curriculum teaches at typeVersion 2.2, which
+    # is not below 2. A false positive, and the reviewer had no way to see it was one.
+    #
+    # So the bound is read off the rule's own wording, and read conservatively: an
+    # unparsed bound means "no bound stated", never "not affected".
+    _BOUND = (
+        (re.compile(r"versions?\s+below\s+v?(\d+(?:\.\d+)*)", re.I), "<"),
+        (re.compile(r"versions?\s+v?(\d+(?:\.\d+)*)\s+(?:and|or)\s+(?:earlier|below|lower)",
+                    re.I), "<="),
+        (re.compile(r"\bbefore\s+version\s+v?(\d+(?:\.\d+)*)", re.I), "<"),
+    )
+
+    @property
+    def version_bound(self) -> Optional[tuple[str, str]]:
+        """`('<', '2')` when the rule states which node versions it breaks, else None."""
+        text = " ".join([self.title, self.description] + list(self.actions))
+        for pat, op in self._BOUND:
+            m = pat.search(text)
+            if m:
+                return op, m.group(1)
+        return None
+
+    def affects_version(self, taught: Optional[str]) -> Optional[bool]:
+        """True / False / None, where None means 'the rule does not say'.
+
+        None is not a synonym for True: the caller reports it differently, because
+        "n8n did not state a version range" and "your version is in the range" are
+        different facts and only one of them is a defect in the course.
+        """
+        bound = self.version_bound
+        if not bound or not taught:
+            return None
+        op, limit = bound
+        try:
+            t = tuple(int(x) for x in str(taught).split("."))
+            l = tuple(int(x) for x in limit.split("."))
+        except ValueError:
+            return None
+        # Compare on equal length so 2.2 vs 2 does not read as 2 vs 2.
+        n = max(len(t), len(l))
+        t = t + (0,) * (n - len(t))
+        l = l + (0,) * (n - len(l))
+        return t < l if op == "<" else t <= l
+
+    # --- placeholder interpolation ----------------------------------------
+    #
+    # n8n writes some rule titles as TypeScript template literals, so the title of
+    # `binary-input-loader-removed` is literally "${removedNodeName} node removed" and
+    # two findings shipped with that text in them. The binding is available at match
+    # time - we know which node type matched - so it is filled in here rather than
+    # printed raw. Anything still unresolved is stripped, and `has_placeholder` lets
+    # the caller refuse to ship a rule whose meaning did not survive parsing.
+    _PLACEHOLDER = re.compile(r"\$\{[^}]*\}")
+
+    def render(self, node_type: str = "") -> tuple[str, str]:
+        """(title, description) with `${...}` resolved for this node, or removed."""
+        name = display_name(node_type) if node_type else ""
+        out = []
+        for text in (self.title, self.description):
+            if name:
+                text = text.replace("${removedNodeName}", name)
+            text = self._PLACEHOLDER.sub("", text)
+            out.append(re.sub(r"\s{2,}", " ", text).strip())
+        return out[0], out[1]
+
+    @property
+    def has_placeholder(self) -> bool:
+        return "${" in (self.title + self.description)
+
+
+def display_name(node_type: str) -> str:
+    """`n8n-nodes-base.readPDF` -> `Read PDF`. n8n's own naming, reversed."""
+    leaf = node_type.rsplit(".", 1)[-1]
+    # Split at a lower->upper boundary only, so `readPDF` is "read PDF" and not
+    # "read P D F".
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", leaf).strip()
+    return spaced[:1].upper() + spaced[1:] if spaced else node_type
+
 
 def parse_rule(body: str, path: str) -> Optional[BreakingRule]:
     ver = _RULE_VERSION.search(body)
@@ -229,7 +312,26 @@ def rules_mentioning(rules: list[dict], terms: list[str]) -> list[BreakingRule]:
     for r in rules:
         if r.get("node_types"):
             continue
-        blob = f"{r.get('title', '')} {r.get('description', '')}".lower()
-        if any(t.lower() in blob for t in terms if len(t) > 3):
+        blob = " ".join([r.get("title", ""), r.get("description", "")]
+                        + list(r.get("actions") or [])).lower()
+        if any(_names_a_node(blob, t) for t in terms if len(t) > 3):
             out.append(BreakingRule(**r))
     return out
+
+
+# A bare substring test raised `In-memory binary data storage is removed` against the
+# Switch node, because its description says instances "must switch to filesystem". The
+# node leaf is an ordinary English verb, and the rule was not talking about it.
+#
+# So a mention only counts when the term appears as a WORD and near the word "node" -
+# which is how n8n writes these ("the Code node", "AI Agent nodes on versions below 2").
+# The distance is three words, measured on the rule corpus: it admits every genuine
+# phrasing there and rejects every incidental verb.
+_NEAR_NODE = 3
+
+
+def _names_a_node(blob: str, term: str) -> bool:
+    gap = r"(?:\W+\w+){0,%d}\W+" % _NEAR_NODE
+    term = re.escape(term.lower())
+    return bool(re.search(rf"\b{term}\b{gap}nodes?\b", blob)
+                or re.search(rf"\bnodes?\b{gap}{term}\b", blob))

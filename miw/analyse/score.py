@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 from typing import Optional
 
+from config.constants import ARTIFACT_ORDER, artifact_word
 from miw.analyse import notes
 from miw.schema import (Alternative, Claim, Dependency, Finding, ProbeResult,
                         ResearchResult, UncitedClaim, utcnow)
@@ -138,6 +139,126 @@ def _fingerprint(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
 
+# --------------------------------------------------------------- location scoping
+#
+# A finding used to inherit `dep.locations[:12]` - every place the dependency is named
+# anywhere in the curriculum - regardless of what the signal was about. So Composio's
+# dead dashboard URL listed 12 locations of which 6 were links and 6 were a quiz
+# question saying the word "Composio" and two tracking-sheet rows; Ngrok listed 9 of
+# which 2 were links. The recommendation sentence right below that list already said
+# "the 6 place(s) Composio is linked", because `recommend()` was scoped years before
+# the list under it was. This closes that gap.
+#
+# The rule per signal is *what evidence could this event invalidate*, and it is
+# deliberately about evidence kind rather than about how alarming the event is:
+#
+#   a dead URL          -> the places that LINK to it
+#   a paywall           -> the places that LINK to it
+#   money changed       -> everywhere, because price changes the instruction itself
+#   the thing is dying  -> everywhere, for the same reason
+#   the UI moved        -> where the UI is DEPICTED or walked through
+#   a version moved     -> where a version is pinned or the thing is executed
+#   a model retired     -> where the model ID is passed to an API, and the sheet
+#   the docs were rewritten -> the places that LINK to the docs
+#   an n8n node changed -> the workflows that WIRE that node
+#
+# A signal with no rule keeps the whole footprint, because inventing a narrower answer
+# would be a guess dressed as a measurement.
+
+_LINK = ("link:a_href", "link:iframe", "link:bare", "link:markdown")
+_RUNTIME = ("install_command", "solution_import", "sheet_pin", "n8n_workflow",
+            "test_case_enum")
+_DEPICTED = ("SESSION_PPT", "LEARNING_RESOURCE")
+
+# evidence_source prefixes/values a signal can reach; None = every location.
+SIGNAL_EVIDENCE: dict[str, Optional[tuple[str, ...]]] = {
+    "S1": _LINK,
+    "S2": _LINK,
+    "S3": None,
+    "S4": None,
+    "S5": _LINK,                      # widened by object_type below
+    "S6": _RUNTIME,
+    "S7": ("model_id", "sheet_declared", "sheet_pin"),
+    "S8": _LINK,
+    "S9": ("n8n_workflow",),
+    "S10": None,
+    "S11": None,
+    "S12": None,
+}
+MAX_LOCATIONS = 12
+
+
+def _get(loc, name: str) -> str:
+    """Field access that works on a Location and on its serialised form.
+
+    The API reads locations straight out of the artifact as dicts, and it needs the
+    same answer as the analyser or the detail panel contradicts the finding above it.
+    """
+    if isinstance(loc, dict):
+        return loc.get(name) or ""
+    return getattr(loc, name, "") or ""
+
+
+def reaches(signal: str, loc) -> bool:
+    """Can this signal's event invalidate what is at this location?"""
+    sources = SIGNAL_EVIDENCE.get(signal, None)
+    if sources is None:
+        return True
+    if _get(loc, "evidence_source") in sources:
+        return True
+    # A UX change invalidates the places that SHOW the UI as much as the places that
+    # link to it: a screenshot in a deck and a walkthrough in reading material both go
+    # stale when the vendor moves a button.
+    if signal == "S5" and _get(loc, "object_type") in _DEPICTED:
+        return True
+    return False
+
+
+def reaching_locations(signal: str, affected_urls, locations) -> tuple[list, list]:
+    """Split `locations` into (reached by this signal, merely mentioning).
+
+    Uncapped, and usable on both `Location` objects and their serialised dicts, so the
+    analyser and the detail panel cannot disagree about what a finding affects.
+    """
+    reached = [l for l in locations if reaches(signal, l)]
+    if affected_urls and signal in ("S1", "S2", "S8"):
+        broken = {str(u).rstrip("/") for u in affected_urls}
+        exact = [l for l in reached if _get(l, "url").rstrip("/") in broken
+                 and _get(l, "url")]
+        if exact:
+            reached = exact
+    keep = {id(l) for l in reached}
+    return reached, [l for l in locations if id(l) not in keep]
+
+
+def scope_locations(dep: Dependency, f: Finding) -> None:
+    """Split `dep.locations` into the places this finding reaches and the rest.
+
+    Sets `f.locations`, `f.mention_locations` and `f.locations_scoped` in place.
+
+    Where the finding names specific URLs and we recorded a URL on the link locations,
+    narrow once more to the links that actually point at a broken URL. The narrowing is
+    conditional on it finding something: `Location.url` is only populated for `link:*`
+    evidence extracted after this field existed, so an older inventory has none, and a
+    rule that silently empties a finding on old data is worse than one that stops at
+    evidence kind.
+    """
+    reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations)
+
+    if not reached:
+        # Structural refusal, the same discipline `supported=False` applies elsewhere:
+        # we could not establish where this lands, so we say that instead of handing
+        # back the dependency's whole footprint and letting it read as a measurement.
+        f.locations = []
+        f.mention_locations = dep.locations[:MAX_LOCATIONS]
+        f.locations_scoped = False
+        return
+
+    f.locations = reached[:MAX_LOCATIONS]
+    f.mention_locations = rest[:MAX_LOCATIONS]
+    f.locations_scoped = True
+
+
 def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                  research: Optional[ResearchResult]) -> list[Finding]:
     radius = blast_radius(dep)
@@ -151,7 +272,10 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                 signal=signal, signal_label=label, kind_of_signal=kind,
                 severity=severity_for(signal, dep, radius),
                 blast_radius=radius, graded_locations=dep.graded_locations,
-                courses=dep.courses, locations=dep.locations[:12],
+                # Left empty on purpose. `scope_locations` fills it once every signal
+                # and affected URL is known, which is not until the loops below have
+                # run - and seeding it here is exactly the bug this replaces.
+                courses=dep.courses, locations=[],
                 questions_executing=len(dep.questions_that_execute_it),
                 questions_mentioning=len(dep.questions_that_mention_it),
                 # Dedupe: one question can reference a dependency from several field
@@ -215,10 +339,28 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                 if vend and SEVERITY_ORDER.index(vend) > SEVERITY_ORDER.index(f.severity):
                     f.severity = vend
                 if sig == "breaking_change_possible":
-                    f.severity = _bump(f.severity, -1)
+                    # Absolute, not relative. This branch fires on a rule that names no
+                    # node types at all - n8n matched it by prose - and its own detail
+                    # line says "whether the course is affected needs a human check".
+                    # A relative step down still landed on `high` for a widely-used
+                    # node, which is a confident severity on an admittedly unconfirmed
+                    # claim. `low` is what "someone should look" is worth.
+                    f.severity = "low"
                 url = change.get("doc_url") or ""
                 quote = " ".join(x for x in (change.get("title"),
                                              change.get("description")) if x)
+                # The rule's identity, carried onto the finding so `merge.py` can put
+                # one rule's blast back together. n8n's `wait-node-subworkflow` names
+                # 16 node types; the curriculum teaches 4 of them, and a reviewer was
+                # handed the same paragraph four times.
+                if change.get("rule_id"):
+                    tag = f"n8n_rule:{change['rule_id']}"
+                    if tag not in f.probe_signals:
+                        f.probe_signals = list(f.probe_signals) + [tag]
+                if change.get("version_checked") and change.get("taught_version"):
+                    f.probe_signals = list(f.probe_signals) + [
+                        f"n8n_version_checked:{change['taught_version']}"
+                        f"{change.get('version_bound', '')}"]
                 if not url or len(quote) < 12:
                     continue
                 # A model's serving provider is authoritative about it even when the
@@ -364,6 +506,7 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
     for f in out.values():
         if not f.is_substantiated:
             continue
+        scope_locations(dep, f)
         f.recommendation = recommend(dep, f)
         notes.compose(dep, f)          # deterministic triad; refine() may replace it
         final.append(f)
@@ -435,13 +578,56 @@ def fingerprint_of(f: Finding) -> str:
                         ",".join(f.evidence_urls))
 
 
+def _place(loc) -> str:
+    """One location, as an address a reviewer can act on."""
+    word = artifact_word(loc.object_type)
+    sess = f"session {loc.session_no}" if loc.session_no else loc.unit_name[:40]
+    return f"the {word} in {loc.course} / {sess}"
+
+
+def where_line(dep: Dependency, f: Finding) -> str:
+    """Which places this finding affects, named by what the reviewer has to open.
+
+    Replaces a line that read "Starts at <course> / session N / <unit_name>". Two
+    things were wrong with it. It printed the *unit* name, and the unit holding this
+    curriculum's MCQ bank is called "Coding Practice" - so 25 of 43 findings announced
+    "Coding Practice" while every one of them pointed at a quiz question and not one
+    pointed at a coding question. And `locations[0]` was extract order, so "starts"
+    named an arbitrary member of an unordered set.
+
+    Now: the artifact type comes from `object_type`, which we recorded; the exemplar is
+    the location that *executes* the dependency where one exists, because that is the
+    one that is already broken rather than merely stale; and the phrasing leads with
+    the count, because one place is the common case and "starts at" implies a sequence.
+    """
+    if not f.locations:
+        if f.locations_scoped:
+            return ""
+        n = len(f.mention_locations)
+        return (f" Affected places not determined: no place {dep.canonical_name} is "
+                f"named ({n}+) is one this kind of change is known to reach - confirm "
+                f"by hand before acting.")
+
+    # The already-broken one first, then the graded ones, then the rest.
+    ranked = sorted(f.locations,
+                    key=lambda l: (not dep._executes(l), not l.is_graded,
+                                   l.session_no or 999))
+    head = _place(ranked[0])
+
+    by_type: dict[str, int] = {}
+    for l in f.locations:
+        by_type[l.object_type] = by_type.get(l.object_type, 0) + 1
+    spread = ", ".join(f"{n} {artifact_word(t, n != 1)}"
+                       for t in ARTIFACT_ORDER if (n := by_type.get(t, 0)))
+
+    if len(f.locations) == 1:
+        return f" Affects {head}."
+    return f" Affects {spread} - starting with {head}."
+
+
 def recommend(dep: Dependency, f: Finding) -> str:
     """A concrete next action. Deterministic: no LLM required."""
-    where = ""
-    if f.locations:
-        first = f.locations[0]
-        sess = f"session {first.session_no}" if first.session_no else first.unit_name
-        where = f" Starts at {first.course} / {sess} / {first.unit_name[:50]}."
+    where = where_line(dep, f)
 
     alt_txt = ""
     if f.alternatives:
@@ -464,7 +650,10 @@ def recommend(dep: Dependency, f: Finding) -> str:
         url_note += "."
 
     base = {
-        "S1": f"Repoint or replace the dead link in the {dep.link_locations} place(s) "
+        # `len(f.locations)`, not `dep.link_locations`: the two now measure the same
+        # thing, and reading it off the finding means the sentence can never again
+        # disagree with the list printed under it.
+        "S1": f"Repoint or replace the dead link in the {len(f.locations)} place(s) "
               f"{dep.canonical_name} is linked.{url_note}",
         "S2": f"Check whether the taught step for {dep.canonical_name} still works "
               f"without an account; if not, rewrite the step or swap the tool.{url_note}",

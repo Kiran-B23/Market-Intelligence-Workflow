@@ -299,6 +299,14 @@ def findings(course: str = "") -> dict:
         rows = _project_rows(rows, title)
         standing_raw = _project_rows(standing_raw, title)
     standing = standing_raw
+    # What a reviewer has to open, on the row itself. A finding that says only
+    # "Composio" and "12 locations" cannot be triaged without opening it; "2 quiz
+    # questions" can. The counts come from `Finding.locations`, which is now the places
+    # the SIGNAL reaches rather than every mention of the dependency, so the row and
+    # the panel say the same thing.
+    for r in rows + standing:
+        r["affects"] = [{"count": g["count"], "label": g["label"]}
+                        for g in _artifact_groups(r.get("locations") or [])]
     state = State()
     for f in rows:
         d = state.latest_decision(f["finding_id"])
@@ -337,6 +345,7 @@ def findings(course: str = "") -> dict:
                                               for l in (r.get("locations") or [])
                                               if l.get("session_no")}),
                           "courses": r.get("courses", []),
+                          "affects": r.get("affects", []),
                           "blast_radius": r.get("blast_radius", 0)}
                          for r in standing],
             "resolved": data.get("resolved", []),
@@ -407,6 +416,32 @@ def _as_int(v) -> Optional[int]:
         return int(str(v).strip())
     except (TypeError, ValueError):
         return None
+
+
+
+def _artifact_groups(locs: list) -> list:
+    """Occurrences per artifact type, in the order a reviewer works in.
+
+    `object_type` is the CMS's word for the kind of content object; `ARTIFACT_WORDS`
+    is the curriculum team's word for the same thing. The counts are over the whole
+    list and resolve no excerpts, so this is free.
+    """
+    from config.constants import ARTIFACT_ORDER, artifact_word
+    by: dict = {}
+    for l in locs:
+        ot = l.get("object_type") or "UNKNOWN"
+        g = by.setdefault(ot, {"object_type": ot, "count": 0, "sessions": []})
+        g["count"] += 1
+        sn = l.get("session_no")
+        if sn and sn not in g["sessions"]:
+            g["sessions"].append(sn)
+    order = {t: i for i, t in enumerate(ARTIFACT_ORDER)}
+    out = sorted(by.values(), key=lambda g: (order.get(g["object_type"], 99),
+                                             -g["count"]))
+    for g in out:
+        g["label"] = artifact_word(g["object_type"], g["count"] != 1)
+        g["sessions"] = sorted(g["sessions"])[:8]
+    return out
 
 
 def _session_groups(locs: list, graded: tuple) -> list:
@@ -622,6 +657,15 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
     graded = ("CODING_QUESTIONS", "OBJECTIVE_QUESTIONS")
     locs.sort(key=lambda l: (l.get("object_type") not in graded,
                              l.get("session_no") or 999, l.get("unit_name") or ""))
+
+    # Split before anything else is computed. The panel used to show every place the
+    # DEPENDENCY is named, under a finding about one specific event - so a dead
+    # dashboard URL listed the four quiz questions that merely say "Composio". The
+    # split runs through the same function the analyser uses, on the full uncapped
+    # list, so the panel and the finding above it can never disagree.
+    from miw.analyse.score import reaching_locations
+    locs, mentions = reaching_locations(row.get("signal", ""),
+                                        row.get("affected_urls") or [], locs)
     total_locations = len(locs)
 
     # Grouping is computed over the FULL location list and costs nothing, because a
@@ -631,6 +675,11 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
     # `DETAIL_LOCATION_CAP` exists. Grouped, the reviewer picks a session and only that
     # session's excerpts are read.
     groups = _session_groups(locs, graded)
+    # The second axis a reviewer asked for: not just which session, but what they have
+    # to open in it. Reading material, a quiz question and a coding practice are three
+    # different pieces of work, and the unit name cannot tell them apart - this
+    # curriculum's MCQ bank lives in a unit called "Coding Practice".
+    artifact_groups = _artifact_groups(locs)
 
     # `session` selects one group to resolve; otherwise the first page. Both are capped.
     if session:
@@ -673,8 +722,15 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
         } if dep is not None else _topic_block(row)),
         "where": where,
         "groups": groups,
+        "artifact_groups": artifact_groups,
         "locations_total": total_locations,
         "locations_shown": len(where),
+        # Kept, not discarded: "named in 14 other places we did not flag" is useful,
+        # and it is the honest way to show the difference between where a tool appears
+        # and where this particular change lands.
+        "mentions_total": len(mentions),
+        "mentions_groups": _artifact_groups(mentions),
+        "locations_scoped": bool(shown.get("locations_scoped", True)),
         "session": session,
         "offset": max(offset, 0),
         "has_more": (not session) and (max(offset, 0) + len(where)) < total_locations,
