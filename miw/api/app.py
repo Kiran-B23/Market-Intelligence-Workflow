@@ -693,7 +693,8 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
     # list, so the panel and the finding above it can never disagree.
     from miw.analyse.score import reaching_locations
     locs, mentions = reaching_locations(row.get("signal", ""),
-                                        row.get("affected_urls") or [], locs)
+                                        row.get("affected_urls") or [], locs,
+                                        row.get("redirects") or [])
     total_locations = len(locs)
 
     # Grouping is computed over the FULL location list and costs nothing, because a

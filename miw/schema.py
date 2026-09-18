@@ -279,6 +279,12 @@ class ProbeResult:
     # rather than links to. First-hand, like everything else the probe records: each
     # one is a page we fetched that answered 200 on a domain this dependency owns.
     successors: list[dict] = field(default_factory=list)
+    # Where each redirected URL now lands: {"from": ..., "to": ..., "off_site": bool}.
+    # `off_site` is the load-bearing bit: a URL that now answers on a domain this
+    # dependency already owns is the vendor reorganising its own site, and a URL that
+    # lands somewhere else is the product having moved, been rebranded or been acquired.
+    # Those call for different work and used to be one signal.
+    redirects: list[dict] = field(default_factory=list)
     detail: str = ""
     evidence_url: str = ""
     consecutive_failures: int = 0
@@ -581,6 +587,8 @@ class Finding:
     # Carried from the probe: where each dead URL went, or that it was never a link.
     # Shape as `ProbeResult.successors`.
     successors: list[dict] = field(default_factory=list)
+    # Carried from the probe. Shape as `ProbeResult.redirects`.
+    redirects: list[dict] = field(default_factory=list)
     screenshots_at_risk: int = 0
     questions_executing: int = 0
     questions_mentioning: int = 0

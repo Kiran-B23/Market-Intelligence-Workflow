@@ -31,6 +31,10 @@ PROPOSED = {
  "V0 by Vercel":    ("service","https://v0.app",["v0.app","v0.dev","vercel.com"],"Vercel",["v0"]),
  "Replit":          ("service","https://replit.com",["replit.com","docs.replit.com"],"Replit",["replit"]),
  "Cursor IDE":      ("tool","https://cursor.com",["cursor.com","docs.cursor.com"],"Cursor",["cursor"]),
+ # windsurf.com now redirects to devin.ai/desktop. `devin.ai` is deliberately NOT in
+ # this authority set: an acquirer does not speak for the product it absorbed, and
+ # listing it would make the redirect read as an internal reorganisation and hide the
+ # move - which is the one thing about Windsurf a curriculum owner needs to know.
  "Windsurf":        ("tool","https://windsurf.com",["windsurf.com","docs.windsurf.com"],"Windsurf",["windsurf"]),
  "MeloTTS":         ("tool","https://github.com/myshell-ai/MeloTTS",["github.com"],"MyShell",["melotts"]),
  "OpenVoice V2":    ("tool","https://github.com/myshell-ai/OpenVoice",["github.com"],"MyShell",["openvoice"]),

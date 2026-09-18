@@ -3813,13 +3813,13 @@ tools:
   - Windsurf
   homepage: https://windsurf.com
   official_domains:
-  - devin.ai
-  - docs.devin.ai
   - docs.windsurf.com
   - windsurf.com
   vendor: Windsurf
   review_status: verified
-  notes: declared in ai_for_finance_contents.xlsx / Entity Ids - Tools & Versions U
+  notes: 'windsurf.com now redirects to devin.ai/desktop - Cognition''s product. devin.ai is deliberately
+    NOT in this authority set: an acquirer does not speak for the product it absorbed, and listing it
+    here would make the redirect look like an internal reorganisation and hide the move.'
 - canonical_name: Yahoo Finance
   kind: tool
   aliases:

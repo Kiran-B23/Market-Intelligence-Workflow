@@ -3918,3 +3918,103 @@ only fall, and the eight heaviest taught tools are spoken for by name.
 everywhere), Claude Skills (a product feature belonging under Anthropic), and a long tail
 of one- and two-mention names from the workbook. The next pass is a smaller and much
 duller job than this one, which is the point.
+
+---
+
+## 41. A redirect is two different events wearing one name
+
+> *"The actual error is the URL mentioned in the reading material is redirecting to other
+> places, so ideally it should point out the URL only, instead it suspects the OpenAI
+> keyword across all the sessions."*
+
+Correct, and the finding proved it:
+
+```
+OpenAI · S5 · "https://cookbook.openai.com/ now redirects to
+               https://developers.openai.com/cookbook."
+
+affected_urls   2, both on cookbook.openai.com
+claims          24 places — 21 reading materials, 3 slide decks
+of which links  2
+of which prose  10 mentions of the word "OpenAI"
+```
+
+OpenAI reorganised its own docs. The finding told a reviewer to *"re-verify the taught
+steps for OpenAI; screenshots and click-paths may be stale"* in 24 places.
+
+### Two causes
+
+**The `_DEPICTED` widening keyed on `object_type` alone.** §35 gave S5 a widening past
+link evidence, reasoning that *"a screenshot in a deck and a walkthrough in reading
+material both go stale when the vendor moves a button"*. That is sound for a UI change
+and wrong for everything else, because the test was `object_type in (SESSION_PPT,
+LEARNING_RESOURCE)` — so the word "OpenAI" appearing anywhere in any reading material
+counted as depicting OpenAI's interface.
+
+**S5 had no URL narrowing.** S1, S2 and S8 narrow to the links pointing at the affected
+URL. S5 did not, although `redirected_off_path` names exact URLs.
+
+And underneath both, the thing named in §39's review as gap #2: **every S5 fires on
+`redirected_off_path`**. A redirect is a link event, and the signal is labelled "the
+taught steps changed".
+
+### The distinction the data already held
+
+```
+cookbook.openai.com  -> developers.openai.com        same estate
+mcp.composio.dev     -> composio.dev                 same estate
+admin.mistral.ai     -> v2.auth.mistral.ai           same estate
+windsurf.com         -> devin.ai/desktop             gone
+protectai.com        -> paloaltonetworks.com         gone
+llama.com            -> developer.meta.com           gone
+```
+
+The probe knows the final URL and the registry knows the authority set, so "did it land
+on a domain this dependency owns" is checkable without judgement. `ProbeResult.redirects`
+records `{from, to, off_site}` and `s5_reach()` returns one of three:
+
+| | what happened | what it reaches | what it says |
+|---|---|---|---|
+| `links` | the vendor reorganised | the links at those URLs | "Repoint the links … nothing about how X works has changed" |
+| `moved` | the product left its own domain | links **and** every place that names it | "X has moved off its own domain … check whether it has been rebranded or acquired; if so the prose is wrong too, not just the link" |
+| `behaviour` | a researched IMPLEMENTATION claim | links, decks and walkthroughs | "Re-verify the taught steps; screenshots may be stale" |
+
+`behaviour` is the only one that widens to depicted material, and it is the only one that
+ever meant to.
+
+### Measured
+
+```
+Google      65 -> 23      Windsurf    2 -> 17
+OpenAI      24 ->  2      ProtectAI   1 -> 11
+Composio    12 ->  2
+Mistral      8 ->  1
+Chroma       5 ->  1
+```
+
+The two that **rose** are the point. `windsurf.com` now lands on `devin.ai` and
+`protectai.com` on Palo Alto Networks: both products have been absorbed, the curriculum
+teaches them by name, and every one of those mentions is now naming something that no
+longer exists under that name. The system had been reporting each as a one-line link
+nudge.
+
+### Two defects found while verifying the fix
+
+**A redirect was not recorded when another URL on the same dependency was dead.**
+`res_from_urls` returns at the `url_gone` branch before reaching the
+`redirected_off_path` branch. Composio has exactly that shape — a dead dashboard and a
+moved docs path — so its S5 carried no redirect record and fell back to the widest
+reading. The record is now written in the observation loop, which no earlier `return`
+can skip.
+
+**And §40's own seeding had suppressed the signal it was meant to expose.** Windsurf was
+seeded with `devin.ai` in its `official_domains`, on the reasoning that "both domains are
+authoritative for it now". That made its acquisition read as an internal reorganisation
+and hid it. An acquirer does not speak for the product it absorbed; `devin.ai` is Devin's
+authority, not Windsurf's. Removed, with the reason recorded in the entry's `notes` and
+asserted by a test, because the next person to look at that redirect will be tempted to
+add it back.
+
+### Gates
+
+726 tests, eval 4/4, `verify` clean.

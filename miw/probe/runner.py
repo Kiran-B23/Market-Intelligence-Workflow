@@ -18,7 +18,7 @@ import re
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
-from miw.net import SIMHASH_DISTANCE, hash_distance
+from miw.net import SIMHASH_DISTANCE, domain, hash_distance
 from miw.probe import registries as R
 from miw.probe.http_probe import UrlObservation, observe
 from miw.schema import Dependency, ProbeResult, utcnow
@@ -112,7 +112,7 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             res.status = "inconclusive"
             res.detail = "no URL known for this dependency"
         else:
-            res_from_urls(res, obs, prev_hash)
+            res_from_urls(res, obs, prev_hash, dep)
             # Where did it go? A finding that says "repoint or replace the dead link"
             # and stops hands the reviewer's whole job back to them: they open the URL,
             # see the 404, and then try the obvious candidates on the vendor's own site
@@ -326,7 +326,29 @@ def _successors_for(dep: Dependency, res: ProbeResult, obs) -> list[dict]:
     return out
 
 
-def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str) -> None:
+
+def _record_redirect(res: ProbeResult, o, dep: Optional[Dependency]) -> None:
+    """Where this URL went, and whether it left the dependency's own estate.
+
+    `cookbook.openai.com -> developers.openai.com` is OpenAI reorganising its docs, and
+    it implicates the two links that point at it. `windsurf.com -> devin.ai` is the
+    product having been absorbed, which makes the prose that names it wrong too.
+    Reporting both as "redirected" made the first one claim 24 places, 21 of which were
+    reading material that merely says the word "OpenAI".
+    """
+    own = set()
+    if dep is not None:
+        own = {(d or "").lower() for d in dep.official_domains} | {
+            (domain(dep.homepage) or "").lower()} - {""}
+    landed = (domain(o.final_url) or "").lower()
+    inside = bool(landed) and any(
+        landed == d or landed.endswith("." + d) or d.endswith("." + landed)
+        for d in own)
+    res.redirects.append({"from": o.url, "to": o.final_url, "off_site": not inside})
+
+
+def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str,
+                  dep: Optional[Dependency] = None) -> None:
     """Fold several URL observations into one dependency status."""
     primary = obs[0]
     res.http_status = primary.status
@@ -350,6 +372,13 @@ def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str) -
                 res.affected_urls.append(o.url)
         if o.redirected_off_path:
             res.flag("redirected_off_path")
+            # Recorded HERE, in the loop, not in the `redirected_off_path` branch
+            # below: that branch is unreachable when a different URL on the same
+            # dependency is also gone, because `url_gone` returns first. Composio has
+            # exactly that shape - a dead dashboard and a moved docs path - and its S5
+            # was left with no redirect record, so the scoper could not tell a
+            # reorganisation from a rebrand and fell back to the widest reading.
+            _record_redirect(res, o, dep)
 
     if parked:
         res.status = "broken"

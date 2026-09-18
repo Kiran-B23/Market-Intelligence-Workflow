@@ -208,29 +208,63 @@ def _get(loc, name: str) -> str:
     return getattr(loc, name, "") or ""
 
 
-def reaches(signal: str, loc) -> bool:
+def s5_reach(redirects) -> str:
+    """What an S5 is actually about, which decides how far it reaches.
+
+    S5 is labelled "the taught steps changed" and every one of its findings is produced
+    by a REDIRECT. A redirect is two different events wearing one name:
+
+      `cookbook.openai.com` -> `developers.openai.com`   OpenAI reorganised its docs
+      `windsurf.com`        -> `devin.ai/desktop`        the product was absorbed
+
+    The first implicates the two links that point at it and nothing else. The second
+    makes the prose that names the tool wrong as well. Reporting both as "redirected"
+    is why an OpenAI docs move claimed 24 places, 21 of them reading material that
+    merely says the word "OpenAI" - the tool had not changed at all.
+
+    Returns `links` | `moved` | `behaviour`.
+    """
+    if not redirects:
+        # No redirect recorded, so this is a researched IMPLEMENTATION claim: the
+        # vendor says it changed how the thing works. That is the case where a
+        # screenshot and a walkthrough really do go stale.
+        return "behaviour"
+    return "moved" if any(r.get("off_site") for r in redirects) else "links"
+
+
+def reaches(signal: str, loc, reach: str = "behaviour") -> bool:
     """Can this signal's event invalidate what is at this location?"""
     sources = SIGNAL_EVIDENCE.get(signal, None)
     if sources is None:
         return True
     if _get(loc, "evidence_source") in sources:
         return True
-    # A UX change invalidates the places that SHOW the UI as much as the places that
-    # link to it: a screenshot in a deck and a walkthrough in reading material both go
-    # stale when the vendor moves a button.
-    if signal == "S5" and _get(loc, "object_type") in _DEPICTED:
-        return True
+    if signal == "S5":
+        # A UX change invalidates the places that SHOW the UI as much as the places
+        # that link to it - but only when the UI is what changed. A URL moving inside
+        # the vendor's own estate changes nothing a deck depicts.
+        if reach == "behaviour" and _get(loc, "object_type") in _DEPICTED:
+            return True
+        # The product moved off its own domain: every place that NAMES it is now
+        # naming something that has been rebranded or absorbed, which is a real edit.
+        if reach == "moved" and _get(loc, "evidence_source") in ("prose_name", "title"):
+            return True
     return False
 
 
-def reaching_locations(signal: str, affected_urls, locations) -> tuple[list, list]:
+def reaching_locations(signal: str, affected_urls, locations,
+                       redirects=()) -> tuple[list, list]:
     """Split `locations` into (reached by this signal, merely mentioning).
 
     Uncapped, and usable on both `Location` objects and their serialised dicts, so the
     analyser and the detail panel cannot disagree about what a finding affects.
     """
-    reached = [l for l in locations if reaches(signal, l)]
-    if affected_urls and signal in ("S1", "S2", "S8"):
+    reach = s5_reach(redirects) if signal == "S5" else "behaviour"
+    reached = [l for l in locations if reaches(signal, l, reach)]
+    # S5 joins the URL narrowing when the redirect stayed inside the vendor's estate:
+    # the event is "these links now land elsewhere", and the links are nameable.
+    narrowing = ("S1", "S2", "S8") + (("S5",) if reach == "links" else ())
+    if affected_urls and signal in narrowing:
         broken = {str(u).rstrip("/") for u in affected_urls}
         exact = [l for l in reached if _get(l, "url").rstrip("/") in broken
                  and _get(l, "url")]
@@ -252,7 +286,8 @@ def scope_locations(dep: Dependency, f: Finding) -> None:
     rule that silently empties a finding on old data is worse than one that stops at
     evidence kind.
     """
-    reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations)
+    reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations,
+                                       f.redirects)
 
     # Counted before the cap, and recorded, because `locations` is a display list and
     # every surface that counted it understated a busy finding by an order of magnitude.
@@ -350,6 +385,7 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f.probe_signals.append(sig)
             f.affected_urls = list(probe.affected_urls)
             f.successors = list(probe.successors)
+            f.redirects = list(probe.redirects)
             f.latest_version = probe.latest_version or ""
             if not f.summary:
                 f.summary = _probe_summary(sig, dep, probe)
@@ -804,6 +840,24 @@ def recommend(dep: Dependency, f: Finding) -> str:
                          f"is the page the session meant.")
             break
 
+    reach = s5_reach(f.redirects)
+    moved = next((r for r in (f.redirects or []) if r.get("off_site")), None)
+    if reach == "links":
+        hop = (f.redirects or [{}])[0]
+        s5 = (f"Repoint the link{'s' if len(f.locations) != 1 else ''}: "
+              f"{hop.get('from', 'the taught URL')} now lands on "
+              f"{hop.get('to', 'another page')}. Same vendor, reorganised site - "
+              f"nothing about how {dep.canonical_name} works has changed, so only the "
+              f"{len(f.locations)} link(s) need editing.")
+    elif reach == "moved":
+        s5 = (f"{dep.canonical_name} has moved off its own domain: "
+              f"{moved.get('from')} now lands on {moved.get('to')}. Check whether it "
+              f"has been rebranded or acquired - if so the prose that names it is "
+              f"wrong too, not just the link.")
+    else:
+        s5 = (f"Re-verify the taught steps for {dep.canonical_name} against its "
+              f"current docs; screenshots and click-paths may be stale.{url_note}")
+
     # The lead sentence has to change, not just gain a clause: "repoint or replace the
     # dead link" is the wrong instruction when there is no link to repoint.
     s1 = (f"Not a broken link: {f.affected_urls[0] if f.affected_urls else 'this URL'} "
@@ -825,8 +879,11 @@ def recommend(dep: Dependency, f: Finding) -> str:
               f"asks a student to do.",
         "S4": f"{dep.canonical_name} shows deprecation/abandonment signals - plan a "
               f"replacement before the next cohort.",
-        "S5": f"Re-verify the taught steps for {dep.canonical_name} against its "
-              f"current docs; screenshots and click-paths may be stale.{url_note}",
+        # Three sentences, because a redirect is three different events. The one that
+        # used to be printed for all of them - "re-verify the taught steps, screenshots
+        # may be stale" - was right only for the third, and it was the third that
+        # almost never happened.
+        "S5": s5,
         "S6": (f"Confirm the session's code still runs: the course teaches "
                f"{dep.canonical_name}"
                + (f" {dep.taught_version}" if dep.taught_version else "")
