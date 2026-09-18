@@ -1385,6 +1385,20 @@ const WORDS = {
            S7: 'model retired', S8: 'docs rewritten', S9: 'n8n node changed',
            S10: 'a better option exists', S11: "topic we don't teach yet",
            S12: 'a newer option exists'},
+  /* How the tool was found at this location. The chip used to print the raw
+     `evidence_source`, which is fine for `prose_name` and useless for the one
+     distinction that now matters most: `n8n_workflow` means a workflow BUILDS with the
+     node, `n8n_mention` means a reference table merely names it, and nine of the 41
+     taught nodes are the second kind. The raw name stays on hover. */
+  evidence: {
+    n8n_workflow: 'built into a workflow', n8n_mention: 'named in a reference table',
+    solution_import: 'imported by the solution', install_command: 'installed in a step',
+    test_case_enum: 'used by a test case', model_id: 'passed as a model id',
+    prose_name: 'named in the text', question_tag: 'question tag',
+    sheet_declared: 'declared in the workbook', sheet_pin: 'version pinned in the workbook',
+    title: 'in the title',
+    'link:a_href': 'linked', 'link:iframe': 'embedded', 'link:bare': 'linked',
+    'link:markdown': 'linked'},
   // Pipeline stages, in the order they run.
   stage: {ingest: 'reading course exports', extract: 'rebuilding the tool list',
           decks: 'reading the slide decks',
@@ -2048,7 +2062,8 @@ function locBlock(w) {
     <div class="loc-head">
       <span class="where">${esc(where)}</span>
       ${graded ? '<span class="chip high">graded</span>' : ''}
-      <span class="chip n">${esc(w.evidence_source || '')}</span>
+      <span class="chip n" title="${esc(w.evidence_source || '')}">${
+        esc(word('evidence', w.evidence_source))}</span>
       ${isPpt ? '<span class="chip med" title="From the session\'s slide outline as '
         + 'recorded in the course workbook">slide outline</span>' : ''}
       ${via}

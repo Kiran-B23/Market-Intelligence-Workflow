@@ -73,12 +73,20 @@ def merge_n8n_breaks(findings: list[Finding],
         carrier.question_ids = list(dict.fromkeys(
             [q for f in members for q in f.question_ids]))[:MAX_QUESTION_IDS]
 
-        seen = {id(l) for l in carrier.locations}
+        # Strongest evidence first, then cap. Without the sort the carrier's own wired
+        # locations were pushed out by an absorbed member's 32 reference-table
+        # mentions, so a finding about 4 real workflow instances displayed 12 glossary
+        # rows - the same confusion between naming a thing and building with it that
+        # `n8n.nodes` exists to keep apart.
+        from miw.analyse.score import EVIDENCE_WEIGHT
+        pool, seen = list(carrier.locations), {id(l) for l in carrier.locations}
         for f in others:
             for l in f.locations:
-                if id(l) not in seen and len(carrier.locations) < MAX_LOCATIONS:
-                    carrier.locations.append(l)
+                if id(l) not in seen:
+                    pool.append(l)
                     seen.add(id(l))
+        pool.sort(key=lambda l: -EVIDENCE_WEIGHT.get(l.evidence_source, 1.0))
+        carrier.locations = pool[:MAX_LOCATIONS]
         # Every member was scoped, or the merged finding cannot claim to have been.
         carrier.locations_scoped = all(f.locations_scoped for f in members)
 

@@ -376,9 +376,28 @@ def probe_all(deps: Iterable[Dependency], state: State, *,
     inventory takes about an hour, while one course's critical dependencies take a
     minute or two.
     """
+    import dataclasses
+
     from miw.scope import Scope
     scope = scope or Scope(tiers={"critical", "standard"})
-    todo = scope.select(list(deps))
+    deps = list(deps)
+    todo = scope.select(deps)
+
+    # `watch_tier` rations RESEARCH budget - fetches, searches, model calls. An n8n node
+    # costs none of that: `_probe_n8n_node` reads one cached copy of n8n's source tree
+    # and its parsed rules, so every node after the first is free. Excluding the
+    # mention-only ones on budget grounds therefore buys nothing and loses something
+    # real - nine of the 41 taught nodes are named only in a display-name reference
+    # table, and a table listing a node n8n has removed is still wrong. They are
+    # reported at `low` (`score.findings_for`), not silently dropped.
+    #
+    # Only the TIER constraint is lifted. Course, session, kind, dep-id and limit still
+    # apply, so `--course X` or `--kinds model` cannot be widened by this.
+    if scope.tiers and (not scope.kinds or "n8n_node" in scope.kinds):
+        untiered = dataclasses.replace(scope, tiers=set(), limit=None)
+        picked = {d.dep_id for d in todo}
+        todo += [d for d in untiered.select(deps)
+                 if d.kind == "n8n_node" and d.dep_id not in picked]
     out = []
     for i, dep in enumerate(todo, 1):
         out.append(probe_dependency(dep, state))

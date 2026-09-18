@@ -29,7 +29,11 @@ EVIDENCE_WEIGHT = {
     "solution_import": 5.0, "n8n_workflow": 5.0, "test_case_enum": 4.0,
     "install_command": 4.0, "link:a_href": 2.0, "link:iframe": 2.0,
     "model_id": 2.0, "link:bare": 1.0, "link:markdown": 1.0,
-    "question_tag": 0.5, "title": 0.5, "prose_name": 0.2,
+    # A node type named in a display-name reference table, not built into a workflow.
+    # Worth what a prose mention is worth, which is what it is: the course says the
+    # name exists. Recording it as `n8n_workflow` gave nine glossary rows the weight of
+    # a wired node and put two of them in the digest at `high`.
+    "question_tag": 0.5, "title": 0.5, "prose_name": 0.2, "n8n_mention": 0.2,
 }
 GRADED_MULTIPLIER = 2.0
 
@@ -180,7 +184,11 @@ SIGNAL_EVIDENCE: dict[str, Optional[tuple[str, ...]]] = {
     "S6": _RUNTIME,
     "S7": ("model_id", "sheet_declared", "sheet_pin"),
     "S8": _LINK,
-    "S9": ("n8n_workflow",),
+    # Both: a breaking change invalidates the workflows that wire the node AND the
+    # reference table that names it. They are different work and very different
+    # urgency, which `EVIDENCE_WEIGHT` and the severity cap below express - not a
+    # filter that would drop the glossary row and leave it wrong for ever.
+    "S9": ("n8n_workflow", "n8n_mention"),
     "S10": None,
     "S11": None,
     "S12": None,
@@ -506,6 +514,19 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
     for f in out.values():
         if not f.is_substantiated:
             continue
+        # An n8n node the curriculum only NAMES cannot break a student's workflow,
+        # because there is no workflow. Nine of the 41 taught nodes are in exactly that
+        # position: 32 locations each, every one of them the same display-name
+        # reference table, zero wired instances. The finding is still real - a table
+        # listing a node n8n has removed is wrong and should be corrected - but it is
+        # documentation work, so it is capped absolutely rather than stepped down, the
+        # same treatment `breaking_change_possible` gets and for the same reason.
+        if (f.signal == "S9" and dep.kind == "n8n_node"
+                and not dep.wired_locations and dep.locations):
+            f.severity = "low"
+            f.summary = (f"{f.summary.rstrip('.')}. The curriculum names this node in a "
+                         f"reference table but never builds a workflow with it, so "
+                         f"nothing a student runs is affected.")
         scope_locations(dep, f)
         f.recommendation = recommend(dep, f)
         notes.compose(dep, f)          # deterministic triad; refine() may replace it
@@ -686,7 +707,14 @@ def recommend(dep: Dependency, f: Finding) -> str:
                  else " is affected by a declared breaking change"
                  if "breaking_change_declared" in f.probe_signals else " changed")
               + (f" (course teaches typeVersion {dep.taught_version})" if dep.taught_version else "")
-              + "; re-import the workflow and confirm node behaviour.",
+              # The action depends on whether the course BUILDS with the node or only
+              # names it. "Re-import the workflow" is not something a reviewer can do
+              # for a node that appears solely in a display-name reference table, and
+              # nine of the 41 taught nodes are in exactly that position.
+              + ("; correct or drop the reference-table row - no workflow builds with "
+                 "this node." if dep.kind == "n8n_node" and dep.locations
+                 and not dep.wired_locations
+                 else "; re-import the workflow and confirm node behaviour."),
         "S10": f"Consider whether a better-suited tool than {dep.canonical_name} is "
                f"now available.",
         "S11": "Review course coverage against current industry expectations.",

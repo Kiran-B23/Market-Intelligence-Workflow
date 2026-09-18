@@ -576,3 +576,25 @@ def test_the_never_covered_table_says_how_a_row_is_related():
     headed "closest thing we teach" implied a closeness that was not there."""
     assert "related to what we teach" in PAGE
     assert "r.relation" in PAGE
+
+
+def test_every_evidence_source_has_a_plain_word():
+    """The chip shows how the tool was found. `n8n_workflow` vs `n8n_mention` is the
+    distinction that separates a node a workflow builds with from one a reference table
+    merely names, and nine of the 41 taught nodes are the second kind."""
+    import json
+    import pathlib
+    import re
+
+    block = PAGE[PAGE.index("  evidence: {"):PAGE.index("  // Pipeline stages")]
+    keys = set(re.findall(r"(?:^|[{,\s])'?([\w:]+)'?\s*:\s*'", block))
+    inv = pathlib.Path(__file__).resolve().parents[1] / "out" / "inventory.json"
+    if not inv.exists():                      # artifact-free checkout
+        emitted = {"n8n_workflow", "n8n_mention", "prose_name", "link:a_href"}
+    else:
+        emitted = {l["evidence_source"]
+                   for d in json.loads(inv.read_text())["dependencies"]
+                   for l in d["locations"]}
+    assert not (emitted - keys), sorted(emitted - keys)
+    # the raw name stays reachable, the same rule the drift codes follow
+    assert 'title="${esc(w.evidence_source || \'\')}"' in PAGE

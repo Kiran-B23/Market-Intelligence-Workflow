@@ -3424,3 +3424,96 @@ right to retire a signal it never looked for.
 612 → 649 tests (37 new, one per measured defect), eval 4/4 at 100%, `main.py verify`
 clean, and the artifact re-measured end to end: extract, a full 232-dependency probe,
 analyse, gaps, changes and report.
+
+---
+
+## 36. Naming a node is not building with it
+
+A question about one node — *"did we use `@n8n/n8n-nodes-langchain.lmOpenAi` anywhere?"* —
+turned out to be answerable and the answer was **no**. All 32 of its locations were the
+same "Technical Type | Display Name" reference table, repeated across 32 quiz questions in
+Intro to Gen AI. It is wired into a workflow exactly zero times; `lmChatGoogleGemini` is
+wired 126 times and `chainLlm` 125.
+
+It nevertheless carried a `high` S9 finding.
+
+### The cause
+
+`extract/n8n.py:nodes()` runs three passes — a JSON parse, a `"type": "..."` regex for
+embedded blobs, and bare mentions in prose or a markdown table. The third pass is
+deliberate and documented; it is why n8n's Code-node breaking change can match anything at
+all. But `inventory.py:_n8n` recorded **every** pass as `evidence_source="n8n_workflow"`,
+which carries the top blast-radius weight (5.0, equal to `solution_import`), sits in
+`RUNTIME_EVIDENCE`, and counts as *executing* the dependency. A glossary row was being
+scored as a wired node.
+
+Measured across the export, nine of the 41 taught nodes are in that position — 32
+locations each, zero wired:
+
+```
+lmChatAnthropic · lmChatOpenAi · lmOpenAi · toolCode · toolWorkflow
+vectorStoreInMemory · n8n-nodes-base.set · n8n-nodes-base.switch · n8n-nodes-base.code
+```
+
+### The fix, and why it is not a filter
+
+`nodes()` now returns `(type, version, how)` with `how` in `{WIRED, MENTIONED}`, and the
+strength of the evidence travels with the location instead of being decided once at the
+call site. `n8n_mention` joins `WEAK_EVIDENCE` and weighs what `prose_name` weighs.
+
+It is deliberately **not** dropped. A reference table listing a node n8n has removed is
+still wrong and somebody should fix it — it is just documentation work, not a broken
+workflow. So S9 still reaches `n8n_mention` locations, the severity is capped at `low`
+*absolutely* (the same treatment `breaking_change_possible` gets, and for the same reason:
+a relative step down still landed on `high`), and the action changes to match what a
+reviewer can actually do:
+
+> *wired* — "re-import the workflow and confirm node behaviour"
+> *mentioned* — "correct or drop the reference-table row — no workflow builds with this node"
+
+Two consequences had to be chased down.
+
+**The nine dropped out of the probe.** Demoting them moved them to `mention-only`, and
+`cmd_probe` defaults to `{critical, standard}` — so the glossary rows would have stood for
+ever with nothing looking at them. `watch_tier` rations *research* budget: fetches,
+searches, model calls. An n8n node probe reads one cached copy of n8n's source tree and
+its parsed rules, so every node after the first is free, and rationing a free check buys
+nothing. `probe_all` now lifts the **tier** constraint for `n8n_node` and only that one —
+course, session, kind, dep-id and limit still bind, so `--course X` cannot be widened by it.
+
+**The merge put the weak evidence first.** `merge.py` folded an absorbed member's 32
+reference-table mentions into the carrier ahead of the carrier's own 4 wired instances, so
+a finding about real workflow instances displayed glossary rows. Merged locations are now
+sorted by `EVIDENCE_WEIGHT` before the cap.
+
+And the detail panel's location chip printed the raw `evidence_source`. That is tolerable
+for `prose_name` and useless for the distinction that now matters most, so the chip reads
+plainly — *built into a workflow* / *named in a reference table* — with the raw name on
+hover, the same rule the drift codes follow. A test asserts every source the extractor
+emits has a word.
+
+### Measured, before and after
+
+```
+locations                     9,061  ->  9,061      a relabelling, not a re-count
+  n8n_workflow                  776  ->    263      66% of it was a table row
+  n8n_mention                     0  ->    513
+watch tier critical             180  ->    171      the nine, demoted
+S9 findings                       8  ->      8      none lost
+  lmOpenAi                     high  ->      -      now a member of toolSerpApi's finding
+  toolCode                     high  ->    low      with the action rewritten
+  n8n-nodes-base.code          high  ->    low
+  gmail / chatTrigger / toolSerpApi        high     unchanged: these are wired
+  googleCalendarTool / googleDocsTool / httpRequestTool  critical, unchanged
+```
+
+`toolSerpApi` is the check on the other side: it is named in no table and wired 4 times,
+so it keeps `high` — and it is now the **carrier** of the merged `binary-input-loader`
+finding that `lmOpenAi` used to carry, because the merge picks the widest footprint and the
+footprints are finally honest.
+
+### Gates
+
+Applied across the whole workflow and confirmed stage by stage: extract → probe → analyse
+→ gaps → changes → report → verify, with the live API re-checked for a wired node, a
+mention-only node and a merged one. 649 → 659 tests, eval 4/4 at 100%, `verify` clean.

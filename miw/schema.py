@@ -171,6 +171,16 @@ class Dependency:
     def link_locations(self) -> int:
         return sum(1 for l in self.locations if l.evidence_source.startswith("link:"))
 
+    @property
+    def wired_locations(self) -> int:
+        """Places a workflow actually instantiates this node.
+
+        Distinct from `len(self.locations)` for an n8n node, because the course also
+        names nodes in a display-name reference table. Nine of the 41 taught nodes have
+        32 locations each and zero wired ones.
+        """
+        return sum(1 for l in self.locations if l.evidence_source == "n8n_workflow")
+
     # When a tool changes, the questions about it go stale too - a point MIW had the
     # data for (content_id + object_type on every location) but never surfaced. The
     # two buckets need different work, so they are counted separately rather than

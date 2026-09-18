@@ -20,6 +20,12 @@ TYPE_VERSION = re.compile(r"\"typeVersion\"\s*:\s*([\d.]+)")
 # breaking change about Python in the Code node could never have matched anything.
 BARE_NODE = re.compile(r"(?<![\w.\-/\"])((?:@[\w.\-]+/)?n8n-nodes[\w.\-]*\.[a-zA-Z][\w.]*)")
 
+# How a node type was found, and therefore how much it is worth. These are the
+# `evidence_source` values the inventory records, so the strength of the evidence
+# travels with the location instead of being decided once at the call site.
+WIRED = "n8n_workflow"          # a node in a workflow: the course builds with it
+MENTIONED = "n8n_mention"       # a name in prose or a table: the course names it
+
 # Placeholders from documentation examples. `someNode` alone accounted for 32
 # locations and is not a node anyone can install.
 PLACEHOLDERS = {"somenode", "yournode", "mynode", "examplenode", "nodename",
@@ -41,18 +47,28 @@ def _walk_nodes(obj) -> Iterator[dict]:
             yield from _walk_nodes(v)
 
 
-def nodes(payload: str) -> list[tuple[str, str]]:
-    """(node_type, type_version) pairs found in `payload`.
+def nodes(payload: str) -> list[tuple[str, str, str]]:
+    """(node_type, type_version, how) triples found in `payload`.
 
     Three passes, strongest first: a real JSON parse (so `typeVersion` binds to the
     right node), the JSON-shaped `"type": "..."` regex for truncated or embedded
     blobs, and finally bare mentions in prose or a markdown table. Versions come only
     from the JSON parse - a mention carries none, and inventing one would be worse
     than leaving it blank.
+
+    `how` is `WIRED` for the first two passes and `MENTIONED` for the third, and the
+    caller must not flatten that distinction. It used to: every pass was recorded as
+    `n8n_workflow` evidence, which carries the top blast-radius weight and counts as
+    EXECUTING the dependency. Measured on the live export, that made nine of the 41
+    taught n8n nodes - lmOpenAi, toolCode, toolWorkflow, lmChatOpenAi, lmChatAnthropic,
+    vectorStoreInMemory, set, switch and code - look like 32-location wired
+    dependencies when every one of those 32 was the same "Technical Type | Display
+    Name" reference table repeated across 32 quiz questions, and not one of them was a
+    node in a workflow. Two of them carried a `high` S9 as a result.
     """
     if not payload or "n8n-nodes" not in payload:
         return []
-    out: list[tuple[str, str]] = []
+    out: list[tuple[str, str, str]] = []
     try:
         data = json.loads(payload) if payload.lstrip()[:1] in "{[" else None
     except (json.JSONDecodeError, ValueError):
@@ -61,22 +77,22 @@ def nodes(payload: str) -> list[tuple[str, str]]:
     if data is not None:
         for node in _walk_nodes(data):
             tv = node.get("typeVersion")
-            out.append((node["type"], str(tv) if tv is not None else ""))
+            out.append((node["type"], str(tv) if tv is not None else "", WIRED))
     else:
         for t in NODE_TYPE.findall(payload):
-            out.append((t, ""))
+            out.append((t, "", WIRED))
 
-    known = {t for t, _ in out}
+    known = {t for t, _, _ in out}
     for t in BARE_NODE.findall(payload):
         if t not in known:
-            out.append((t, ""))
+            out.append((t, "", MENTIONED))
 
     seen, uniq = set(), []
-    for t, v in out:
+    for t, v, how in out:
         if _is_placeholder(t) or (t, v) in seen:
             continue
         seen.add((t, v))
-        uniq.append((t, v))
+        uniq.append((t, v, how))
     return uniq
 
 

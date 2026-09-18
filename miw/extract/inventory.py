@@ -246,7 +246,7 @@ class InventoryBuilder:
     def _n8n(self, r: ContentRecord) -> None:
         if "n8n-nodes" not in r.body_text:
             return
-        for node_type, tv in N8N.nodes(r.body_text):
+        for node_type, tv, how in N8N.nodes(r.body_text):
             dep = self._dep("n8n_node", node_type, registry="n8n",
                             registry_id=N8N.package_of(node_type),
                             official_domains=list(N8N_DOMAINS),
@@ -256,7 +256,10 @@ class InventoryBuilder:
                             vendor="n8n")
             if tv and not dep.taught_version:
                 dep.taught_version = tv
-            self._locate(dep, r, "n8n_workflow")
+            # `how`, not a constant. A node named in a markdown reference table is not
+            # a node the course builds with, and recording both as `n8n_workflow` gave
+            # a glossary row the same weight as a wired node - see `n8n.nodes`.
+            self._locate(dep, r, how)
 
     def _tag(self, r: ContentRecord) -> None:
         name = r.body_text.strip()
@@ -440,8 +443,12 @@ RUNTIME_EVIDENCE = {"solution_import", "n8n_workflow", "test_case_enum",
 # A student opens these to follow the material.
 VISITED_EVIDENCE = {"link:a_href", "link:iframe", "model_id"}
 # Weak signals: the name appears, but nothing is shown to depend on it.
+# `n8n_mention` belongs here and not in RUNTIME_EVIDENCE: it is a node type printed in a
+# display-name reference table, which tells us the course names the node, not that any
+# workflow builds with it. Landing in RUNTIME made nine such nodes `critical` and bought
+# them a research budget for a glossary row.
 WEAK_EVIDENCE = {"prose_name", "question_tag", "link:bare", "link:markdown", "title",
-                 "sheet_declared"}
+                 "sheet_declared", "n8n_mention"}
 
 
 def watch_tier_for(dep: Dependency) -> str:

@@ -35,7 +35,7 @@ def test_model_ids_require_a_digit():
 
 def test_n8n_nodes_carry_type_versions():
     wf = '{"nodes":[{"type":"@n8n/n8n-nodes-langchain.agent","typeVersion":2.2}]}'
-    assert N.nodes(wf) == [("@n8n/n8n-nodes-langchain.agent", "2.2")]
+    assert N.nodes(wf) == [("@n8n/n8n-nodes-langchain.agent", "2.2", N.WIRED)]
 
 
 def test_registrable_domain_handles_multi_label_suffixes():

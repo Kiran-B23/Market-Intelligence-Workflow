@@ -134,3 +134,55 @@ def test_artifact_words_cover_every_object_type_the_extractor_emits():
     for ot in ("OBJECTIVE_QUESTIONS", "CODING_QUESTIONS", "LEARNING_RESOURCE",
                "SESSION_PPT", "SHEET", "UNIT_TAG"):
         assert artifact_word(ot) != "place"
+
+
+def test_a_free_probe_is_not_rationed_by_a_research_budget():
+    """`watch_tier` rations research. An n8n node probe reads one cached source tree.
+
+    Nine of the 41 taught nodes are `mention-only`, so a tiered probe skipped them
+    entirely - and a reference table listing a node n8n has removed then stood for ever
+    with nothing looking at it.
+    """
+    from miw.probe.runner import probe_all
+    from miw.scope import Scope
+    from miw.state import State
+
+    mention_node = Dependency(kind="n8n_node", canonical_name="n8n-nodes-base.code",
+                              registry="n8n", watch_tier="mention-only",
+                              locations=[loc("n8n_mention", "OBJECTIVE_QUESTIONS")])
+    mention_tool = Dependency(kind="tool", canonical_name="SomeTool",
+                              watch_tier="mention-only",
+                              locations=[loc("prose_name", "OBJECTIVE_QUESTIONS")])
+    wired = Dependency(kind="n8n_node", canonical_name="n8n-nodes-base.gmail",
+                       registry="n8n", watch_tier="critical",
+                       locations=[loc("n8n_workflow", "OBJECTIVE_QUESTIONS")])
+
+    seen = []
+    state = State(":memory:") if _state_takes_path() else State()
+    try:
+        probe_all([mention_node, mention_tool, wired], state,
+                  scope=Scope(tiers={"critical", "standard"}),
+                  progress=lambda i, n, r: seen.append(r.canonical_name))
+    finally:
+        state.close()
+    # the mention-only n8n node is probed anyway; the mention-only TOOL is not
+    assert "n8n-nodes-base.code" in seen
+    assert "n8n-nodes-base.gmail" in seen
+    assert "SomeTool" not in seen
+
+
+def test_the_tier_lift_does_not_widen_any_other_filter():
+    """Only the tier constraint is lifted - course, kind and dep-id still bind."""
+    import inspect
+
+    from miw.probe import runner
+    src = inspect.getsource(runner.probe_all)
+    assert 'if scope.tiers and (not scope.kinds or "n8n_node" in scope.kinds):' in src
+    assert 'd.kind == "n8n_node"' in src
+
+
+def _state_takes_path() -> bool:
+    import inspect
+
+    from miw.state import State
+    return "path" in inspect.signature(State.__init__).parameters
