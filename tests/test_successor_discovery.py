@@ -162,14 +162,22 @@ def test_a_successor_is_reported_once_however_many_pages_repeat_it():
 
 # --------------------------------------------- and it reaches the finding
 
-def test_the_replacement_reaches_the_dead_tool_finding():
+def test_the_replacement_reaches_the_deprecation_finding_not_the_dead_link():
+    """A successor answers "this tool is going away", not "this URL moved".
+
+    Both findings exist here - the vendor declared a deprecation (S4) and a URL 404s
+    (S1) - and the replacement belongs to the first. Attaching it to the second is what
+    put "Candidate replacement: Nango" under a Composio finding whose only evidence was
+    that `mcp.composio.dev/dashboard` had moved while `composio.dev` answered 200.
+    """
     dep, res = _gather(TWO_SENTENCE)
     probe = ProbeResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name,
                         status="broken", detail="404")
     probe.flag("url_gone")
     fs = findings_for(dep, probe, res)
-    s1 = next(f for f in fs if f.signal == "S1")
-    assert [a.name for a in s1.alternatives] == ["DeepWiki"]
+    s4 = next(f for f in fs if f.signal == "S4")
+    assert [a.name for a in s4.alternatives] == ["DeepWiki"]
+    assert next(f for f in fs if f.signal == "S1").alternatives == []
 
 
 def test_the_recommendation_does_not_advertise_an_empty_homepage():
@@ -180,7 +188,7 @@ def test_the_recommendation_does_not_advertise_an_empty_homepage():
     probe = ProbeResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name,
                         status="broken")
     probe.flag("url_gone")
-    f = next(x for x in findings_for(dep, probe, res) if x.signal == "S1")
+    f = next(x for x in findings_for(dep, probe, res) if x.signal == "S4")
     compose(dep, f)
     assert "()" not in f.what_to_act
     assert "homepage not yet verified" in f.what_to_act
@@ -248,14 +256,116 @@ def test_an_unverified_alternative_produces_no_s10():
     assert [f.signal for f in fs] == []
 
 
-def test_a_broken_dependency_reports_alternatives_on_s1_not_as_a_separate_s10():
-    """Pins the working path so the S10 work cannot regress it."""
+def test_a_moved_page_surfaces_no_replacement_at_all():
+    """One event, one finding - and a moved page is not a reason to change tools.
+
+    The original of this test asserted the alternative landed on the S1. It was written
+    to stop the same event being reported twice, which still holds; what it also pinned,
+    by accident, was that a 404 on one page could recommend a different vendor. Every
+    dead-link finding in the live artifact is a page - a moved doc anchor, an API path,
+    and twice a placeholder URL the course prints as an example - and not one of those
+    vendors has gone anywhere.
+    """
     dep = _dep("OldTool", "oldtool.com")
     probe = ProbeResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name,
                         status="broken", detail="404")
     probe.flag("url_gone")
+    probe.affected_urls = ["https://oldtool.com/docs/getting-started"]
     fs = findings_for(dep, probe, _research(dep, _verified_alt()))
     sigs = [f.signal for f in fs]
     assert "S1" in sigs and "S10" not in sigs
-    assert [a.name for a in next(f for f in fs if f.signal == "S1").alternatives] \
-        == ["NewTool"]
+    assert next(f for f in fs if f.signal == "S1").alternatives == []
+    # Not silently dropped: the run recorded that it had leads and did not use them.
+    assert any(x.startswith("alternatives_not_surfaced")
+               for x in next(f for f in fs if f.signal == "S1").probe_signals)
+
+
+def test_a_dead_front_door_does_surface_the_replacement():
+    """The other half of the same rule: when the homepage itself is gone, the tool is
+    gone, and a replacement is exactly the right conversation."""
+    dep = _dep("OldTool", "oldtool.com")
+    probe = ProbeResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name,
+                        status="broken", detail="404")
+    probe.flag("url_gone")
+    probe.affected_urls = ["https://oldtool.com/"]
+    fs = findings_for(dep, probe, _research(dep, _verified_alt()))
+    s1 = next(f for f in fs if f.signal == "S1")
+    assert [a.name for a in s1.alternatives] == ["NewTool"]
+
+
+# ------------------------------------------- a competitor's ad is not a nomination
+#
+# The open-web nominator searches "<tool> alternatives", and the page that wins that
+# query is, by construction, a competitor's comparison article. Measured on the
+# 2026-09-18 artifact, 9 of the 11 leads were exactly that:
+#
+#   Nango <- nango.dev/blog/composio-alternatives
+#   Getmembrane <- getmembrane.com/articles/comparisons/composio-alternatives
+#   Tailscale <- tailscale.com/learn/ngrok-alternatives
+#   Wellsaid <- wellsaid.io/resources/blog/murf-ai-alternatives
+#   Superblocks <- superblocks.com/blog/lovable-dev-alternatives   ... and four more
+#
+# The two that were not were Groq's own deprecation page naming its successor models,
+# which is the vendor speaking about its own catalogue and is sound.
+
+from miw.research.nominate import self_promoted
+from miw.schema import AlternativeNomination
+
+
+def test_a_candidate_that_nominated_itself_is_detected():
+    assert self_promoted(AlternativeNomination(
+        name="Nango", candidate_domain="nango.dev",
+        nominated_by="https://nango.dev/blog/composio-alternatives"))
+    # subdomains of the candidate count too
+    assert self_promoted(AlternativeNomination(
+        name="Nango", candidate_domain="nango.dev",
+        nominated_by="https://blog.nango.dev/composio-alternatives"))
+
+
+def test_a_vendor_naming_its_own_successor_is_not_self_promotion():
+    """Groq's deprecation page pointing at a replacement is the honest path."""
+    assert not self_promoted(AlternativeNomination(
+        name="gpt-oss", candidate_domain="openai.com",
+        nominated_by="https://console.groq.com/docs/deprecations"))
+
+
+def test_a_third_party_directory_is_not_self_promotion():
+    assert not self_promoted(AlternativeNomination(
+        name="DeepWiki", candidate_domain="deepwiki.com",
+        nominated_by="https://alternativeto.net/software/x/"))
+
+
+def test_verified_is_not_recommendable():
+    """`verified` means the candidate EXISTS. It was being read as "is a replacement"."""
+    a = _verified_alt()
+    assert a.verified
+    assert not a.recommendable, "no fit judgement was made, so nothing may be recommended"
+    a.does_taught_job = True
+    assert a.recommendable
+    # Derived from the two fields, so it is right on an artifact written before the
+    # rule existed - a stored flag would have read False on all of them.
+    a.nominated_by = a.homepage.rstrip("/") + "/blog/oldtool-alternatives"
+    assert a.self_promoted
+    assert not a.recommendable, "its own advertisement cannot carry a recommendation"
+
+
+def test_an_s10_is_never_raised_from_a_self_promoted_lead():
+    dep = _dep("OldTool", "oldtool.com")
+    alt = _verified_alt()
+    alt.nominated_by = alt.homepage.rstrip("/") + "/blog/oldtool-alternatives"
+    assert alt.self_promoted
+    fs = findings_for(dep, None, _research(dep, alt))
+    assert [f.signal for f in fs] == []
+
+
+def test_an_s10_is_raised_from_an_independent_lead():
+    dep = _dep("OldTool", "oldtool.com")
+    fs = findings_for(dep, None, _research(dep, _verified_alt()))
+    assert [f.signal for f in fs] == ["S10"]
+
+
+def test_the_wording_never_calls_an_unassessed_lead_a_replacement():
+    dep = _dep("OldTool", "oldtool.com")
+    f = findings_for(dep, None, _research(dep, _verified_alt()))[0]
+    assert "Candidate replacement" not in f.recommendation
+    assert "Nobody has assessed whether it does the taught job" in f.recommendation

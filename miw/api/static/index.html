@@ -577,6 +577,10 @@
   .candhead a{font-size:12px}
   .cand .note{margin-top:3px; line-height:1.55}
   .risks{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:var(--s2)}
+  /* A lead that nominated itself is not shown in the accent - the accent reads as
+     endorsement, and the whole point is that nothing endorsed this. */
+  .cand.selfpromo{background:var(--sunk);
+                  border-color:color-mix(in srgb,var(--high) 26%,transparent)}
   @media (max-width:560px){
     .proof{grid-template-columns:minmax(0,1fr); gap:2px}
     .proof .lab{margin-top:var(--s2)}
@@ -2380,21 +2384,36 @@ function renderDetail(d) {
      applies it: this system reads the curriculum and never writes to it, so the
      honest affordances are "open the vendor's page" and "decide", not "apply". Saying
      so on the block is the only way a reader knows the difference without trying. */
+  /* Self-promotion, derived the same way `Alternative.self_promoted` derives it: the
+     nominating page's host is the candidate's own. `to_jsonable` uses `asdict`, so a
+     property never reaches the artifact - and recomputing it here is better than
+     storing it anyway, because it is then right on every artifact ever written. */
+  const host = u => { try { return new URL(u).hostname.replace(/^www\./, '')
+                             .split('.').slice(-2).join('.'); } catch (e) { return ''; } };
   const cand = (f.alternatives || []).filter(a => a.name)[0];
-  const candBlock = cand ? `<div class="cand">
+  const candSelf = cand && host(cand.nominated_by) && host(cand.nominated_by) === host(cand.homepage);
+  const candBlock = cand ? `<div class="cand${candSelf ? ' selfpromo' : ''}">
       <div class="candhead">
         <b>${esc(cand.name)}</b>
         ${cand.homepage ? `<a class="mono" href="${esc(cand.homepage)}" target="_blank"
            rel="noopener">${esc(cand.homepage.replace(/^https?:\/\//, ''))}</a>`
           : '<span class="note">homepage not yet verified</span>'}
       </div>
-      <div class="note">${esc(cand.maturity_note || 'Candidate replacement for the taught step.')}
-        Review before acting — nothing here changes the course.</div>
+      <div class="note">${esc(cand.maturity_note || 'A lead, not an assessment.')}
+        Review before acting — nothing here changes the course.
+        ${cand.nominated_by ? `Pointed at by <a href="${esc(cand.nominated_by)}"
+          target="_blank" rel="noopener">${esc(host(cand.nominated_by) || 'a source')}</a>.` : ''}</div>
       <div class="risks">
+        ${/* The three things a reader needs before treating this as a candidate, in
+              the order they undercut it. "does it do the taught job" is the one that
+              matters most and is the one nothing in the weekly pipeline sets. */''}
+        <span class="chip ${cand.does_taught_job ? 'ok' : 'high'}">${
+          cand.does_taught_job ? 'does the taught job' : 'fit not assessed'}</span>
+        ${candSelf ? `<span class="chip critical"
+          title="The page that nominated it belongs to the candidate">its own comparison page</span>` : ''}
         <span class="chip ${cand.free_student_path ? 'ok' : 'high'}">${
           cand.free_student_path ? 'free path confirmed' : 'free path unconfirmed'}</span>
         ${cand.signup_required ? '<span class="chip n">signup required</span>' : ''}
-        <span class="chip n">not human-verified</span>
         ${(f.alternatives || []).length > 1
           ? `<span class="note">+${f.alternatives.length - 1} other candidate${
               f.alternatives.length === 2 ? '' : 's'}</span>` : ''}

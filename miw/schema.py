@@ -349,8 +349,57 @@ class Alternative:
 
     @property
     def verified(self) -> bool:
-        """At least one claim about it rests on its own official domain."""
+        """At least one claim about it rests on its own official domain.
+
+        Read this narrowly, because the word does more work than it can carry: it means
+        THE CANDIDATE EXISTS and says something checkable about its own pricing or
+        access. It is the anti-hallucination test and nothing else. It is not a
+        judgement that the candidate does the job the course teaches - that is
+        `does_taught_job`, and `recommendable` is the property that requires it.
+        """
         return any(c.substantiating for c in self.claims)
+
+    @property
+    def self_promoted(self) -> bool:
+        """Did the candidate nominate itself?
+
+        Derived, not stored, and deliberately: it is a fact about the two fields below
+        it, so it is always correct - including on an artifact written before this
+        existed, which a stored flag would have read as `False`. The nominator searches
+        "<tool> alternatives" and the page that wins that query is, by construction, a
+        competitor's comparison article; 9 of the 11 leads in the 2026-09-18 artifact
+        were exactly that shape. It does not disqualify the candidate - it may well be
+        a real alternative - but its own advertisement cannot be the evidence.
+        """
+        from miw.extract.links import registrable
+        from miw.net import domain
+        src = registrable(domain(self.nominated_by or ""))
+        home = registrable(domain(self.homepage or ""))
+        return bool(src and home and src == home)
+
+    @property
+    def independently_nominated(self) -> bool:
+        """Verified, and proposed by somebody other than itself.
+
+        The bar for APPEARING as a lead. `recommendable` - the bar for being called a
+        candidate replacement - additionally needs a fit judgement.
+        """
+        return bool(self.verified and not self.self_promoted)
+
+    @property
+    def recommendable(self) -> bool:
+        """May this be put in front of a reviewer as a candidate replacement?
+
+        Three things have to hold, and until this existed only the first did:
+          * it exists and its own pages substantiate something (`verified`);
+          * somebody other than the candidate itself nominated it - a vendor's page
+            about its own competitors is an advertisement;
+          * a fit judgement was actually made. `does_taught_job is None` means nobody,
+            model or person, has said this does the taught job; presenting it as a
+            replacement on that basis puts our silence in the reader's mouth.
+        """
+        return bool(self.verified and not self.self_promoted
+                    and self.does_taught_job)
 
 
 @dataclass

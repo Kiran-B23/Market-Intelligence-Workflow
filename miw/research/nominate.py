@@ -65,6 +65,31 @@ def _reject(nom: AlternativeNomination, verdict: str, detail: str
     return nom
 
 
+
+def self_promoted(nom: AlternativeNomination) -> bool:
+    """Did the candidate nominate itself? The nomination-side twin of
+    `Alternative.self_promoted`, which is what the scorer reads.
+
+    The open-web nominator searches "<tool> alternatives", and the page that wins that
+    query is, by construction, a competitor's comparison article. Measured on the
+    2026-09-18 run, 9 of 11 nominations came from exactly that shape:
+
+        Nango        <- nango.dev/blog/composio-alternatives
+        Getmembrane  <- getmembrane.com/articles/comparisons/composio-alternatives
+        Tailscale    <- tailscale.com/learn/ngrok-alternatives
+        Wellsaid     <- wellsaid.io/resources/blog/murf-ai-alternatives
+        ...
+
+    The test is structural and needs no judgement: the nominating URL's registrable
+    domain is the candidate's own. The trust module already refuses to let a vendor be
+    authoritative about somebody else's product; this is the same rule, applied one
+    stage earlier, to the act of nomination rather than to a claim.
+    """
+    src = registrable(domain(nom.nominated_by or ""))
+    cand = registrable(nom.candidate_domain or "")
+    return bool(src and cand and src == cand)
+
+
 def adjudicate(nom: AlternativeNomination, dep: Dependency, *,
                fetcher: Optional[Callable] = None,
                resolver: Optional[Callable] = None,
@@ -179,7 +204,16 @@ def adjudicate(nom: AlternativeNomination, dep: Dependency, *,
     nom.verdict_detail = "; ".join(
         corrections + [f"{len(claims)} authoritative claim(s) on {dom}"])
     nom.checked_at = utcnow()
-    alt.maturity_note = "verified on its own official pages"
+    # Say what was verified, not just that something was. "Verified" on its own has
+    # been read as "verified as a replacement"; what R4 establishes is that the
+    # candidate exists and publishes something checkable about its own pricing or
+    # access, which is the anti-hallucination test and nothing more.
+    alt.maturity_note = (f"exists and publishes checkable pricing/access terms on "
+                         f"{dom}")
+    if alt.self_promoted:
+        alt.maturity_note += ("; nominated by its own comparison page, so this is the "
+                              "vendor's marketing rather than an independent lead")
+        nom.verdict_detail += "; self-promoted nomination"
     return nom, alt
 
 

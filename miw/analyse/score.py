@@ -276,6 +276,31 @@ def scope_locations(dep: Dependency, f: Finding) -> None:
     f.locations_scoped = True
 
 
+
+def front_door_gone(dep: Dependency, affected_urls) -> bool:
+    """Did the DEPENDENCY die, or did one of its pages move?
+
+    S1 covers both and they call for opposite actions. Measured on the 2026-09-18 run,
+    every one of the six dead-link findings was a page:
+
+        Composio      mcp.composio.dev/dashboard   composio.dev answers 200
+        LangChain     docs.langchain.com/oss/.../pypdfloader
+        Stability AI  api.stability.ai/v2beta/stable-image/generate/core
+        Earth Ai      earth-ai.com/technology
+        Gradio        xxxxx.gradio.live            a placeholder in the teaching text
+        Ngrok         abc123.ngrok.io              a placeholder in the teaching text
+
+    Not one of those vendors has gone anywhere, and the action for all six is to
+    repoint a link. A replacement is only the right conversation when the front door
+    itself is gone - which is what the CodeToTutorial backtest is: `codetotutorial.com/`
+    returns 404 and the vendor's own page names a successor.
+    """
+    home = (dep.homepage or "").rstrip("/").lower()
+    if not home:
+        return False
+    return any((u or "").rstrip("/").lower() == home for u in (affected_urls or []))
+
+
 def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                  research: Optional[ResearchResult]) -> list[Finding]:
     radius = blast_radius(dep)
@@ -459,10 +484,43 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
 
         verified_alts = [a for a in research.alternatives if a.verified]
         if verified_alts:
-            target = out.get("S1") or out.get("S4")
-            if target:
-                target.alternatives = verified_alts
-            else:
+            # NOT S1. A dead URL means a link moved, not that the vendor is finished -
+            # and attaching a competitor to it said the second thing on evidence for
+            # the first. Composio's `mcp.composio.dev/dashboard` 404s while
+            # `mcp.composio.dev/` and `app.composio.dev` both answer 200 and redirect
+            # to the reorganised dashboard; the finding nonetheless carried "Candidate
+            # replacement: Nango". The action for a moved link is to repoint it.
+            #
+            # S4 is where a replacement belongs: `registry_missing`,
+            # `registry_deprecated`, `no_release_in_2y` - the tool itself is going
+            # away. S7 gets the vendor's own named successor, separately, below.
+            independent = [a for a in verified_alts if a.independently_nominated]
+            gone = "S1" in out and front_door_gone(dep, out["S1"].affected_urls)
+            if "S4" in out or gone:
+                # A tool that is actually going away: show every verified lead,
+                # self-promoted ones included but labelled, because a reviewer with a
+                # dying dependency wants the whole field even if half of it is
+                # marketing.
+                (out.get("S4") or out["S1"]).alternatives = verified_alts
+            elif out:
+                # Something else is wrong with this dependency - most often S1, a link
+                # that moved - and a replacement is not the answer to it. Composio's
+                # `mcp.composio.dev/dashboard` 404s while `mcp.composio.dev/` and
+                # `app.composio.dev` both answer 200 and redirect to the reorganised
+                # dashboard; the tool is fine and the link is stale. Attaching Nango to
+                # that said the vendor was finished on evidence that one page moved,
+                # and raising a separate S10 would say the same thing twice.
+                for g in out.values():
+                    g.probe_signals = list(g.probe_signals) + [
+                        f"alternatives_not_surfaced:{len(verified_alts)}"]
+            elif independent:
+                # An S10 asserts "a better option exists", which is a claim about the
+                # curriculum's choice of tool. A candidate that nominated itself cannot
+                # support it: `nango.dev/blog/composio-alternatives` is an
+                # advertisement, and it was the source of 9 of the 11 leads this
+                # produced. Raising S10 from those made a competitor's SEO page into a
+                # curriculum recommendation.
+                verified_alts = independent
                 f = ensure("S10")
                 f.alternatives = verified_alts
                 f.summary = (f"{len(verified_alts)} verified alternative(s) to "
@@ -479,6 +537,10 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                     for c in a.claims:
                         if c.substantiating and c not in f.claims:
                             f.claims.append(c)
+            # else: the probe found nothing wrong and every lead nominated itself.
+            # Nothing is raised, and nothing needs to be - there is no finding to hang
+            # the note on. The refutation accounting in the research artifact is where
+            # "we looked and found only the competitors' own marketing" is recorded.
 
     # Model-kind dependencies with a deprecation finding are S7, not S4.
     if dep.kind == "model" and "S4" in out:
@@ -694,8 +756,23 @@ def recommend(dep: Dependency, f: Finding) -> str:
         # a missing field; saying so plainly tells a reviewer what is left to do.
         where_alt = f" ({a.homepage})" if a.homepage else " (homepage not yet verified)"
         free = "free path confirmed" if a.free_student_path else "free path unconfirmed"
-        alt_txt = (f" Candidate replacement: {a.name}{where_alt} - {free}"
-                   f"{'; signup required' if a.signup_required else ''}.")
+        # "Candidate replacement" is a recommendation, and it may only be used when one
+        # was actually made. `verified` means the candidate EXISTS and publishes
+        # checkable pricing - the anti-hallucination test - and nothing about whether it
+        # does the job the course teaches. `does_taught_job` is that judgement, and in
+        # the weekly pipeline nothing sets it: `research/fit.py` runs only on the agent
+        # path. So the default wording is a lead, not a replacement, and the sentence
+        # says which rung of the ladder the thing actually reached.
+        if a.recommendable:
+            alt_txt = (f" Candidate replacement: {a.name}{where_alt} - {free}"
+                       f"{'; signup required' if a.signup_required else ''}.")
+        elif a.self_promoted:
+            alt_txt = (f" One lead, {a.name}{where_alt}, but it was named by its own "
+                       f"comparison page - marketing, not a recommendation.")
+        else:
+            alt_txt = (f" One lead to look at: {a.name}{where_alt} - {free}"
+                       f"{'; signup required' if a.signup_required else ''}. "
+                       f"Nobody has assessed whether it does the taught job.")
 
     # Scope the action to the links actually affected, not to every mention of the
     # dependency: "repoint the dead link in 845 locations" is false when one URL broke.
@@ -751,8 +828,11 @@ def recommend(dep: Dependency, f: Finding) -> str:
                  "this node." if dep.kind == "n8n_node" and dep.locations
                  and not dep.wired_locations
                  else "; re-import the workflow and confirm node behaviour."),
-        "S10": f"Consider whether a better-suited tool than {dep.canonical_name} is "
-               f"now available.",
+        # Deliberately not "a better-suited tool is now available" - nothing here
+        # established that. What was established is that a named alternative exists and
+        # somebody other than itself pointed at it.
+        "S10": f"A lead worth a look, not a conclusion: something in the same space as "
+               f"{dep.canonical_name} exists and was pointed at by a third party.",
         "S11": "Review course coverage against current industry expectations.",
     }[f.signal]
     # Assessment fallout: the reading material is only half the edit.

@@ -3564,3 +3564,133 @@ claimed two placements on each of their pages.
 666 tests, eval 4/4, `verify` clean, and the whole workflow re-run — extract, probe,
 analyse, gaps, changes, report — with row-versus-panel agreement checked programmatically
 across every finding on every page.
+
+---
+
+## 38. A moved page is not a reason to change tools
+
+> *"The Composio dashboard has been updated to a new one. That does not mean it should
+> be replaced. You suggested it will be replaced with another platform — why?"*
+
+The finding said:
+
+> `https://mcp.composio.dev/dashboard` returns 404/410 · **Candidate replacement: Nango
+> (https://nango.dev)**
+
+Checked directly:
+
+```
+mcp.composio.dev/dashboard   404   -> composio.dev/toolkits/dashboard
+mcp.composio.dev/            200   -> composio.dev/toolkits
+app.composio.dev/            200   -> login.composio.dev -> dashboard.composio.dev
+platform.composio.dev/       200   -> login.composio.dev -> dashboard.composio.dev
+docs.composio.dev/           200
+```
+
+Composio reorganised. One deep link died and the front door answers. The recommendation
+was wrong, and it was wrong for three independent reasons, each of which affects every
+finding of its kind rather than just this one.
+
+### 1. A dead link was being treated as a dead vendor
+
+`findings_for` attached verified alternatives to `out.get("S1") or out.get("S4")`. S4 is
+*deprecated / abandoned* — the tool is going away, and a replacement is the right
+conversation. S1 is *dead or moved URL*, which is about a **page**. Attaching a
+competitor to it asserted the vendor was finished on evidence that one URL had moved.
+
+The two cases are distinguishable and the distinction is cheap: did the **front door**
+die, or a page? Every S1 in the live artifact is a page:
+
+```
+Composio      mcp.composio.dev/dashboard     composio.dev answers 200
+LangChain     docs.langchain.com/oss/python/integrations/document_loaders/pypdfloader
+Stability AI  api.stability.ai/v2beta/stable-image/generate/core
+Earth Ai      earth-ai.com/technology
+Gradio        xxxxx.gradio.live              a placeholder the course prints as an example
+Ngrok         abc123.ngrok.io                a placeholder the course prints as an example
+```
+
+Not one of those vendors has gone anywhere. `front_door_gone()` compares the affected
+URLs against `dep.homepage`; alternatives surface on an S1 only when the homepage itself
+is what died — which is exactly the CodeToTutorial backtest, where `codetotutorial.com/`
+returns 404 and the vendor's own page names a successor. Otherwise the leads are recorded
+on the finding as `alternatives_not_surfaced:N` and nothing is shown. Counted, not
+dropped: "we had leads and did not use them" is a different fact from "we never looked".
+
+### 2. Nine of eleven leads were the competitor's own advertisement
+
+The open-web nominator searches `"<tool> alternatives"`, and the page that wins that
+query is, by construction, a competitor's comparison article:
+
+```
+Nango        <- nango.dev/blog/composio-alternatives
+Getmembrane  <- getmembrane.com/articles/comparisons/composio-alternatives
+Tailscale    <- tailscale.com/learn/ngrok-alternatives
+Sendbird     <- sendbird.com/developer/tutorials/ngrok-alternatives
+Wellsaid     <- wellsaid.io/resources/blog/murf-ai-alternatives
+Vozo         <- vozo.ai/blogs/murf-ai-alternatives
+Superblocks  <- superblocks.com/blog/lovable-dev-alternatives
+Mindstudio   <- mindstudio.ai/blog/what-is-stable-image-ultra-...
+Undetectr    <- undetectr.com/blog/suno-alternatives
+```
+
+The two that were not are Groq's own deprecation page naming its successor models — a
+vendor speaking about its own catalogue, which is sound and is all that survives.
+
+The test is structural and needs no judgement: **the nominating URL's registrable domain
+is the candidate's own**. `miw/trust.py` already refuses to let a vendor be authoritative
+about somebody else's product; this is the same rule applied one stage earlier, to the
+act of nominating rather than to a claim. `Alternative.self_promoted` is *derived* from
+`nominated_by` and `homepage` rather than stored — a stored flag read `False` on every
+artifact written before the rule existed, which is how the first re-run still showed all
+nine.
+
+A self-promoted lead is not deleted; it may well be a real alternative. It may not raise
+an S10, and where it does appear — on an S4, where a reviewer with a dying dependency
+wants the whole field — it is labelled *"its own comparison page"* and loses the accent,
+because the accent reads as endorsement.
+
+### 3. "Verified" meant "this company exists"
+
+`Alternative.verified` is *"at least one claim about it rests on its own official
+domain"*. The R4 rung fetches the candidate's site and looks for a quote about pricing or
+access. It is the **anti-hallucination test** — it stops an invented tool acquiring a
+citation, and it does that well. It says nothing about whether the candidate does the job
+the course teaches.
+
+That judgement has a field, `does_taught_job`, and a well-built module to fill it,
+`miw/research/fit.py` — which the weekly pipeline never calls. It runs only on the agent
+path. So `does_taught_job` was `None` on **every one of the eleven**, and the wording
+said *"Candidate replacement"* regardless.
+
+`Alternative.recommendable` now requires all three — it exists, somebody other than
+itself pointed at it, and a fit judgement was made — and the wording follows the rung
+actually reached:
+
+| | |
+|---|---|
+| recommendable | "Candidate replacement: X (url) — free path confirmed." |
+| independent, no fit | "One lead to look at: X (url). **Nobody has assessed whether it does the taught job.**" |
+| self-promoted | "One lead, X, but it was named by **its own comparison page** — marketing, not a recommendation." |
+
+S10's own line changes with it: not *"a better-suited tool is now available"*, which
+nothing established, but *"a lead worth a look, not a conclusion"*.
+
+### Measured
+
+```
+findings                       57 -> 54
+S10                             3 -> 0     Murf.AI, Lovable, Sunoapi - all three
+                                           rested on a competitor's marketing page
+alternatives reaching a finding 11 -> 2    both Groq naming its own successors
+Composio                        "Candidate replacement: Nango" -> "Repoint the link"
+```
+
+The honest reading of the new state: **this system currently has no basis for
+recommending a replacement for anything**, except where a vendor names its own successor.
+Saying so is the finding. Wiring `fit.py` into the research stage is what would change
+it, and that is a separate piece of work with its own measurement.
+
+### Gates
+
+692 tests, eval 4/4, `verify` clean, workflow re-run end to end.
