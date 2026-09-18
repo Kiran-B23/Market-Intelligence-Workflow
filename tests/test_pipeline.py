@@ -299,20 +299,82 @@ def test_unreadable_pricing_page_yields_no_signal():
 
 def test_diff_class_distinguishes_improvement_from_worsening():
     """Any fingerprint change used to read as 'worsened', so a tool going from broken
-    back to redirected was reported as a deterioration."""
+    back to redirected was reported as a deterioration.
+
+    Each step is followed by `mark_reported`, because the class is measured against
+    what a human was last SHOWN. See the idempotency test below for why.
+    """
     import tempfile
     from pathlib import Path
     from miw.state import State
     with tempfile.TemporaryDirectory() as tmp:
         st = State(Path(tmp) / "t.db")
         kw = dict(finding_id="f", dep_id="d", signal="S1", fingerprint="fp")
+
+        def shown(sev, fp="fp"):
+            st.mark_reported([("f", fp, sev)], "reported")
+
         assert st.classify_finding(severity="high", now="t0", **kw) == "new"
+        shown("high")
         assert st.classify_finding(severity="critical", now="t1", **kw) == "worsened"
+        shown("critical")
         assert st.classify_finding(severity="low", now="t2", **kw) == "improved"
+        shown("low")
         assert st.classify_finding(severity="low", now="t3", **kw) == "unchanged"
         assert st.classify_finding(severity="low", now="t4",
                                    **{**kw, "fingerprint": "fp2"}) == "changed"
         st.close()
+
+
+def test_a_finding_stays_new_until_somebody_has_been_shown_it():
+    """Re-running `analyse` must not consume the week's news.
+
+    Classification used to advance on OBSERVATION: the first call inserted the row and
+    returned "new", and every later call found that row and returned "unchanged". So a
+    second `analyse` on the same inputs turned the whole week's findings into
+    non-news and the digest printed "No new or worsened findings this week."
+
+    It happened in production on 2026-09-09, -09-11 and -09-18. On the last of those,
+    33 findings carrying `first_raised` of that same day were written to the artifact
+    as `unchanged`, and the artifact is overwritten in place, so there was no way back.
+    """
+    import tempfile
+    from pathlib import Path
+    from miw.state import State
+    with tempfile.TemporaryDirectory() as tmp:
+        st = State(Path(tmp) / "t.db")
+        kw = dict(finding_id="f", dep_id="d", signal="S1", fingerprint="fp",
+                  severity="high")
+        # However many times the stage runs, until a digest is written it is still news.
+        assert st.classify_finding(now="t0", **kw) == "new"
+        assert st.classify_finding(now="t1", **kw) == "new"
+        assert st.classify_finding(now="t2", **kw) == "new"
+        # `report` writes the digest and stamps what it showed.
+        st.mark_reported([("f", "fp", "high")], "t3")
+        assert st.classify_finding(now="t4", **kw) == "unchanged"
+        st.close()
+
+
+def test_the_reported_backfill_runs_once_not_on_every_connection():
+    """The guard that makes the two watermarks actually two.
+
+    A standing `WHERE reported_fingerprint IS NULL` backfill would stamp rows the run
+    had just raised as "reported" on the next `State()`, before anyone had seen them -
+    the original defect, reintroduced by its own fix.
+    """
+    import tempfile
+    from pathlib import Path
+    from miw.state import State
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "t.db"
+        st = State(path)
+        kw = dict(finding_id="f", dep_id="d", signal="S1", fingerprint="fp",
+                  severity="high")
+        assert st.classify_finding(now="t0", **kw) == "new"
+        st.close()
+        again = State(path)                      # a fresh connection, as a stage boundary is
+        assert again.classify_finding(now="t1", **kw) == "new"
+        again.close()
 
 
 def test_screenshot_exposure_is_counted_per_unit_not_per_reference():

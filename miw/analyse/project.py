@@ -40,10 +40,20 @@ from miw.schema import Dependency, Finding
 
 # Facts about a vendor, not about a course. A model Groq retired is retired in every
 # course that teaches it, so these are carried across untouched.
+#
+# `redirects` and `successors` are on this list for a reason worth stating: they are
+# observations about a URL, and dropping them does not merely lose a display field, it
+# silently changes the SCOPE. `score.scope_locations` calls `s5_reach(f.redirects)`, so
+# a projection with no redirects reads `behaviour` instead of `links`/`moved` and
+# re-admits the SESSION_PPT and LEARNING_RESOURCE locations this module exists to keep
+# out - the global finding said "repoint the link", the course page said "re-verify the
+# taught steps". `successors` is the "where the dead link went" block in the UI, which
+# vanished on every course-scoped detail page for the same reason.
 VENDOR_FACTS = ("finding_id", "dep_id", "canonical_name", "signal", "signal_label",
                 "kind_of_signal", "severity", "diff_class", "summary", "probe_signals",
                 "claims", "alternatives", "latest_version", "raised_at",
-                "affected_urls", "locations_scoped")
+                "affected_urls", "locations_scoped", "redirects", "successors",
+                "shutdown_date")
 
 
 def course_dependency(dep: Dependency, course: str) -> Dependency:

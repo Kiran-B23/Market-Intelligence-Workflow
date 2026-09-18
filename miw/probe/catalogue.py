@@ -29,6 +29,7 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Optional
 
 # --- markup segmentation ----------------------------------------------------
@@ -122,21 +123,35 @@ QUOTED_PRICING = ("contact sales", "contact us", "talk to sales", "custom pricin
                   "enterprise only", "on request", "request a quote")
 
 
-def _role_of(header: str) -> Optional[str]:
+def _role_and_fit(header: str) -> Optional[tuple[str, int]]:
+    """The role this header names, and how exactly it names it.
+
+    The fit score exists because a table can offer the same role twice at different
+    strengths. Google's deprecations table is
+    `Model | Release date | Shutdown date | Recommended replacement`: "release date"
+    reaches the `date` role only by containing the bare word "date", while "shutdown
+    date" is in the lexicon outright. Taking whichever came first read a live model's
+    RELEASE date as its shutdown date, and every date already in the past — so
+    `gemini-3.1-flash-lite`, taught in 148 places, would have been reported as an
+    outage that had already happened.
+    """
     h = header.strip().lower()
     if not h:
         return None
     for role, names in ROLE_LEXICON.items():
         if h in names:
-            return role
-    # Fall back to containment, longest lexicon entry first so "deprecated model"
-    # is preferred over the bare "model".
-    best: Optional[tuple[int, str]] = None
+            return role, 1000                  # exact: nothing beats it
+    best: Optional[tuple[str, int]] = None
     for role, names in ROLE_LEXICON.items():
         for n in names:
-            if n in h and (best is None or len(n) > best[0]):
-                best = (len(n), role)
-    return best[1] if best else None
+            if n in h and (best is None or len(n) > best[1]):
+                best = (role, len(n))
+    return best
+
+
+def _role_of(header: str) -> Optional[str]:
+    hit = _role_and_fit(header)
+    return hit[0] if hit else None
 
 
 @dataclass
@@ -170,6 +185,17 @@ class Table:
         return [c for c in out if c]
 
     @property
+    def id_header_declares_retirement(self) -> bool:
+        """Does the id column itself say these rows are retired?
+
+        "Deprecated Model" does; a bare "Model" beside a shutdown-date column does not,
+        and that difference decides whether a dateless row is a retirement.
+        """
+        h = (self.headers[self.roles["id"]].lower()
+             if "id" in self.roles and self.roles["id"] < len(self.headers) else "")
+        return "deprecat" in h or "legacy" in h
+
+    @property
     def role(self) -> str:
         """What this table is: a retirement list, an availability list, or neither."""
         id_header = (self.headers[self.roles["id"]].lower()
@@ -184,13 +210,71 @@ class Table:
         return "unknown"
 
 
+def _header_row(body: str) -> tuple[tuple[str, ...], bool]:
+    """A first row that is really a header, or `((), False)`.
+
+    Conservative on purpose: the row is only believed when it names an `id` column and
+    at least one other role, and when no cell in it carries a machine identifier. A
+    data row whose first cell happens to read "Model" is thereby still a data row.
+    """
+    rows = _ROW.findall(body)
+    if not rows:
+        return (), False
+    cells = tuple(_text(c) for c in _TD.findall(rows[0]))
+    if len(cells) < 2 or any(_ID_TOKEN.search(c) for c in cells):
+        return (), False
+    named = {r for r in (_role_of(c) for c in cells) if r}
+    if "id" not in named or len(named) < 2:
+        return (), False
+    return cells, True
+
+
+# Groq writes 08/16/26; others use ISO or a spelled month. Lives here rather than in
+# `probe/models.py` because reading a table now needs it too: whether a row on a
+# deprecations page is a retirement or a still-current model is decided by whether its
+# date cell holds a date at all.
+_DATE_FORMS = ("%m/%d/%y", "%m/%d/%Y", "%Y-%m-%d", "%B %d, %Y", "%b %d, %Y")
+
+
+def parse_shutdown(raw: str) -> Optional[date]:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    for fmt in _DATE_FORMS:
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    m = re.search(r"(20\d{2})-(\d{2})-(\d{2})", raw)
+    if m:
+        try:
+            return date(*(int(x) for x in m.groups()))
+        except ValueError:
+            return None
+    return None
+
+
 def tables(html_text: str) -> list[Table]:
     """Every role-typed table in the document, in source order."""
     out: list[Table] = []
     for body in _TABLE.findall(html_text or ""):
         headers = tuple(_text(h) for h in _TH.findall(body))
+        skip_first_row = False
+        if not headers:
+            # A header row written as bolded <td>, which is how Google's deprecations
+            # page marks up `Model | Release date | Shutdown date | Recommended
+            # replacement`. With no <th> anywhere the table role-typed as "unknown"
+            # and `entries()` skipped it, so every shutdown date Google publishes was
+            # invisible: 0 of 44 catalogue entries carried one, against 36 of 49 for
+            # Groq, whose dates sit on a page that does use <th>.
+            #
+            # Promoted only when the row actually reads like a header - an `id` column
+            # plus at least one other named role - so a data row can never be eaten.
+            headers, skip_first_row = _header_row(body)
         rows: list[Row] = []
-        for tr in _ROW.findall(body):
+        for idx, tr in enumerate(_ROW.findall(body)):
+            if skip_first_row and idx == 0:
+                continue
             if _TH.search(tr) and not _TD.search(re.sub(_TH.pattern, "", tr, flags=re.S | re.I)):
                 continue                      # header row
             raw_cells = _TD.findall(tr)
@@ -206,15 +290,18 @@ def tables(html_text: str) -> list[Table]:
         if not rows:
             continue
         roles: dict[str, int] = {}
+        fits: dict[str, int] = {}
         id_cols: list[int] = []
         for i, h in enumerate(headers):
-            r = _role_of(h)
-            if not r:
+            hit = _role_and_fit(h)
+            if not hit:
                 continue
+            r, fit = hit
             if r == "id":
                 id_cols.append(i)
-            if r not in roles:
-                roles[r] = i
+            # Best fit wins, not first position. See `_role_and_fit`.
+            if r not in roles or fit > fits[r]:
+                roles[r], fits[r] = i, fit
         cap = _CAPTION.search(body)
         out.append(Table(headers=headers, rows=tuple(rows), roles=roles,
                          id_columns=tuple(id_cols),
@@ -253,7 +340,22 @@ def status_in_row(row: Row, table: Table, id_cell: Cell) -> str:
         m = _STATUS_PAREN.search(c.text)
         if m:
             return _normalise_status(m.group(1))
-    return "deprecated" if table.role == "deprecation" else "available"
+    if table.role != "deprecation":
+        return "available"
+    # A deprecation table whose id column does not itself say "deprecated" or "legacy"
+    # states each row's fate in the DATE cell, and lists current models alongside
+    # retired ones. Google's deprecations page is the case: `gemini-2.5-flash`, taught
+    # in 213 places, sits there under "No shutdown date announced". Reading the table's
+    # role alone would have retired it, and every other live Gemini model with it -
+    # a fabricated critical on the most-taught model in the curriculum.
+    #
+    # Groq is unaffected: its id header reads "Deprecated Model", so the rows are
+    # retirements whatever the date cell says.
+    if not table.id_header_declares_retirement and "date" in table.roles:
+        d = row.cell_for(table.roles["date"])
+        if d is not None and not parse_shutdown(d.text):
+            return "available"
+    return "deprecated"
 
 
 # --- the extracted record ---------------------------------------------------

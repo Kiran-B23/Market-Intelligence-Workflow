@@ -10,6 +10,13 @@ from __future__ import annotations
 from miw.vendors.base import Catalogue, build_catalogue
 
 MODELS_URL = "https://ai.google.dev/gemini-api/docs/models"
+# The models page carries a status parenthetical - "Gemini 2.0 Flash (Shut down)" - and
+# no dates at all. Every shutdown DATE Google announces is on the deprecations page, in
+# a `Model | Release date | Shutdown date | Recommended replacement` table. Reading only
+# the first page meant 0 of 44 entries carried a date, so `model_deprecation_declared`
+# could never fire for Google and a retirement was only ever noticed once it had already
+# happened. Both pages are read; `build_catalogue` reconciles an id listed on both.
+DEPRECATIONS_URL = "https://ai.google.dev/gemini-api/docs/deprecations"
 
 
 class GoogleAIAdapter:
@@ -20,4 +27,5 @@ class GoogleAIAdapter:
     kinds = ("model",)
 
     def catalogue(self, refresh: bool = False) -> Catalogue:
-        return build_catalogue(self.vendor, self.key, [MODELS_URL], refresh=refresh)
+        return build_catalogue(self.vendor, self.key, [MODELS_URL, DEPRECATIONS_URL],
+                               refresh=refresh)

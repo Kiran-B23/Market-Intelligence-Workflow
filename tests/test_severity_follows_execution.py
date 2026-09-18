@@ -128,3 +128,47 @@ def test_a_broken_why_resolver_never_loses_the_digest():
         assert f.why_to_act and "Scope:" in f.why_to_act
     finally:
         notes.WHY["S7"] = original
+
+
+def test_an_announced_shutdown_date_sets_the_deadline_not_the_severity():
+    """Severity says how bad; the vendor's date says when. They disagree by months.
+
+    `gemini-3.1-flash-lite` is critical on impact - 52 graded items execute it and every
+    one breaks - and its shutdown is 231 days out. Rendering "This sprint" against a
+    2027 date puts a real deadline in the same row as this week's outages, which teaches
+    a reviewer to discount both.
+    """
+    from datetime import date, timedelta
+
+    from miw.analyse import notes
+    from miw.schema import Dependency, Finding, Location
+
+    far = date.today() + timedelta(days=231)
+    dep = Dependency(kind="model", canonical_name="gemini-3.1-flash-lite")
+    f = Finding(dep_id="d", canonical_name="gemini-3.1-flash-lite", signal="S7",
+                signal_label="Model deprecated or superseded", kind_of_signal="regression",
+                severity="critical", questions_executing=52,
+                shutdown_date=far.isoformat(),
+                locations=[Location(course="AI for Finance", topic_name="t",
+                                    unit_id="u", unit_name="U", content_id="c",
+                                    field_path="f", evidence_source="model_id",
+                                    object_type="CODING_QUESTIONS", session_no=3)])
+    notes.compose(dep, f)
+    assert f.severity == "critical", "impact is unchanged by the date"
+    assert f.due_by == far.isoformat(), "a planning tool must sort on the real date"
+    assert "This sprint" not in f.when_to_act
+    assert far.isoformat() in f.when_to_act
+    assert "231 days away" in f.when_to_act
+
+    # A date inside a month reads as the deadline it is, not as a distant plan.
+    soon = date.today() + timedelta(days=10)
+    f.shutdown_date, f.due_by, f.when_to_act = soon.isoformat(), "", ""
+    notes.compose(dep, f)
+    assert f.due_by == soon.isoformat()
+    assert "Not this week's work" not in f.when_to_act
+
+    # No announced date: back to the severity-derived deadline.
+    f.shutdown_date = ""
+    notes.compose(dep, f)
+    assert f.due_by == (date.today() + timedelta(days=7)).isoformat()
+    assert "This sprint" in f.when_to_act

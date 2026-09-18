@@ -156,6 +156,14 @@ class Subject:
     changelog_url: str = ""
     pricing_url: str = ""
     status_url: str = ""
+    # Domains that are in `official_domains` only because they are this subject's
+    # REGISTRY, not because they are its site. A package has no website of its own, so
+    # `Dependency.subject()` lends it `pypi.org`; that makes PyPI speak for it, but only
+    # about what PyPI knows. Kept apart from the rest of the authority set because the
+    # same host means two different things depending on which subject is asking:
+    # `huggingface.co` IS Hugging Face's own site and is merely a registry for a model
+    # hosted on it.
+    registry_domains: tuple[str, ...] = ()
 
     def with_domains_from_urls(self) -> "Subject":
         """Fold any host appearing in the entry's own URLs into the authority set."""
@@ -169,7 +177,7 @@ class Subject:
             name=self.name, official_domains=tuple(sorted(found)),
             docs_url=self.docs_url, homepage=self.homepage,
             changelog_url=self.changelog_url, pricing_url=self.pricing_url,
-            status_url=self.status_url,
+            status_url=self.status_url, registry_domains=self.registry_domains,
         )
 
 
@@ -216,16 +224,34 @@ def classify(url: str, subject: Optional[Subject] = None,
     if is_user_generated(url):
         return Tier.LEAD_ONLY
 
-    # The subject's own domains outrank everything else, for every claim kind.
-    if subject and _host_matches(host, subject.official_domains):
-        return Tier.AUTHORITATIVE
+    own = bool(subject and _host_matches(host, subject.official_domains))
+    # Is the host in that set only because it is this package's registry? A package has
+    # no site of its own, so `Dependency.subject()` lends it `pypi.org` — and with the
+    # own-domain test first, that put the registry inside the subject's own set and made
+    # the remit below unreachable for exactly the dependencies it was written for. PyPI
+    # came back AUTHORITATIVE for a PRICING claim, the one thing the README says it can
+    # never settle, so a `pip install` page whose long description happens to say "free
+    # tier" sat one keyword match from a cited pricing finding.
+    #
+    # The distinction is not cosmetic, and blanket-applying the remit is wrong in the
+    # other direction: 20 of the 25 dependencies whose authority set contains a
+    # canonical registry are ones where that host IS the vendor — `huggingface.co` for
+    # Hugging Face itself and for every model card hosted on it, `github.com` for
+    # GitHub and for tools that live only in a repo. Under a blanket rule an HF model
+    # card could no longer settle a deprecation about its own model, which is a
+    # recall loss on the most authoritative source there is.
+    lent = bool(subject and _host_matches(host, subject.registry_domains))
 
-    # A canonical registry, but only within its remit.
-    for reg, kinds in REGISTRY_AUTHORITY.items():
-        if _host_matches(host, [reg]):
-            if kind is None or kind in kinds:
-                return Tier.AUTHORITATIVE
-            return Tier.CORROBORATING
+    if not (own and not lent):
+        for reg, kinds in REGISTRY_AUTHORITY.items():
+            if _host_matches(host, [reg]):
+                if kind is None or kind in kinds:
+                    return Tier.AUTHORITATIVE
+                return Tier.CORROBORATING
+
+    # The subject's own domains outrank everything else, for every claim kind.
+    if own:
+        return Tier.AUTHORITATIVE
 
     if _host_matches(host, LEAD_ONLY_DOMAINS):
         return Tier.LEAD_ONLY

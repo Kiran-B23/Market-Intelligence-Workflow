@@ -100,6 +100,8 @@ class NewerStats:
     appeared: int = 0
     already_taught: int = 0
     no_sibling: int = 0
+    # Reconcile only: a family match that is not actually a later version.
+    not_newer: int = 0
     not_offerable: int = 0
     uncitable: list = field(default_factory=list)
     findings: int = 0
@@ -130,6 +132,39 @@ def _taught_index(deps: Iterable[Dependency], kinds: tuple) -> dict:
     """`{exact casefolded id: Dependency}` for the kinds we are diffing against."""
     return {d.canonical_name.strip().casefold(): d
             for d in deps if d.kind in kinds and d.canonical_name}
+
+
+_VERSION_IN_ID = re.compile(r"(?<![\w.])(\d+(?:\.\d+)*)")
+
+
+def _version_of(ident: str) -> tuple:
+    """The first version-like number in an id, as a comparable tuple.
+
+    `gemini-3.8-flash` -> (3, 8); `gemini-2.5-flash-lite` -> (2, 5). Empty when the id
+    carries no number, which is a real case (`gemini-omni-flash`) and is why callers
+    have to decide what to do with "cannot tell" rather than being handed a default.
+    """
+    m = _VERSION_IN_ID.search(ident or "")
+    if not m:
+        return ()
+    try:
+        return tuple(int(p) for p in m.group(1).split("."))
+    except ValueError:
+        return ()
+
+
+def _is_newer(candidate: str, taught_name: str) -> bool:
+    """Is `candidate` a strictly later version than what the course teaches?
+
+    Only asked on the reconcile path. In the diff path the candidate's newness is
+    established by the catalogue itself - it was not there last week - and ids with no
+    version number are legitimate there. Reconcile has no such evidence: it considers
+    everything a vendor lists today, so without this it offered `gemini-2.5-flash-lite`
+    as a "newer option" than the taught `gemini-3.1-flash-lite`, under a signal whose
+    name is "Newer option from a vendor we already use".
+    """
+    a, b = _version_of(candidate), _version_of(taught_name)
+    return bool(a and b and a > b)
 
 
 def _sibling(ident: str, taught: dict, keyer: Callable) -> Optional[Dependency]:
@@ -201,8 +236,20 @@ def _where(sibling: Dependency) -> str:
 
 # --------------------------------------------------------------------- the enumerators
 
-def _models(deps, state, rep, *, adapters=None, now: str, persist: bool = True) -> None:
-    """Vendor model catalogues, diffed against the last snapshot."""
+def _models(deps, state, rep, *, adapters=None, now: str, persist: bool = True,
+            reconcile: bool = False) -> None:
+    """Vendor model catalogues, diffed against the last snapshot.
+
+    `reconcile=True` asks a different question: not "what appeared since we last
+    looked", but "what does this vendor list TODAY that supersedes something we teach".
+    It exists because the baseline was seeded from the live world. Every snapshot in
+    `catalogue_snapshot` carries `first_seen` of the day the feature shipped, so
+    everything a vendor released before that date is permanently marked as already
+    known - `gemini-3.6-flash`, `-3.7-flash` and `-3.8-flash` among them, three newer
+    generations of a model the curriculum teaches in 213 places, none of which S12 can
+    ever raise. A set difference cannot recover a baseline it never had; only asking
+    the catalogue directly can.
+    """
     from miw.vendors.base import all_adapters
 
     taught = _taught_index(deps, ("model",))
@@ -255,11 +302,17 @@ def _models(deps, state, rep, *, adapters=None, now: str, persist: bool = True) 
         seen = state.snapshot(key)
         if persist:
             state.snapshot_save(source_key=key, ids=live, now=now)
-        if seen is None:
+        if reconcile:
+            # No diff, so no baseline to distrust and nothing to seed. Everything the
+            # vendor lists is a candidate; `already_taught` and `_sibling` below do the
+            # narrowing, which is the same narrowing the diff path relies on anyway.
+            fresh = live
+        elif seen is None:
             rep.stats.seeded.append(f"{adapter.key} ({len(live)} entries)")
             continue
-        fresh = live - seen
-        if _implausible(fresh, live):
+        else:
+            fresh = live - seen
+        if not reconcile and _implausible(fresh, live):
             rep.stats.distrusted.append(
                 f"{adapter.key}: {len(fresh)} of {len(live)} entries look new, which "
                 f"is not a week of vendor releases — the stored baseline is not "
@@ -280,6 +333,10 @@ def _models(deps, state, rep, *, adapters=None, now: str, persist: bool = True) 
             sib = _sibling(ident, taught, family)
             if sib is None:
                 rep.stats.no_sibling += 1
+                continue
+            if reconcile and not _is_newer(ident, sib.canonical_name):
+                # See `_is_newer`: on this path nothing else establishes direction.
+                rep.stats.not_newer += 1
                 continue
             subject = Subject(name=adapter.vendor,
                               official_domains=tuple(adapter.official_domains))
@@ -435,17 +492,22 @@ def _n8n_nodes(deps, state, rep, *, upstream=None, now: str,
 
 
 def find_newer(deps, state, *, adapters=None, upstream=None,
-               now: Optional[str] = None, persist: bool = True) -> NewerReport:
+               now: Optional[str] = None, persist: bool = True,
+               reconcile: bool = False) -> NewerReport:
     """Everything a vendor we already use has added since we last looked.
 
     `persist=False` for a dry run. It matters more here than for any other stage: the
     snapshot IS the state this signal depends on, so a dry run that saved it would
     silently consume the one baseline it was supposed to preview against, and the next
     real run would find nothing new and report nothing — with no error anywhere.
+
+    `reconcile=True` ignores the snapshot and asks the catalogue what it lists today.
+    Run once, to recover everything the seeded baseline hid; see `_models`.
     """
     rep = NewerReport()
     now = now or utcnow()
-    _models(deps, state, rep, adapters=adapters, now=now, persist=persist)
+    _models(deps, state, rep, adapters=adapters, now=now, persist=persist,
+            reconcile=reconcile)
     _n8n_nodes(deps, state, rep, upstream=upstream, now=now, persist=persist)
     rep.stats.findings = len(rep.findings)
     return rep

@@ -20,29 +20,44 @@ import re
 from datetime import date, datetime
 from typing import Optional
 
+from miw.probe.catalogue import parse_shutdown
 from miw.schema import Dependency, ProbeResult, utcnow
 from miw.vendors import Catalogue, adapters_for
 
-# Groq writes 08/16/26; others use ISO or a spelled month.
-_DATE_FORMS = ("%m/%d/%y", "%m/%d/%Y", "%Y-%m-%d", "%B %d, %Y", "%b %d, %Y")
+# `parse_shutdown` moved to `probe/catalogue.py`, which now needs it to tell a
+# retirement row from a still-current one. Re-exported here because it was part of this
+# module's surface and the tests import it from both places.
+__all__ = ["parse_shutdown", "probe_model_dependency"]
 
 
-def parse_shutdown(raw: str) -> Optional[date]:
-    raw = (raw or "").strip()
-    if not raw:
-        return None
-    for fmt in _DATE_FORMS:
-        try:
-            return datetime.strptime(raw, fmt).date()
-        except ValueError:
-            continue
-    m = re.search(r"(20\d{2})-(\d{2})-(\d{2})", raw)
-    if m:
-        try:
-            return date(*(int(x) for x in m.groups()))
-        except ValueError:
-            return None
-    return None
+def _declared(adapter, entry, provider: str) -> dict:
+    """The vendor's own statement about this id, in the shape `score.py` reads.
+
+    Shared by the retirement path and the advance-warning path so the two cannot drift
+    apart in what they hand downstream.
+    """
+    return {
+        "rule_id": f"{adapter.key}:{entry.entry_id}",
+        "n8n_version": "",                       # shared shape with the n8n path
+        "title": f"{entry.entry_id} is {entry.status} on {provider}",
+        "description": entry.quote,
+        # No `severity` key, deliberately. n8n states a severity on each of its
+        # own breaking-change rules and `score.py` rightly honours it; a model
+        # provider states no such thing, so anything here would be OUR inference
+        # wearing the vendor's authority - and it overrode the execution-aware
+        # severity, putting one line of reading material at `critical`. The date
+        # is the fact, and it already reaches scoring as the choice between
+        # `model_shutdown_passed` and `model_deprecation_declared`.
+        "doc_url": entry.evidence_url,
+        "node_types": [entry.entry_id],
+        "actions": [f"Replace with {r}" for r in entry.replacement_ids],
+        "replacement_ids": entry.replacement_ids,
+        "shutdown_date": entry.shutdown_date,
+        "still_listed": entry.still_listed,
+        "listed_price": entry.listed_price,
+        "listed_quote": entry.listed_quote,
+        "listed_url": entry.listed_url,
+    }
 
 
 def probe_model_dependency(dep: Dependency, *, today: Optional[date] = None,
@@ -58,6 +73,14 @@ def probe_model_dependency(dep: Dependency, *, today: Optional[date] = None,
             unreadable.append(f"{adapter.key}: {cat.error}")
             continue
         if not cat.supported:
+            # Fetched fine, parsed to nothing we can role-type - a page restructure.
+            # Recorded, not skipped: this is the ONE failure mode that looks like
+            # success. A 500 or a timeout already lands in `unreadable` and produces
+            # `inconclusive`, but a 200 whose table has moved used to `continue`
+            # silently, so every model from that vendor flipped to
+            # `model_provider_unknown` and kept `status="ok"` - the same reading as a
+            # healthy check, reported for as long as the page stayed restructured.
+            unreadable.append(f"{adapter.key}: {cat.error or 'catalogue not readable'}")
             continue
         entry = cat.get(dep.canonical_name)
         if entry is None:
@@ -69,34 +92,30 @@ def probe_model_dependency(dep: Dependency, *, today: Optional[date] = None,
         res.evidence_url = entry.evidence_url
         res.checked_at = utcnow()
 
+        when = parse_shutdown(entry.shutdown_date)
+
         if not entry.retired:
+            # Still listed - but a vendor can announce a shutdown date for a model it
+            # goes on serving, which is the whole of the advance warning this system
+            # exists to give. Returning "ok" here the moment the status column looked
+            # healthy is why `model_deprecation_declared` had never once fired in
+            # production: the date was fetched, parsed, and then dropped one line
+            # before it was read.
+            if when and when > today:
+                res.status = "changed"
+                res.flag("model_deprecation_declared")
+                res.detail = (f"{res.provider} still lists {entry.entry_id}, and has "
+                              f"announced its shutdown for {entry.shutdown_date} "
+                              f"({(when - today).days} days away)")
+                res.declared_changes = [_declared(adapter, entry, res.provider)]
+                if entry.replacement_ids:
+                    res.flag("vendor_named_replacement")
+                return res
             res.status = "ok"
             res.flag("model_listed_available")
             return res
 
-        when = parse_shutdown(entry.shutdown_date)
-        res.declared_changes = [{
-            "rule_id": f"{adapter.key}:{entry.entry_id}",
-            "n8n_version": "",                       # shared shape with the n8n path
-            "title": f"{entry.entry_id} is {entry.status} on {res.provider}",
-            "description": entry.quote,
-            # No `severity` key, deliberately. n8n states a severity on each of its
-            # own breaking-change rules and `score.py` rightly honours it; a model
-            # provider states no such thing, so anything here would be OUR inference
-            # wearing the vendor's authority - and it overrode the execution-aware
-            # severity, putting one line of reading material at `critical`. The date
-            # is the fact, and it already reaches scoring as the choice between
-            # `model_shutdown_passed` and `model_deprecation_declared`.
-            "doc_url": entry.evidence_url,
-            "node_types": [entry.entry_id],
-            "actions": [f"Replace with {r}" for r in entry.replacement_ids],
-            "replacement_ids": entry.replacement_ids,
-            "shutdown_date": entry.shutdown_date,
-            "still_listed": entry.still_listed,
-            "listed_price": entry.listed_price,
-            "listed_quote": entry.listed_quote,
-            "listed_url": entry.listed_url,
-        }]
+        res.declared_changes = [_declared(adapter, entry, res.provider)]
 
         if entry.tier_restricted:
             # The vendor says both things, and both are true: retired on the developer

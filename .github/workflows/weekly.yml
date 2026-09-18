@@ -5,7 +5,13 @@ name: curriculum-drift-watch
 
 on:
   schedule:
-    - cron: '0 4 * * 1'        # Mondays 04:00 UTC = 09:30 IST
+    - cron: '0 4 * * 1'        # Mondays 04:00 UTC = 09:30 IST — the full run
+    # The event path. `main.py watch` is documented as the daily entry point and was
+    # scheduled nowhere: `run-weekly` does not call it (and cannot — `cmd_watch` reads
+    # options the shared namespace does not carry), so on the live database
+    # `watch_state` had not been written since 2026-09-09 and `watch_signal` held a
+    # single row. A vendor catalogue moving mid-week went unseen until the next Monday.
+    - cron: '0 4 * * 0,2,3,4,5,6'
   workflow_dispatch:
     inputs:
       tiers:
@@ -29,22 +35,60 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt -r requirements-optional.txt
-      # Gate the run on the offline suites. They need no keys and no network, so a
-      # broken extractor or a loosened trust rule fails here rather than in a digest.
+      # Gate the run on the offline suites. No keys and no network — and that is now
+      # enforced rather than assumed: `tests/conftest.py` fails any test that reaches
+      # out. It used to be true only by luck, and the week a seven-day cache expired a
+      # tier-gating test started fetching n8n's repository tree for real and hung
+      # instead of failing.
       - run: python3 -m pytest tests/ -q
       - run: python3 eval/run_eval.py
       # State carries week-over-week memory: without it every run reports the same
-      # standing facts and the digest becomes noise.
+      # standing facts, forgets every reviewer decision, and the digest becomes a flood
+      # that gets read once.
+      #
+      # The cache alone could not be trusted with it. GitHub evicts a cache after seven
+      # days without a hit, and the cron is weekly - so one skipped or cancelled run
+      # puts the only copy of `finding_state`, `catalogue_snapshot` and
+      # `review_decisions` past the eviction line with nothing to say it happened. The
+      # cache stays as the fast path; a retained artifact is the copy that survives it.
       - uses: actions/cache@v4
+        id: state-cache
         with:
           path: state
           key: miw-state-${{ github.run_id }}
           restore-keys: miw-state-
-      - env:
+      - name: Restore state from the last run's artifact if the cache missed
+        if: steps.state-cache.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          last=$(gh run list --workflow curriculum-drift-watch --status success                    --limit 1 --json databaseId --jq '.[0].databaseId' || true)
+          if [ -n "${last:-}" ]; then
+            gh run download "$last" --name miw-state --dir . ||               echo "::warning::no miw-state artifact on run $last"
+          else
+            echo "::warning::no earlier successful run to restore state from"
+          fi
+          # Not fatal: a genuine first run has no state and must still work. `analyse`
+          # prints a STATE LOST banner when the artifacts on disk disagree with an
+          # empty store, which is what distinguishes the two cases.
+          test -f state/miw.db || echo "::warning::starting with no week-over-week memory"
+      # Monday, or any manual dispatch: the full pipeline.
+      - name: Weekly run
+        if: github.event.schedule != '0 4 * * 0,2,3,4,5,6'
+        env:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 main.py run-weekly --tiers "${{ inputs.tiers || 'critical,standard' }}"
+      # Every other day: poll the vendor catalogues only. Reads no course content,
+      # calls no model, and writes only `watch_*` — cheap enough to run daily, which is
+      # the cadence a catalogue move deserves.
+      - name: Daily vendor watch
+        if: github.event.schedule == '0 4 * * 0,2,3,4,5,6'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 main.py watch
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -53,3 +97,11 @@ jobs:
             out/digest_*.md
             out/findings_*.json
             out/probe_*.json
+      # The durable copy. Retained well past the cache's eviction window so a missed
+      # week cannot cost the store.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: miw-state
+          path: state
+          retention-days: 90

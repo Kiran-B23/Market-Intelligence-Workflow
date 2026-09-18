@@ -131,3 +131,67 @@ def test_every_adapter_is_registered_once():
     keys = [a.key for a in all_adapters()]
     assert keys == sorted(set(keys), key=keys.index), "a duplicate adapter key"
     assert {"groq", "google_ai", "openai"} <= set(keys)
+
+
+# ------------------------------------- the deprecations page Google actually publishes
+#
+# Every case below is a real row from `ai.google.dev/gemini-api/docs/deprecations`,
+# which the Google adapter did not read at all until this was fixed: 0 of 44 catalogue
+# entries carried a shutdown date, against 36 of 49 for Groq, so
+# `model_deprecation_declared` had never fired once in production.
+
+
+def _google_deprecations():
+    return (FIX / "google_deprecations.html").read_text()
+
+
+def test_a_header_row_written_as_bolded_td_still_role_types():
+    """Google marks headers `<td><b>Model</b></td>`, with no `<th>` on the page.
+
+    Without promoting that row every table read `role == "unknown"` and `entries()`
+    skipped the lot.
+    """
+    ts = [t for t in tables(_google_deprecations()) if t.role != "unknown"]
+    assert ts, "no table role-typed on a page with 13 of them"
+    t = ts[0]
+    assert t.headers[:4] == ("Model", "Release date", "Shutdown date",
+                             "Recommended replacement")
+    # the promoted header row must not survive as data
+    assert all(r.cells[0].text != "Model" for r in t.rows)
+
+
+def test_the_shutdown_column_wins_the_date_role_over_the_release_column():
+    """Both headers contain "date"; only one of them is the fact we act on.
+
+    First-column-wins read `gemini-3.1-flash-lite`'s RELEASE date (May 7, 2026) as its
+    shutdown date. That date is in the past, so a model taught in 148 places would have
+    been reported as an outage that had already happened.
+    """
+    t = [t for t in tables(_google_deprecations()) if t.role != "unknown"][0]
+    assert t.headers[t.roles["date"]] == "Shutdown date"
+    e = {x.entry_id: x for x in entries(_google_deprecations()) if x.column_role == "id"}
+    assert e["gemini-3.1-flash-lite"].shutdown_date == "May 7, 2027"
+    assert e["gemini-3.1-flash-lite"].replacement_ids == ["gemini-3.5-flash-lite"]
+
+
+def test_a_current_model_listed_on_the_deprecations_page_is_not_retired():
+    """The page lists live models too, separated only by the date cell.
+
+    `gemini-2.5-flash` is taught in 213 places and sits there under "No shutdown date
+    announced". Taking the table's role as the status would have retired it, and every
+    other live Gemini model with it.
+    """
+    e = {x.entry_id: x for x in entries(_google_deprecations()) if x.column_role == "id"}
+    assert e["gemini-2.5-flash"].status == "available"
+    assert not e["gemini-2.5-flash"].retired
+    assert e["gemini-2.5-flash-image"].retired          # this one does carry a date
+    assert e["gemini-2.5-flash-image"].shutdown_date == "October 2, 2026"
+
+
+def test_groq_rows_stay_retirements_whatever_their_date_cell_says():
+    """Groq's id header reads "Deprecated Model", so the row IS the retirement.
+
+    The dateless-means-available rule must not reach a table that declares itself.
+    """
+    got = [e for e in entries(_groq()) if e.column_role == "id"]
+    assert got and all(e.retired for e in got)

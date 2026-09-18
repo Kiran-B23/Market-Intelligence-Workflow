@@ -336,3 +336,46 @@ def test_a_deprecations_only_catalogue_is_labelled_not_seeded_as_empty(st):
     assert not rep.stats.seeded, "an all-retired catalogue is not a baseline"
     assert rep.stats.retirement_only and "all retired" in rep.stats.retirement_only[0]
     assert st.snapshot("catalogue:acme") is None, "nothing worth snapshotting"
+
+
+# ------------------------------------------------- the baseline seeded from the world
+#
+# Every row in `catalogue_snapshot` carried `first_seen` of the day the feature
+# shipped, because the first run records what the vendor lists TODAY. So everything
+# released before that date is marked already-known for ever. On the live artifact that
+# hid `gemini-3.5-flash`, `-3.6-flash`, `-3.7-flash` and `-3.8-flash`, four newer
+# generations of a model the curriculum teaches in 213 places.
+
+
+def test_reconcile_finds_what_the_seeded_baseline_hid(st):
+    ids = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.0-flash"]
+    entries = {i: _entry(i) for i in ids}
+    deps = [_dep("gemini-2.5-flash")]
+    # A baseline that already contains the newer model: exactly what seeding from the
+    # live world produces on day one.
+    st.snapshot_save(source_key="catalogue:acme", ids=set(ids),
+                     now="2026-09-11T00:00:00+00:00")
+
+    quiet = _run(st, entries, deps)
+    assert quiet.stats.appeared == 0, "the diff path cannot see past its own baseline"
+    assert not quiet.findings
+
+    found = _run(st, entries, deps, reconcile=True)
+    assert "gemini-3.8-flash" in [f.canonical_name for f in found.findings]
+
+
+def test_reconcile_will_not_call_an_older_model_a_newer_option():
+    """The diff path never needed this: an id that was not there last week is new by
+    construction. Reconcile considers everything a vendor lists today, so without a
+    direction check it offered `gemini-2.5-flash-lite` as the newer option for the
+    taught `gemini-3.1-flash-lite` - under a signal named "Newer option"."""
+    from miw.analyse.newer import _is_newer, _version_of
+
+    assert _is_newer("gemini-3.8-flash", "gemini-2.5-flash")
+    assert _is_newer("gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
+    assert _is_newer("gemini-3.1-pro-preview", "gemini-3-pro-preview")
+    assert not _is_newer("gemini-2.5-flash-lite", "gemini-3.1-flash-lite")
+    # No number on one side means the direction cannot be established, so it is not
+    # claimed. `gemini-omni-flash` is a real id of exactly that shape.
+    assert not _is_newer("gemini-omni-flash", "gemini-2.5-flash")
+    assert _version_of("gemini-omni-flash") == ()

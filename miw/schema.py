@@ -147,6 +147,10 @@ class Dependency:
         return Subject(
             name=self.canonical_name,
             official_domains=tuple(domains),
+            # Only the domain LENT by `_REGISTRY_HOME` above. A tool whose own site
+            # happens to be github.com keeps full authority over itself; a package
+            # borrowing pypi.org gets only what PyPI can settle. See `trust.classify`.
+            registry_domains=((reg[0],) if reg else ()),
             homepage=homepage, docs_url=docs,
             changelog_url=self.changelog_url, pricing_url=self.pricing_url,
             status_url=self.status_url,
@@ -285,6 +289,11 @@ class ProbeResult:
     # lands somewhere else is the product having moved, been rebranded or been acquired.
     # Those call for different work and used to be one signal.
     redirects: list[dict] = field(default_factory=list)
+    # Deprecation notices seen on this dependency's pages this run, as stable keys, and
+    # the verbatim text of any that were not there last time. The keys are the baseline
+    # `state.probe_save` stores; `new_notices` is the news.
+    notice_keys: list[str] = field(default_factory=list)
+    new_notices: list[str] = field(default_factory=list)
     detail: str = ""
     evidence_url: str = ""
     consecutive_failures: int = 0
@@ -589,6 +598,10 @@ class Finding:
     successors: list[dict] = field(default_factory=list)
     # Carried from the probe. Shape as `ProbeResult.redirects`.
     redirects: list[dict] = field(default_factory=list)
+    # The provider's own shutdown date, verbatim, when it announced one. A real date
+    # beats a severity-derived deadline: severity says how bad, this says when, and
+    # they routinely disagree by months.
+    shutdown_date: str = ""
     screenshots_at_risk: int = 0
     questions_executing: int = 0
     questions_mentioning: int = 0

@@ -199,3 +199,71 @@ def test_a_yanked_release_is_still_reported_even_without_a_major_gap():
     dep = _pkg("1.3.1")
     fs = findings_for(dep, _probe(dep, "1.3.2", ["registry_deprecated"]), None)
     assert [f.signal for f in fs] == ["S4"]
+
+
+# ------------------------------------------- the ARRIVAL of a deprecation notice
+#
+# Neither existing detector could see one. `text_hash` is a simhash over 3-word
+# shingles tuned so rotating banners do not read as change: measured on the live
+# 5,790-word Gemini release notes, adding a shutdown announcement moved 0 of 64 bits,
+# and adding it five times moved 1. `sunset_language_about_subject` is saturated on
+# exactly the pages that matter - that changelog already answers "now deprecated" and
+# "will be shut down" every week before anything is added.
+
+
+def _obs(sentences):
+    from miw.probe.http_probe import UrlObservation
+    o = UrlObservation(url="https://vendor.example/changelog")
+    o.reachable = True
+    o.sunset_sentences = list(sentences)
+    return [o]
+
+
+def test_a_new_deprecation_notice_is_news_and_a_standing_one_is_not():
+    from miw.probe.http_probe import notice_key
+    from miw.probe.runner import res_from_urls
+    from miw.schema import ProbeResult
+
+    standing = "The legacy v1 endpoint is deprecated and will be removed."
+    fresh = "Acme Studio has been discontinued and will be shut down on March 1, 2027."
+    baseline = {notice_key(standing)}
+
+    same = ProbeResult(dep_id="d", canonical_name="Acme")
+    res_from_urls(same, _obs([standing]), "", None, seen_notices=baseline)
+    assert "deprecation_notice_added" not in same.signals
+
+    moved = ProbeResult(dep_id="d", canonical_name="Acme")
+    res_from_urls(moved, _obs([standing, fresh]), "", None, seen_notices=baseline)
+    assert "deprecation_notice_added" in moved.signals
+    assert moved.new_notices == [fresh]
+
+
+def test_the_first_look_records_a_baseline_and_raises_nothing():
+    """Same rule the catalogue diff uses. Every standing deprecation would otherwise
+    arrive at once on the first run, and none of it would be news."""
+    from miw.probe.runner import res_from_urls
+    from miw.schema import ProbeResult
+
+    first = ProbeResult(dep_id="d", canonical_name="Acme")
+    res_from_urls(first, _obs(["Acme Studio has been discontinued."]), "", None,
+                  seen_notices=None)
+    assert "deprecation_notice_added" not in first.signals
+    assert first.notice_keys, "the baseline must still be recorded"
+
+
+def test_a_notice_key_keeps_the_numbers_that_identify_the_thing():
+    """Folding digits would look tidy and would merge the notices that matter most.
+
+    `v1` with `v2`, `gemini-2.5-flash` with `gemini-3.8-flash`, and a shutdown date
+    moved from March to June with the announcement that preceded it. Each of those is a
+    second deprecation reading as "already seen" - a missed retirement, which is the
+    one outcome this signal exists to prevent.
+    """
+    from miw.probe.http_probe import notice_key
+    assert notice_key("Acme v1 is deprecated.") != notice_key("Acme v2 is deprecated.")
+    assert (notice_key("gemini-2.5-flash is deprecated.")
+            != notice_key("gemini-3.8-flash is deprecated."))
+    assert (notice_key("Shut down on March 1, 2027.")
+            != notice_key("Shut down on June 1, 2027."))
+    # Case and whitespace are noise, and only those.
+    assert (notice_key("Acme  v1 IS deprecated.") == notice_key("acme v1 is deprecated."))

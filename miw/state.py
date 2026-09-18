@@ -32,6 +32,19 @@ CREATE TABLE IF NOT EXISTS probe_state (
     consecutive_failures INTEGER DEFAULT 0,
     first_seen          TEXT
 );
+-- Two watermarks, not one, and the difference is the whole of this table's job.
+--
+-- `fingerprint`/`severity`/`last_seen` record what the last RUN observed.
+-- `reported_*` record what a human was last SHOWN. Classifying against the first
+-- meant a second `analyse` on the same inputs found its own row already present and
+-- returned "unchanged" for everything, so the digest printed "No new or worsened
+-- findings this week." while 33 findings carried `first_raised` of that same day.
+-- It happened in production on three separate dates, and there is no way back: the
+-- artifact is overwritten in place and nothing else reads `first_raised`.
+--
+-- Keyed on the fingerprint rather than a flag because "shown to a human" is a claim
+-- about a specific situation, not about an id: the same finding at a worse severity
+-- is news again.
 CREATE TABLE IF NOT EXISTS finding_state (
     finding_id   TEXT PRIMARY KEY,
     dep_id       TEXT,
@@ -40,7 +53,10 @@ CREATE TABLE IF NOT EXISTS finding_state (
     fingerprint  TEXT,
     first_raised TEXT,
     last_seen    TEXT,
-    resolved_at  TEXT
+    resolved_at  TEXT,
+    reported_at          TEXT,
+    reported_fingerprint TEXT,
+    reported_severity    TEXT
 );
 -- Per-dependency identity that must survive an `extract`. The inventory is rebuilt
 -- from scratch every run, so anything stored on the Dependency object itself is
@@ -136,7 +152,43 @@ class State:
         self.conn.execute("PRAGMA synchronous=NORMAL")
         with closing(self.conn.cursor()) as cur:
             cur.executescript(SCHEMA)
+            self._migrate(cur)
         self.conn.commit()
+
+    # Columns added after the table shipped. `CREATE TABLE IF NOT EXISTS` is a no-op on
+    # an existing table, so a DB written by an earlier version keeps the old shape and
+    # every read of a new column raises. Additive only: nothing here drops or rewrites.
+    _ADDED_COLUMNS = (
+        ("finding_state", "reported_at", "TEXT"),
+        ("finding_state", "reported_fingerprint", "TEXT"),
+        ("finding_state", "reported_severity", "TEXT"),
+        # Hashes of the deprecation notices already seen on this dependency's pages.
+        ("probe_state", "notice_keys", "TEXT"),
+    )
+
+    def _migrate(self, cur) -> None:
+        added = set()
+        for table, column, decl in self._ADDED_COLUMNS:
+            have = {r[1] for r in cur.execute(f'PRAGMA table_info("{table}")')}
+            if column not in have:
+                cur.execute(f'ALTER TABLE "{table}" ADD COLUMN {column} {decl}')
+                added.add(column)
+        # Backfill ONCE, in the same call that added the column - never as a standing
+        # rule. A standing `WHERE reported_fingerprint IS NULL` would fire on every
+        # connection, so the rows a run had just raised would be stamped "reported" by
+        # the next `State()` before anyone had seen them, which is the original defect
+        # wearing the fix's clothes.
+        #
+        # Treating pre-existing rows as reported is deliberate: without it the first
+        # run after this change re-raises every standing finding at once - 62 of them
+        # on the live artifact - which is the alert-fatigue event the fix exists to
+        # prevent, delivered by the fix. What the old behaviour missed is still
+        # recoverable from `first_raised`; a digest nobody reads is not.
+        if "reported_fingerprint" in added:
+            cur.execute(
+                "UPDATE finding_state SET reported_at = last_seen,"
+                " reported_fingerprint = fingerprint, reported_severity = severity"
+                " WHERE fingerprint IS NOT NULL")
 
     def close(self) -> None:
         self.conn.close()
@@ -151,22 +203,39 @@ class State:
                    checked_at: str, text_hash: str = "", latest_version: str = "",
                    http_status: Optional[int] = None,
                    repo_archived: Optional[bool] = None,
-                   consecutive_failures: int = 0) -> None:
+                   consecutive_failures: int = 0,
+                   notice_keys: Optional[list] = None) -> None:
         prev = self.probe_prev(dep_id)
         first_seen = prev["first_seen"] if prev else checked_at
+        # Union, never replacement. A notice that scrolls off a changelog has still
+        # been seen, and re-reporting it when it reappears on an archive page would be
+        # the repeat-suppression failure this table exists to prevent.
+        keys = sorted(set(self.notice_keys(dep_id)) | set(notice_keys or []))
         self.conn.execute(
             "INSERT INTO probe_state (dep_id, canonical_name, last_status, last_checked,"
             " text_hash, latest_version, http_status, repo_archived,"
-            " consecutive_failures, first_seen) VALUES (?,?,?,?,?,?,?,?,?,?)"
+            " consecutive_failures, first_seen, notice_keys)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(dep_id) DO UPDATE SET canonical_name=excluded.canonical_name,"
             " last_status=excluded.last_status, last_checked=excluded.last_checked,"
             " text_hash=excluded.text_hash, latest_version=excluded.latest_version,"
             " http_status=excluded.http_status, repo_archived=excluded.repo_archived,"
-            " consecutive_failures=excluded.consecutive_failures",
+            " consecutive_failures=excluded.consecutive_failures,"
+            " notice_keys=excluded.notice_keys",
             (dep_id, canonical_name, status, checked_at, text_hash, latest_version,
              http_status, None if repo_archived is None else int(repo_archived),
-             consecutive_failures, first_seen))
+             consecutive_failures, first_seen, json.dumps(keys)))
         self.conn.commit()
+
+    def notice_keys(self, dep_id: str) -> list:
+        """Deprecation notices already seen on this dependency's pages."""
+        row = self.probe_prev(dep_id)
+        if row is None:
+            return []
+        try:
+            return json.loads(row["notice_keys"] or "[]")
+        except (json.JSONDecodeError, TypeError, IndexError, KeyError):
+            return []
 
     # --- findings -----------------------------------------------------------
 
@@ -183,9 +252,13 @@ class State:
             self.conn.commit()
             return "new"
 
-        was = SEVERITY_ORDER.get(prev["severity"] or "info", 0)
+        # Compared against what a human was last SHOWN, never against what the last run
+        # merely saw. Re-running `analyse` without an intervening `report` must not
+        # consume the news, because nothing has been said to anybody yet.
+        reported_fp = prev["reported_fingerprint"]
+        was = SEVERITY_ORDER.get(prev["reported_severity"] or "info", 0)
         now_sev = SEVERITY_ORDER.get(severity, 0)
-        changed = fingerprint != (prev["fingerprint"] or "")
+        changed = fingerprint != (reported_fp or "")
         # A finding that had been resolved and is back is news again.
         reopened = prev["resolved_at"] is not None
         self.conn.execute(
@@ -195,6 +268,10 @@ class State:
         self.conn.commit()
         if reopened:
             return "new"
+        if reported_fp is None:
+            # Seen on an earlier run, never shown to anyone - an `analyse` that was
+            # re-run, or one whose `report` never completed. Still news.
+            return "new"
         # Direction matters. Treating any fingerprint change as "worsened" reported a
         # tool going from broken back to merely redirected as a deterioration.
         if now_sev > was:
@@ -202,6 +279,28 @@ class State:
         if now_sev < was:
             return "improved"
         return "changed" if changed else "unchanged"
+
+    def finding_count(self) -> int:
+        """How many findings this store remembers. 0 means no week-over-week memory."""
+        return self.conn.execute("SELECT COUNT(*) FROM finding_state").fetchone()[0]
+
+    def mark_reported(self, findings: list, now: str) -> int:
+        """Record that these findings, as they now stand, have been shown to a human.
+
+        Called by `report` once the digest is on disk. It is what makes the classifier
+        idempotent: until this runs, every `analyse` keeps calling the same finding new,
+        however many times it is executed.
+
+        `findings` is a list of (finding_id, fingerprint, severity).
+        """
+        rows = [(now, fp, sev, fid) for fid, fp, sev in findings]
+        if not rows:
+            return 0
+        self.conn.executemany(
+            "UPDATE finding_state SET reported_at=?, reported_fingerprint=?,"
+            " reported_severity=? WHERE finding_id=?", rows)
+        self.conn.commit()
+        return len(rows)
 
     def resolve_absent(self, seen_ids: set[str], now: str,
                        examined_dep_ids: Optional[set[str]] = None

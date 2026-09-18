@@ -117,6 +117,17 @@ def _why_for(f: Finding) -> str:
     return entry or "This affects material students are working through."
 
 
+def _announced_shutdown(f: Finding):
+    """The provider's own shutdown date for this finding, if it stated one and it is
+    still in the future. `None` otherwise, including for a date already passed - that
+    is an outage, and its urgency is not a deadline."""
+    from datetime import date
+
+    from miw.probe.catalogue import parse_shutdown
+    when = parse_shutdown(f.shutdown_date or "")
+    return when if when and when > date.today() else None
+
+
 def compose(dep: Dependency, f: Finding) -> None:
     """Fill the triad deterministically. Always runs; never needs a model."""
     f.what_to_act = f.recommendation or f"Review {dep.canonical_name}."
@@ -144,12 +155,34 @@ def compose(dep: Dependency, f: Finding) -> None:
         first = min(dated, key=lambda l: (l.session_no, l.course))
         when = (f"{when} The earliest affected session is {first.course} "
                 f"session {first.session_no}.")
-    f.when_to_act = when
-    # A sortable deadline alongside the prose. Derived from severity, so it moves with
-    # it - and it is the same mapping the prose uses, not an independent guess.
     from datetime import date, timedelta
+
+    # An ANNOUNCED shutdown date beats a severity-derived guess, and has to, because the
+    # two disagree by months. `gemini-3.1-flash-lite` is critical on impact - 52 graded
+    # items execute it and every one will break - but its shutdown is 231 days away, and
+    # "This sprint" against a 2027 date is the wrong-urgency failure: a real deadline
+    # sitting in the same row as this week's outages teaches a reviewer to discount
+    # both. The severity still says how bad, the date still says when.
+    announced = _announced_shutdown(f)
+    if announced:
+        lead = (announced - date.today()).days
+        if lead > 30:
+            when = (f"Before {announced.isoformat()}, when the provider shuts it down "
+                    f"— {lead} days away. Not this week's work, but it is dated.")
+        else:
+            when = (f"By {announced.isoformat()} — the provider's own shutdown date, "
+                    f"{max(lead, 0)} day(s) away.")
+        if dated:
+            first = min(dated, key=lambda l: (l.session_no, l.course))
+            when = (f"{when} The earliest affected session is {first.course} "
+                    f"session {first.session_no}.")
+
+    f.when_to_act = when
+    # A sortable deadline alongside the prose. The vendor's date when there is one, and
+    # otherwise derived from severity through the same mapping the prose uses.
     offset = SEVERITY_OFFSETS.get(f.severity)
-    f.due_by = ((date.today() + timedelta(days=offset)).isoformat()
+    f.due_by = (announced.isoformat() if announced else
+                (date.today() + timedelta(days=offset)).isoformat()
                 if offset is not None else "")
     f.note_source = "template"
     f.note_provider = f.note_model = ""
@@ -242,6 +275,33 @@ def build_refine_prompt(dep: Dependency, f: Finding, feedback: str = "") -> str:
     )
 
 
+# Tokens that assert a checkable fact: a version or dotted id (1.60.0, gpt-4.2,
+# gemini-3.8-flash), a price, or a date in any of the forms vendors print. Deliberately
+# narrow - the model is being asked to write prose, and prose that names none of these
+# is exactly what it is for. Bare integers are excluded: "2 places" and "session 12"
+# are counts we supplied, not claims about the world.
+_FACTUAL = re.compile(
+    r"\$\d[\d,.]*"                                           # $0.42, $1,000
+    r"|\b\d{4}-\d{2}-\d{2}\b"                                # 2027-03-01
+    r"|\b(?:January|February|March|April|May|June|July|August|September|October"
+    r"|November|December)\s+\d{1,2},?\s+\d{4}\b"             # March 4, 2027
+    r"|\b\d{1,2}/\d{1,2}/\d{2,4}\b"                          # 08/16/26
+    r"|\bv?\d+\.\d+(?:\.\d+)*\b"                            # 1.60.0, v2.3
+    r"|\b[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*-\d+(?:\.\d+)*(?:-[a-z0-9.]+)*\b",  # gpt-4o, gemini-3.8-flash
+    re.I)
+
+
+def prose_source(f: Finding) -> str:
+    """Everything already written about this finding deterministically.
+
+    A rewrite may restate what the template said; it may not add to it.
+    """
+    return " ".join([f.recommendation or "", f.affects_line or "",
+                     f.what_to_act or "", f.why_to_act or "", f.when_to_act or "",
+                     " ".join(f.probe_signals or []),
+                     " ".join(f.affected_urls or [])])
+
+
 def judge_rewrite(dep: Dependency, f: Finding,
                   data: object) -> tuple[Optional[tuple[str, str, str]], str]:
     """Accept or reject a model's rewrite. Returns (triad, reason).
@@ -263,10 +323,28 @@ def judge_rewrite(dep: Dependency, f: Finding,
     allowed = " ".join([*f.affected_urls, *(c.source_url for c in f.claims),
                         *(a.homepage for a in f.alternatives), dep.homepage or "",
                         dep.docs_url or ""])
-    for url in re.findall(r"https?://[^\s,)\]]+", f"{what} {why} {when}"):
+    prose = f"{what} {why} {when}"
+    for url in re.findall(r"https?://[^\s,)\]]+", prose):
         if url.rstrip("/.,);") not in allowed:
             # Invented a source: reject the whole rewrite, not just the sentence.
             return None, f"invented a source: {url}"
+
+    # ...and the same test for the facts that are not URLs. The prompt forbids adding
+    # "a tool, version, URL, date, price or claim that does not appear in them"; only
+    # the URL half of that was ever enforced, so a version, a shutdown date, a
+    # replacement model id and a price all passed straight into the action note - the
+    # single most-read line in the digest, and the one a reviewer acts on.
+    #
+    # Generated version numbers and dates are indistinguishable from correct ones to a
+    # reader, which is what makes them worth rejecting outright rather than flagging.
+    grounded = " ".join([
+        prose_source(f), dep.canonical_name, dep.taught_version or "",
+        f.latest_version or "", f.summary or "", allowed,
+        *(c.quote for c in f.claims), *(a.name for a in f.alternatives),
+    ]).lower()
+    for token in _FACTUAL.findall(prose):
+        if token.lower() not in grounded:
+            return None, f"stated an unsourced fact: {token}"
     return (what, why, when), "accepted"
 
 

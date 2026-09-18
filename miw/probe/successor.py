@@ -156,10 +156,15 @@ def find_successor(dead_url: str, *, final_url: str = "", homepage: str = "",
     official = {(o or "").lower() for o in official_domains}
     official |= {(domain(homepage) or "").lower()} - {""}
 
-    for url, rule in _candidates(dead_url, final_url, homepage)[:MAX_TRIES]:
-        # A vendor's content may only be replaced by that vendor's own pages.
-        if official and not _same_site(url, official):
-            continue
+    # Filtered BEFORE the budget is applied. Slicing first spent tries on candidates
+    # that were then discarded unchecked: `windsurf.com` redirecting to `devin.ai` -
+    # the case this module documents, where `devin.ai` is deliberately outside the
+    # authority set - gave up a slot for free, and a deeply nested dead path could
+    # exhaust the rest on `trimmed` candidates before ever reaching `home`.
+    cands = [(u, r) for u, r in _candidates(dead_url, final_url, homepage)
+             # A vendor's content may only be replaced by that vendor's own pages.
+             if not official or _same_site(u, official)]
+    for url, rule in cands[:MAX_TRIES]:
         out.tried.append(url)
         try:
             obs = look(url)

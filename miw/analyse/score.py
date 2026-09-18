@@ -103,6 +103,10 @@ PROBE_TO_SIGNAL = {
     "url_gone": "S1", "domain_parked": "S1",
     "registry_missing": "S4", "registry_deprecated": "S4", "no_release_in_2y": "S4",
     "sunset_language_about_subject": "S4",
+    # A deprecation notice that was not on the vendor's pages last week. Distinct from
+    # the flag above, which is about the page's standing content and is permanently on
+    # for any vendor that keeps a changelog.
+    "deprecation_notice_added": "S4",
     "access_wall_language": "S2",
     "free_tier_language_lost": "S3", "pricing_restriction_language": "S3",
     "pricing_page_changed": "S3",
@@ -215,6 +219,7 @@ EVIDENCE_REACH: dict[str, Optional[tuple]] = {
     # The vendor itself saying it is sunsetting, or that the money changed. These change
     # what the course should TEACH, so they reach everywhere it is taught.
     "sunset_language_about_subject": None,
+    "deprecation_notice_added": None,
     "free_tier_language_lost": None, "pricing_restriction_language": None,
     # A model id is passed to an API; the workbook row names it too.
     "model_shutdown_passed": ("model_id", "sheet_declared", "sheet_pin"),
@@ -523,6 +528,8 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                 # down still landed on medium for a widely-used tool.
                 f.severity = "low"
             for change in probe.declared_changes:
+                if change.get("shutdown_date") and not f.shutdown_date:
+                    f.shutdown_date = str(change["shutdown_date"])
                 vend = VENDOR_SEVERITY.get(str(change.get("severity", "")).lower())
                 if vend and SEVERITY_ORDER.index(vend) > SEVERITY_ORDER.index(f.severity):
                     f.severity = vend
@@ -748,6 +755,22 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f.summary = (f"{f.summary.rstrip('.')}. The curriculum names this node in a "
                          f"reference table but never builds a workflow with it, so "
                          f"nothing a student runs is affected.")
+        # A URL the course PRINTS as an example - `xxxxx.gradio.live`,
+        # `abc123.ngrok.io` - is not a dead link, and the probe already knows it:
+        # `successor.is_placeholder` set `placeholder: True` and `recommend()` writes
+        # "Not a broken link: ... is an example address a student generates for
+        # themselves." The severity and the summary did not get the message, so the
+        # triage list showed two `critical` rows reading "returns 404/410" whose own
+        # recommendation said the opposite. A reviewer triages on severity and summary;
+        # a finding that argues with itself there is one they stop trusting.
+        #
+        # Capped absolutely rather than stepped down, like the n8n reference-table case
+        # above: the work is to unlink a line of text, whatever the blast radius.
+        if f.signal == "S1" and any(sc.get("placeholder") for sc in f.successors or []):
+            f.severity = "low"
+            f.summary = (f"{f.affected_urls[0] if f.affected_urls else 'The taught URL'} "
+                         f"is an example address students generate for themselves, "
+                         f"published as a live link.")
         scope_locations(dep, f)
         f.recommendation = recommend(dep, f)
         _assert_claim_fits(f)
@@ -789,6 +812,9 @@ def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
         "breaking_change_possible": probe.detail,
         "n8n_upstream_unreachable": probe.detail,
         "sunset_language_about_subject": probe.detail,
+        "deprecation_notice_added": (
+            f"{dep.canonical_name}'s own pages carry a deprecation notice that was not "
+            f"there at the last check: \u201c{(probe.new_notices or [''])[0][:200]}\u201d"),
         "model_tier_restricted": probe.detail,
         "new_release": f"{dep.canonical_name}: {probe.detail}.",
         "n8n_new_release": f"n8n released a new version: {probe.detail}.",

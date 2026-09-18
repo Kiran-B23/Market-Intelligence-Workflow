@@ -112,7 +112,13 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             res.status = "inconclusive"
             res.detail = "no URL known for this dependency"
         else:
-            res_from_urls(res, obs, prev_hash, dep)
+            # `None` on a dependency never probed before: a first look records the
+            # notices as a baseline and raises nothing, the same rule the catalogue
+            # diff uses. Reporting every standing deprecation on day one would be a
+            # flood, and none of it would be news.
+            res_from_urls(res, obs, prev_hash, dep,
+                          seen_notices=set(state.notice_keys(dep.dep_id))
+                          if prev is not None else None)
             # Where did it go? A finding that says "repoint or replace the dead link"
             # and stops hands the reviewer's whole job back to them: they open the URL,
             # see the 404, and then try the obvious candidates on the vendor's own site
@@ -155,6 +161,7 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
         checked_at=res.checked_at, text_hash=res.text_hash,
         latest_version=res.latest_version or "", http_status=res.http_status,
         repo_archived=res.repo_archived, consecutive_failures=res.consecutive_failures,
+        notice_keys=res.notice_keys,
     )
     return res
 
@@ -348,7 +355,8 @@ def _record_redirect(res: ProbeResult, o, dep: Optional[Dependency]) -> None:
 
 
 def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str,
-                  dep: Optional[Dependency] = None) -> None:
+                  dep: Optional[Dependency] = None,
+                  seen_notices: Optional[set] = None) -> None:
     """Fold several URL observations into one dependency status."""
     primary = obs[0]
     res.http_status = primary.status
@@ -360,6 +368,28 @@ def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str,
     parked = [o for o in obs if o.parked]
     reachable = [o for o in obs if o.reachable]
     blocked = [o for o in obs if o.blocked]
+
+    # A notice that was not on these pages last week. This is the ARRIVAL of a
+    # deprecation, which neither of the two detectors below could see:
+    #
+    # * `text_hash` is a simhash over 3-word shingles of alphabetic words, tuned so
+    #   rotating banners do not read as change. Measured on the live 5,790-word Gemini
+    #   release notes, adding "gemini-2.5-flash is deprecated and will be shut down on
+    #   March 1, 2027" moves 0 of 64 bits; adding it five times moves 1.
+    # * `sunset_language_about_subject` is saturated on exactly the pages that matter.
+    #   That same changelog already answers ["now deprecated", "will be shut down"]
+    #   every week, before anything is added, so the flag is on permanently and says
+    #   nothing about this week.
+    #
+    # Counting the notices themselves is what separates "this page discusses
+    # deprecations" from "this page deprecated something since we last looked".
+    from miw.probe.http_probe import notice_key
+    current = {notice_key(sent): sent for o in obs for sent in o.sunset_sentences}
+    res.notice_keys = sorted(current)
+    fresh = [current[k] for k in sorted(current) if k not in (seen_notices or set())]
+    if fresh and seen_notices is not None:
+        res.flag("deprecation_notice_added")
+        res.new_notices = fresh[:3]
 
     for o in obs:
         if o.sunset_near_subject:
@@ -475,10 +505,16 @@ def probe_all(deps: Iterable[Dependency], state: State, *,
     # research budget, which is where the money is. Course, session, kind, dep-id and
     # limit all still apply, so `--course X` or `--kinds model` cannot be widened here.
     if scope.tiers:
-        untiered = dataclasses.replace(scope, tiers=set(), limit=None)
+        untiered = dataclasses.replace(scope, tiers=set())
         picked = {d.dep_id for d in todo}
         todo += [d for d in untiered.select(deps)
                  if d.dep_id not in picked and _has_something_to_probe(d)]
+        # `select` applies the limit to each pass separately, so widening could return
+        # up to twice it. `--limit 3` means three dependencies probed, not three per
+        # selection, and an operator asking for a bounded spot-check must not get a
+        # full-inventory sweep.
+        if scope.limit:
+            todo = todo[:scope.limit]
     out = []
     for i, dep in enumerate(todo, 1):
         out.append(probe_dependency(dep, state))

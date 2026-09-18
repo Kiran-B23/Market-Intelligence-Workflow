@@ -93,10 +93,22 @@ def test_an_unreadable_catalogue_is_never_a_retirement():
     assert "model_shutdown_passed" not in r.signals
 
 
-def test_a_vendor_that_publishes_no_catalogue_asserts_nothing():
+def test_a_configured_adapter_that_stops_role_typing_is_an_incident():
+    """`supported=False` from a CONFIGURED adapter means its page was restructured.
+
+    The two cases that used to share this branch are not the same thing. A vendor that
+    publishes no readable table has no adapter at all — `miw/vendors/openai.py` records
+    which pages were tested and rejected — and that case is covered by the test below,
+    where no adapter serves the id and the answer is a quiet `model_provider_unknown`.
+    An adapter only exists because its page role-typed once, so one that stops is news.
+
+    It used to `continue` without recording, which made a restructure indistinguishable
+    from a healthy check: every model from that vendor read `status="ok"`.
+    """
     a = FakeAdapter("x", "X", ["x.test"], supported=False)
     r = probe_model_dependency(model("whatever"), today=TODAY, adapters=[a])
-    assert r.status == "ok" and "model_provider_unknown" in r.signals
+    assert r.status == "inconclusive"
+    assert "model_catalogue_unreadable" in r.signals
 
 
 def test_a_model_no_configured_provider_serves_is_left_alone():
@@ -155,3 +167,125 @@ def test_a_model_id_in_a_coding_question_counts_as_executed():
     assert len(dep.questions_that_execute_it) == 3
     mcq = model("m", kind_locs=3, otype="OBJECTIVE_QUESTIONS")
     assert len(mcq.questions_that_execute_it) == 0
+
+
+def test_an_announced_shutdown_on_a_still_listed_model_is_a_warning():
+    """The advance warning this system exists to give, and had never once given.
+
+    `probe_model_dependency` returned "ok" the moment the status column looked healthy,
+    one line before the shutdown date it had already parsed was read. Measured on the
+    live artifacts: `model_deprecation_declared` fired 0 times across all five
+    production runs, while `model_shutdown_passed` fired twice per run — so every model
+    finding the system had ever produced was about an endpoint that was already dead.
+    """
+    from datetime import date
+
+    from miw.probe.catalogue import CatalogueEntry
+    from miw.probe.models import probe_model_dependency
+    from miw.schema import Dependency
+
+    entry = CatalogueEntry(entry_id="gemini-3.1-flash-lite", status="deprecated",
+                           shutdown_date="May 7, 2027",
+                           replacement_ids=["gemini-3.5-flash-lite"],
+                           quote="gemini-3.1-flash-lite | May 7, 2026 | May 7, 2027",
+                           evidence_url="https://ai.google.dev/gemini-api/docs/deprecations")
+
+    class Cat:
+        ok, supported, error = True, True, ""
+        entries = {"gemini-3.1-flash-lite": entry}
+
+        def get(self, i):
+            return self.entries.get(i)
+
+    class Adapter:
+        key, vendor, official_domains = "google_ai", "Google", ("ai.google.dev",)
+
+        def catalogue(self, refresh=False):
+            return Cat()
+
+    dep = Dependency(kind="model", canonical_name="gemini-3.1-flash-lite")
+    res = probe_model_dependency(dep, today=date(2026, 9, 18), adapters=[Adapter()])
+    assert res.status == "changed"
+    assert "model_deprecation_declared" in res.signals
+    assert "model_shutdown_passed" not in res.signals
+    assert "vendor_named_replacement" in res.signals
+    assert res.declared_changes[0]["shutdown_date"] == "May 7, 2027"
+
+    # ...and once the date passes it is an outage, not a warning.
+    after = probe_model_dependency(dep, today=date(2027, 6, 1), adapters=[Adapter()])
+    assert after.status == "broken"
+    assert "model_shutdown_passed" in after.signals
+
+
+def test_a_listed_model_with_no_announced_date_stays_ok():
+    """The guard against turning every live model into a warning."""
+    from datetime import date
+
+    from miw.probe.catalogue import CatalogueEntry
+    from miw.probe.models import probe_model_dependency
+    from miw.schema import Dependency
+
+    entry = CatalogueEntry(entry_id="gemini-2.5-flash", status="available",
+                           shutdown_date="", quote="gemini-2.5-flash | available")
+
+    class Cat:
+        ok, supported, error = True, True, ""
+
+        def get(self, i):
+            return entry if i == "gemini-2.5-flash" else None
+
+    class Adapter:
+        key, vendor, official_domains = "google_ai", "Google", ("ai.google.dev",)
+
+        def catalogue(self, refresh=False):
+            return Cat()
+
+    res = probe_model_dependency(Dependency(kind="model", canonical_name="gemini-2.5-flash"),
+                                 today=date(2026, 9, 18), adapters=[Adapter()])
+    assert res.status == "ok"
+    assert res.signals == ["model_listed_available"]
+
+
+def test_a_restructured_page_is_inconclusive_not_ok():
+    """The one failure mode that looked like success.
+
+    A 500 or a timeout already produced `inconclusive`. A 200 whose table had moved
+    returned `supported=False`, which the loop skipped without recording, so every
+    model from that vendor silently became `model_provider_unknown` at `status="ok"` -
+    indistinguishable from a healthy check, for as long as the page stayed that way.
+    """
+    from datetime import date
+
+    from miw.probe.models import probe_model_dependency
+    from miw.schema import Dependency
+    from miw.vendors.base import Catalogue
+
+    def adapter_for(cat):
+        class A:
+            key, vendor, official_domains = "google_ai", "Google", ("ai.google.dev",)
+
+            def catalogue(self, refresh=False):
+                return cat
+        return A()
+
+    dep = Dependency(kind="model", canonical_name="gemini-2.5-flash")
+    loud = [
+        Catalogue(vendor="Google", ok=False, error="ai.google.dev: http 500"),
+        Catalogue(vendor="Google", ok=False, error="ai.google.dev: http 429"),
+        Catalogue(vendor="Google", ok=False, error="ai.google.dev: ConnectionError"),
+        # 200, parsed, but nothing role-types: the page was restructured.
+        Catalogue(vendor="Google", ok=True, supported=False,
+                  error="no role-typed catalogue table found"),
+    ]
+    for cat in loud:
+        res = probe_model_dependency(dep, today=date(2026, 9, 18),
+                                     adapters=[adapter_for(cat)])
+        assert res.status == "inconclusive", (cat.error, res.status)
+        assert "model_catalogue_unreadable" in res.signals
+
+    # A catalogue that read fine and simply does not serve this id is NOT a failure.
+    served = Catalogue(vendor="Google", ok=True, supported=True, entries={})
+    res = probe_model_dependency(dep, today=date(2026, 9, 18),
+                                 adapters=[adapter_for(served)])
+    assert res.status == "ok"
+    assert "model_provider_unknown" in res.signals

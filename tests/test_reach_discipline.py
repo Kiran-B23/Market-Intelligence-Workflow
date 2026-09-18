@@ -51,8 +51,16 @@ def test_reaching_everywhere_is_rare_and_every_case_is_named():
     what the course should TEACH, not events about one of its pages, and it has to be
     argued for one observation at a time rather than inherited."""
     everywhere = sorted(k for k, v in EVIDENCE_REACH.items() if v is None)
-    assert everywhere == ["free_tier_language_lost", "pricing_restriction_language",
+    assert everywhere == ["deprecation_notice_added", "free_tier_language_lost",
+                          "pricing_restriction_language",
                           "sunset_language_about_subject"], everywhere
+    # The argument for the newest member, made here because this test exists to force
+    # one: `deprecation_notice_added` fires when the vendor's own pages gained a
+    # sentence saying this dependency is ending. That is a fact about the DEPENDENCY,
+    # not about one of its URLs - the same category as the standing
+    # `sunset_language_about_subject` beside it - so every place the course teaches it
+    # is affected, prose included. A reader who is told the tool is being retired needs
+    # the paragraph that recommends it changed, not just the link.
 
 
 def test_a_page_event_never_reaches_past_the_links_to_that_page():

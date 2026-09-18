@@ -21,6 +21,10 @@ is about to be absorbed is a diff class about nothing.
 """
 from __future__ import annotations
 
+import copy
+from typing import Optional
+
+from miw.analyse import score
 from miw.schema import Dependency, Finding
 
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
@@ -33,6 +37,29 @@ def _rule_of(f: Finding) -> str:
         if sig.startswith("n8n_rule:"):
             return sig.split(":", 1)[1]
     return ""
+
+
+def _union(deps) -> Optional[Dependency]:
+    """One stand-in dependency holding every distinct location the members touch.
+
+    Only `locations` is meaningful on it: it exists so `score.blast_radius` and
+    `Dependency.graded_locations` - both plain sums over `locations` - can be asked the
+    merged question directly instead of being approximated by adding up their answers
+    for each member. `None` when no member is in the inventory, which leaves the caller
+    to fall back rather than lose the finding.
+    """
+    present = [d for d in deps if d is not None]
+    if not present:
+        return None
+    out, seen = [], set()
+    for dep in present:
+        for l in dep.locations:
+            if l not in seen:
+                seen.add(l)
+                out.append(l)
+    stand_in = copy.copy(present[0])
+    stand_in.locations = out
+    return stand_in
 
 
 def merge_n8n_breaks(findings: list[Finding],
@@ -65,28 +92,62 @@ def merge_n8n_breaks(findings: list[Finding],
         carrier.severity = max(
             (f.severity for f in members),
             key=lambda s: SEVERITY_ORDER.index(s) if s in SEVERITY_ORDER else 0)
-        carrier.blast_radius = sum(f.blast_radius for f in members)
-        carrier.graded_locations = sum(f.graded_locations for f in members)
+        # Measured over the UNION of the members' dependencies, not summed across them.
+        # Summing multiply-counts a place two taught nodes share, which is the normal
+        # case here: `wait-node-subworkflow-v2` covers four nodes listed in one
+        # reference table, so the sum claimed ten places where there were two.
+        # `InventoryBuilder._locate` mints a fresh `Location` per (dependency, record),
+        # so identity cannot dedupe them - `Location` is a frozen dataclass whose `url`
+        # is `compare=False`, and equality is the thing that means "the same place".
+        footprint = _union([by_dep.get(f.dep_id) for f in members])
+        if footprint is not None:
+            carrier.blast_radius = score.blast_radius(footprint)
+            carrier.graded_locations = footprint.graded_locations
+        else:                                  # nothing to measure against; overstate
+            carrier.blast_radius = sum(f.blast_radius for f in members)
+            carrier.graded_locations = sum(f.graded_locations for f in members)
         carrier.questions_executing = sum(f.questions_executing for f in members)
         carrier.questions_mentioning = sum(f.questions_mentioning for f in members)
         carrier.courses = sorted({c for f in members for c in f.courses})
         carrier.question_ids = list(dict.fromkeys(
             [q for f in members for q in f.question_ids]))[:MAX_QUESTION_IDS]
 
+        # The places the merged event reaches, re-derived rather than concatenated.
+        # Each member's `locations` is already capped at 12, so pooling them cannot
+        # give an honest `affects_total`; scoping each member's own dependency again
+        # can, and it is the same call `score.scope_locations` makes.
+        reached: list = []
+        seen: set = set()
+        for f in [carrier] + others:
+            dep_of = by_dep.get(f.dep_id)
+            if dep_of is not None and f.locations_scoped:
+                got, _ = score.reaching_locations(
+                    f.signal, f.affected_urls, dep_of.locations,
+                    f.redirects, f.probe_signals)
+            else:
+                got = f.locations
+            for l in got:
+                if l not in seen:
+                    seen.add(l)
+                    reached.append(l)
+
+        # Recomputed here because `scope_locations` - the only other writer - never
+        # runs again after a merge. Every surface reads these rather than `locations`
+        # (`markdown._loc_line`, the API's "N places" chip, `score.where_line`), so a
+        # carrier keeping its own pre-merge counts under-reported its own reach.
+        counts: dict = {}
+        for l in reached:
+            counts[l.object_type] = counts.get(l.object_type, 0) + 1
+        carrier.affects_counts = counts
+        carrier.affects_total = len(reached)
+
         # Strongest evidence first, then cap. Without the sort the carrier's own wired
         # locations were pushed out by an absorbed member's 32 reference-table
         # mentions, so a finding about 4 real workflow instances displayed 12 glossary
         # rows - the same confusion between naming a thing and building with it that
         # `n8n.nodes` exists to keep apart.
-        from miw.analyse.score import EVIDENCE_WEIGHT
-        pool, seen = list(carrier.locations), {id(l) for l in carrier.locations}
-        for f in others:
-            for l in f.locations:
-                if id(l) not in seen:
-                    pool.append(l)
-                    seen.add(id(l))
-        pool.sort(key=lambda l: -EVIDENCE_WEIGHT.get(l.evidence_source, 1.0))
-        carrier.locations = pool[:MAX_LOCATIONS]
+        reached.sort(key=lambda l: -score.EVIDENCE_WEIGHT.get(l.evidence_source, 1.0))
+        carrier.locations = reached[:MAX_LOCATIONS]
         # Every member was scoped, or the merged finding cannot claim to have been.
         carrier.locations_scoped = all(f.locations_scoped for f in members)
 
@@ -99,7 +160,7 @@ def merge_n8n_breaks(findings: list[Finding],
         # changed. Rewriting it here is cheaper than teaching the reader to distrust it.
         dep = by_dep.get(carrier.dep_id)
         if dep is not None:
-            from miw.analyse import notes, score
+            from miw.analyse import notes
             carrier.recommendation = score.recommend(dep, carrier)
             notes.compose(dep, carrier)
 

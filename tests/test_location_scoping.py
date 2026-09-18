@@ -166,7 +166,7 @@ def test_artifact_words_cover_every_object_type_the_extractor_emits():
         assert artifact_word(ot) != "place"
 
 
-def test_the_probe_is_not_rationed_by_a_research_budget():
+def test_the_probe_is_not_rationed_by_a_research_budget(monkeypatch):
     """`watch_tier` rations RESEARCH - searches, model calls, the many fetches
     `official.gather` makes. A probe is one request per referenced URL.
 
@@ -198,6 +198,26 @@ def test_the_probe_is_not_rationed_by_a_research_budget():
                        registry="n8n", watch_tier="critical",
                        locations=[loc("n8n_workflow", "OBJECTIVE_QUESTIONS")])
 
+    # n8n's node index and npm's release list are stubbed, not fetched. This test is
+    # about which dependencies the TIER lets through, and nothing else; reaching out
+    # for the real answers made it depend on a seven-day disk cache, and the week the
+    # cache expired it stopped failing and started hanging instead.
+    # `fetch` consults `url_safety` before it opens anything, so one stub makes the
+    # whole probe offline: a host that does not resolve is returned as unreachable
+    # without a request. These two tests are about which dependencies the SCOPE lets
+    # through, and a real DNS lookup on a `.example` host answers nothing about that.
+    import miw.net as net
+    monkeypatch.setattr(net, "url_safety", lambda url: "unresolvable")
+
+    import miw.probe.n8n_upstream as up
+    import miw.probe.registries as reg
+    monkeypatch.setattr(up, "upstream", lambda *a, **k: {
+        "ok": True, "cached": True, "rules": [],
+        "nodes": ["n8n-nodes-base.code", "n8n-nodes-base.gmail"]})
+    monkeypatch.setattr(reg, "n8n_latest", lambda *a, **k: {
+        "latest_version": "1.100.0", "released_at": "2026-09-01", "found": True,
+        "reachable": True})
+
     seen = []
     state = State(":memory:") if _state_takes_path() else State()
     try:
@@ -212,15 +232,45 @@ def test_the_probe_is_not_rationed_by_a_research_budget():
     assert "QLoRA" not in seen                # nothing to probe it against
 
 
-def test_the_tier_lift_does_not_widen_any_other_filter():
-    """Only the tier constraint is lifted - course, kind and dep-id still bind."""
-    import inspect
+def test_the_tier_lift_does_not_widen_any_other_filter(monkeypatch):
+    """Only the tier constraint is lifted - course, kind, dep-id and limit still bind.
 
-    from miw.probe import runner
-    src = inspect.getsource(runner.probe_all)
-    assert "if scope.tiers:" in src
-    assert "dataclasses.replace(scope, tiers=set(), limit=None)" in src
-    assert "_has_something_to_probe(d)" in src
+    Asserted by RUNNING the selection, not by reading the source of it. The previous
+    version of this test matched on the text of the `dataclasses.replace` call, which
+    meant it passed while `limit=None` in that very call threw the limit away: an
+    operator asking for a bounded spot-check got the whole inventory - ~464
+    dependencies, politeness-throttled - and the test agreed that nothing was widened.
+    """
+    from miw.probe.runner import probe_all
+    from miw.scope import Scope
+    from miw.state import State
+
+    deps = [Dependency(kind="tool", canonical_name=f"Tool{i}",
+                       homepage=f"https://tool{i}.example",
+                       official_domains=[f"tool{i}.example"],
+                       watch_tier="mention-only",
+                       locations=[loc("prose_name", "OBJECTIVE_QUESTIONS")])
+            for i in range(6)]
+    # Critical, so it is picked by the tiered pass; the rest can only arrive through
+    # the widening, which is the path that used to ignore the limit.
+    deps[0].watch_tier = "critical"
+
+    # `fetch` consults `url_safety` before it opens anything, so one stub makes the
+    # whole probe offline: a host that does not resolve is returned as unreachable
+    # without a request. These two tests are about which dependencies the SCOPE lets
+    # through, and a real DNS lookup on a `.example` host answers nothing about that.
+    import miw.net as net
+    monkeypatch.setattr(net, "url_safety", lambda url: "unresolvable")
+
+    seen = []
+    state = State(":memory:") if _state_takes_path() else State()
+    try:
+        probe_all(deps, state, scope=Scope(tiers={"critical", "standard"}, limit=2),
+                  progress=lambda i, n, r: seen.append(r.canonical_name))
+    finally:
+        state.close()
+    assert len(seen) == 2, seen
+    assert "Tool0" in seen                   # the tiered pass still comes first
 
 
 def _state_takes_path() -> bool:

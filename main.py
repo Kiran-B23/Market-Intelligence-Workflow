@@ -467,6 +467,46 @@ def _load_research(day=None):
     return out
 
 
+# Probe signals that mean "nothing was checked", as opposed to "checked and fine".
+_UNCHECKED_SIGNALS = {"model_provider_unknown"}
+
+
+def _probe_coverage(probes: dict) -> dict:
+    """Split the probe count into what was actually verified and what was not.
+
+    `status="ok"` carries two different meanings and the digest reported only the count.
+    A model no configured adapter serves is `ok` because nothing contradicted it, which
+    is not the same fact as a catalogue naming it available.
+    """
+    checked = unchecked = inconclusive = 0
+    for p in probes.values():
+        sigs = set(getattr(p, "signals", None) or [])
+        url = getattr(p, "evidence_url", "") or ""
+        if getattr(p, "status", "") == "inconclusive":
+            inconclusive += 1
+        # A quiet probe is not an unchecked one. 129 of the 136 signal-less results on
+        # the live artifact carry an evidence URL - PyPI answered, the page answered,
+        # nothing had changed - and counting those as blind would overstate the gap as
+        # badly as hiding it understated it.
+        elif sigs & _UNCHECKED_SIGNALS or (not sigs and not url):
+            unchecked += 1
+        else:
+            checked += 1
+    return {"checked": checked, "unchecked": unchecked,
+            "inconclusive": inconclusive}
+
+
+def _prior_findings_count() -> int:
+    """How many findings the most recent artifact on disk carries, or 0."""
+    files = sorted(OUT.glob("findings_*.json"))
+    if not files:
+        return 0
+    try:
+        return len(json.load(open(files[-1])).get("findings") or [])
+    except (json.JSONDecodeError, OSError):
+        return 0
+
+
 def cmd_analyse(args) -> int:
     from miw.analyse import notes
     from miw.analyse.merge import merge_n8n_breaks
@@ -481,6 +521,19 @@ def cmd_analyse(args) -> int:
     research = _load_research()
     state = State()
     now = utcnow()
+
+    # Week-over-week memory lives only in `state/miw.db`, which is gitignored and, in
+    # CI, restored from an `actions/cache` entry that GitHub evicts after seven days of
+    # disuse - against a seven-day cron. Losing it is silent and total: every standing
+    # finding re-raises as new, every reviewer rejection is forgotten, and the digest
+    # becomes a flood that gets read once. Say so, loudly, rather than let a reader
+    # mistake a memory loss for a bad week.
+    prior = _prior_findings_count()
+    if prior and state.finding_count() == 0:
+        print(f"  ! STATE LOST: no week-over-week memory, but the last artifact on disk "
+              f"carries {prior} finding(s).")
+        print(f"  ! Everything will re-raise as new and reviewer decisions are gone. "
+              f"Restore state/miw.db before trusting this digest.")
 
     scope = _scope_from(args, default_tiers=())
     if not scope.is_everything:
@@ -507,6 +560,20 @@ def cmd_analyse(args) -> int:
         f.diff_class = state.classify_finding(
             finding_id=f.finding_id, dep_id=f.dep_id, signal=f.signal,
             severity=f.severity, fingerprint=fp, now=now)
+        # A reviewer said this exact situation is not actionable. Held back only
+        # while the fingerprint matches: new evidence earns another look.
+        #
+        # Asked BEFORE the unchanged branch, which used to `continue` past it: a
+        # rejected finding that had since gone quiet was classed `unchanged`, put
+        # straight into `still_open`, and written to the artifact as an open finding.
+        # The reviewer's decision was still in the database, still correct, and never
+        # consulted - so rejecting something bought silence for exactly one run.
+        why_held = triage.suppressed(state, f.finding_id, fp)
+        if why_held:
+            by_reviewer.append({"finding_id": f.finding_id,
+                                "canonical_name": f.canonical_name,
+                                "signal": f.signal, "reason": why_held})
+            continue
         if f.diff_class == "unchanged":
             # Still open, just not news. It belongs in the artifact - the digest
             # filters it, not the store. Dropping it here made a finding vanish
@@ -514,14 +581,6 @@ def cmd_analyse(args) -> int:
             # and found nothing new.
             suppressed += 1
             still_open.append(f)
-            continue
-        # A reviewer said this exact situation is not actionable. Held back only
-        # while the fingerprint matches: new evidence earns another look.
-        why_held = triage.suppressed(state, f.finding_id, fp)
-        if why_held:
-            by_reviewer.append({"finding_id": f.finding_id,
-                                "canonical_name": f.canonical_name,
-                                "signal": f.signal, "reason": why_held})
             continue
         raised.append(f)
 
@@ -624,7 +683,8 @@ def _find_changes(args, state):
     from miw.research.launch import read_launches
 
     newer = find_newer(_load_inventory(), state,
-                       persist=not getattr(args, "dry_run", False))
+                       persist=not getattr(args, "dry_run", False),
+                       reconcile=getattr(args, "reconcile", False))
     # Nominated tools. Two cheap JSON requests, and the output is a list somebody scans
     # rather than anything scored - see `miw/research/launch.py` for the measurement
     # that settled that. A feed being down must not fail the stage.
@@ -897,8 +957,10 @@ def cmd_gaps(args, only=None) -> int:
     # the whole of it to the half that is NOT running - the only reading that cannot
     # lose a row - and do it BEFORE either half writes, or the half that runs will have
     # already created its key and the carry-forward will not fire.
+    carried = ""
     if "gap_topics" not in doc and "newer_topics" not in doc and doc.get("topics"):
-        doc["newer_topics" if do_gaps else "gap_topics"] = doc["topics"]
+        carried = "newer_topics" if do_gaps else "gap_topics"
+        doc[carried] = doc["topics"]
     doc.update({"generated_at": now, "scope": scope.to_dict()})
     if do_gaps:
         doc.update({"areas": [a.area_id for a in areas],
@@ -921,6 +983,14 @@ def cmd_gaps(args, only=None) -> int:
                              "errors": launches.errors},
             "newer_stats": to_jsonable(ns),
             "newer_topics": newer.rows})
+    # The legacy blob held BOTH halves' rows, so the half that just ran is inside it
+    # too. Attributing it whole listed every row this run re-raised twice - once fresh
+    # from its own key, once as legacy under the other's - and `topics` is what the UI
+    # counts. Subtracted here rather than above because the running half's rows are not
+    # known until it has written them.
+    if carried:
+        mine = doc.get("gap_topics" if do_gaps else "newer_topics") or []
+        doc[carried] = [r for r in doc[carried] if r not in mine]
     # `topics` is what `verify` and the UI read, and it is the two halves together. It
     # is derived rather than written by either half, so neither can delete the other's
     # rows by running alone.
@@ -1045,10 +1115,27 @@ def cmd_report(args) -> int:
                 capability_note=settings.capability_note(),
                 inventory_size=len(inv["dependencies"]), probed=len(probes),
                 researched=len(research), suppressed=raw.get("suppressed_unchanged", 0),
-                nominations=noms)
+                nominations=noms, coverage=_probe_coverage(probes))
     out = OUT / f"digest_{_today()}.md"
     out.write_text(md)
     print(f"  {len(findings)} findings -> {out}")
+
+    # The digest is on disk, so these findings have now been shown to someone. Stamping
+    # it here - after the write, never before - is what makes `analyse` idempotent: the
+    # classifier compares against what was last REPORTED, so re-running `analyse` any
+    # number of times before this point keeps calling the same findings new. The roll-up
+    # is always rendered from the whole merged artifact, so every open finding is
+    # covered whatever `--course` narrowed.
+    from miw.analyse.score import fingerprint_of
+    from miw.schema import utcnow as _utcnow
+    from miw.state import State as _State
+    _st = _State()
+    stamped = _st.mark_reported(
+        [(f.finding_id, fingerprint_of(f), f.severity) for f in findings],
+        _utcnow())
+    _st.close()
+    if stamped:
+        print(f"  {stamped} finding(s) marked as reported")
 
     # --- and one digest per course ----------------------------------------
     from miw.analyse.project import project_all
@@ -1586,22 +1673,26 @@ def cmd_verify(args) -> int:
     # that say "OpenAI" attributed to a docs reorganisation, a glossary row scored as a
     # wired n8n node. Each was caught by a reader rather than by the system, which is
     # the part worth fixing.
-    from miw.analyse.score import evidence_reach
+    # Asked through `reaching_locations`, the same function the analyser scoped with,
+    # rather than by re-deriving half of it here. The earlier version called
+    # `evidence_reach` directly and repeated only ONE of S5's two widenings - the
+    # off-site `prose_name`/`title` case - so a behaviour-class S5 (a researched
+    # IMPLEMENTATION claim, or one carrying only `page_text_changed`, where `s5_reach`
+    # returns "behaviour" and a deck legitimately goes stale) was scoped correctly by
+    # the analyser and then failed the run here. A check that disagrees with the rule
+    # it is checking reports on itself, not on the artifact.
+    from miw.analyse.score import reaching_locations
     over = []
     for f in findings:
-        reach = evidence_reach(f.get("signal", ""), f.get("probe_signals") or [])
-        if reach is None:
-            continue
-        for l in f.get("locations") or []:
+        locs = f.get("locations") or []
+        reached, _ = reaching_locations(
+            f.get("signal", ""), f.get("affected_urls") or [], locs,
+            f.get("redirects") or [], f.get("probe_signals") or [])
+        keep = {id(l) for l in reached}
+        for l in locs:
+            if id(l) in keep:
+                continue
             src = l.get("evidence_source", "")
-            if src in reach:
-                continue
-            # S5's one earned widening: a product that moved OFF its own domain makes
-            # the prose that names it wrong too. `s5_reach` decides it; this repeats
-            # only the exemption, not the judgement.
-            if f["signal"] == "S5" and src in ("prose_name", "title") and any(
-                    r.get("off_site") for r in (f.get("redirects") or [])):
-                continue
             over.append(f"{f['canonical_name']} ({f['signal']}): claims a "
                         f"{src} location, which {', '.join(f.get('probe_signals') or ['its evidence'])} "
                         f"does not reach")
@@ -1717,6 +1808,11 @@ def build_parser() -> argparse.ArgumentParser:
                         help="what a vendor we already use has added, and what the "
                              "launch feeds nominate (S12)")
     _add_scope_args(ch)
+    ch.add_argument("--reconcile", action="store_true",
+                    help="ignore the stored baseline and ask each catalogue what it "
+                         "lists TODAY. Run once: the baseline was seeded from the live "
+                         "world, so anything a vendor released before the first run is "
+                         "otherwise marked as already known for ever.")
     ch.add_argument("--dry-run", action="store_true",
                     help="print what would be raised and write nothing")
     ch.set_defaults(only=("changes",))

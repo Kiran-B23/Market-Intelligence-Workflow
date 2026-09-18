@@ -11,7 +11,11 @@ behind `--nominate` made exactly one previously-offline test start calling the m
 and the only symptom was the suite getting slower. This turns that into a failure with
 the test's name on it.
 """
+import pathlib
+
 import pytest
+
+from tests._guard import NetworkReached
 
 
 @pytest.fixture(autouse=True)
@@ -33,3 +37,75 @@ def _no_model_calls(monkeypatch):
                                 "complete", _refuse, raising=False)
         except ImportError:
             pass
+
+
+@pytest.fixture(autouse=True)
+def _no_network(request, monkeypatch):
+    """**No test may reach the network**, for the same reasons as the model rule above.
+
+    The workflow gates the weekly run on this suite with the comment "they need no keys
+    and no network", and that was true only by luck: `state/n8n_upstream.json` carries a
+    seven-day TTL, so the moment it expired, `test_the_probe_is_not_rationed_by_a
+    _research_budget` started fetching n8n's repository tree for real — about 40
+    requests at a 20-second timeout with two retries each. The suite did not fail. It
+    hung, which in CI reads as an infrastructure problem rather than as the test doing
+    something it was never meant to do.
+
+    The code under it is correct either way: an unreachable GitHub is recorded as
+    `inconclusive` with `n8n_upstream_unreachable`, never as "the node was removed". The
+    defect is in the test reaching out at all, and this turns that into a named failure
+    in milliseconds.
+
+    Every egress path is covered, not only HTTP. Nothing in `miw/` issues a request
+    except through `miw.net.fetch`, but DNS is its own reach: `url_safety` resolves a
+    hostname before any request is made, and on a fake domain that is a real lookup with
+    a real timeout.
+
+    A test that genuinely needs the network marks itself `@pytest.mark.network`, and
+    then has to justify being in a suite that gates every change.
+    """
+    if request.node.get_closest_marker("network"):
+        return
+
+    import socket
+    import subprocess
+
+    import requests
+
+    def _refuse(what: str):
+        raise NetworkReached(
+            f"this test reached the network ({what}). The suite gates every change and "
+            f"must stay offline: inject a fixture through the seam the call site "
+            f"provides (`adapters=`, `upstream=`, `fetcher=`, `observer=`), or mark the "
+            f"test `@pytest.mark.network` and justify it.")
+
+    monkeypatch.setattr(requests, "request",
+                        lambda method, url, *a, **k: _refuse(f"{method} {url}"))
+    monkeypatch.setattr(requests.Session, "request",
+                        lambda self, method, url, *a, **k: _refuse(f"{method} {url}"))
+    monkeypatch.setattr(socket, "getaddrinfo",
+                        lambda host, *a, **k: _refuse(f"DNS {host}"))
+    monkeypatch.setattr(socket, "create_connection",
+                        lambda addr, *a, **k: _refuse(f"connect {addr}"))
+
+    # The model rule above patches `miw.llm.complete`, which is where every caller goes
+    # in. This catches the layer under it: a test exercising a provider backend directly
+    # would otherwise shell out to the operator's `claude` CLI and spend real money.
+    real_run, real_popen = subprocess.run, subprocess.Popen
+
+    def _guard(fn):
+        def inner(cmd, *a, **k):
+            argv0 = cmd[0] if isinstance(cmd, (list, tuple)) and cmd else str(cmd)
+            if pathlib.Path(str(argv0)).name in ("claude", "claude.exe"):
+                _refuse(f"spawned the {argv0!r} CLI")
+            return fn(cmd, *a, **k)
+        return inner
+
+    monkeypatch.setattr(subprocess, "run", _guard(real_run))
+    monkeypatch.setattr(subprocess, "Popen", _guard(real_popen))
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "network: this test reaches the network and is exempt from the "
+                   "offline rule in `_no_network`")

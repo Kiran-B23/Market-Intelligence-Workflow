@@ -92,12 +92,62 @@ class UrlObservation:
     wall_phrases: list[str] = field(default_factory=list)
     sunset_phrases: list[str] = field(default_factory=list)
     sunset_near_subject: list[str] = field(default_factory=list)
+    # The sentences those phrases sit in, so a later run can tell a NEW notice from a
+    # page that has always talked about deprecations. The phrase list alone cannot:
+    # on Google's release notes `sunset_near_subject` reads ["now deprecated",
+    # "will be shut down"] every week, unchanged, whatever was announced this week.
+    sunset_sentences: list[str] = field(default_factory=list)
     paid_phrases: list[str] = field(default_factory=list)
     parked: bool = False
     title: str = ""
 
 
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.S | re.I)
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
+def _sunset_sentences(text: str, subject_terms: tuple[str, ...] = (),
+                      limit: int = 40) -> list[str]:
+    """Sentences that say something is ending, near the subject's own name.
+
+    The unit is the sentence rather than the phrase because the question a weekly run
+    has to answer is "is this notice NEW", and only a sentence is specific enough to
+    be counted once.
+    """
+    terms = tuple(t.lower() for t in subject_terms if t)
+    out: list[str] = []
+    for raw in _SENT_SPLIT.split(text or ""):
+        sent = raw.strip()
+        if not (12 < len(sent) < 400):
+            continue
+        low = sent.lower()
+        if not any(ph in low for ph in SUNSET_PHRASES_STRONG):
+            continue
+        if terms and not any(t in low for t in terms):
+            continue
+        out.append(sent)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def notice_key(sentence: str) -> str:
+    """A stable key for one notice: case and whitespace folded, nothing else.
+
+    Numbers are deliberately NOT normalised. Collapsing them looks tidy - it would fold
+    a rotating "4 endpoints affected" into one key - and it silently merges the notices
+    that matter most: `v1` with `v2`, `gemini-2.5-flash` with `gemini-3.8-flash`, and a
+    shutdown date moved from March to June with the announcement that preceded it. A
+    second model's retirement reading as "already seen" is a missed deprecation, which
+    is the one outcome this signal exists to prevent.
+
+    The cost of the strict key is the opposite error: a vendor re-wording a standing
+    notice re-reports it once. `probe_state.notice_keys` unions rather than replaces,
+    so that costs one line in one digest and never repeats.
+    """
+    import hashlib
+    norm = " ".join((sentence or "").lower().split())
+    return hashlib.sha256(norm.encode()).hexdigest()[:16]
 
 
 def observe(url: str, subject_terms: tuple[str, ...] = ()) -> UrlObservation:
@@ -113,6 +163,7 @@ def observe(url: str, subject_terms: tuple[str, ...] = ()) -> UrlObservation:
         o.wall_phrases = _hits(text, WALL_PHRASES)
         o.sunset_phrases = _hits(text, SUNSET_PHRASES)
         o.sunset_near_subject = _hits_near(text, SUNSET_PHRASES_STRONG, subject_terms)
+        o.sunset_sentences = _sunset_sentences(text, subject_terms)
         o.paid_phrases = _hits(text, PAID_PHRASES)
         o.parked = bool(_hits(text, PARKED_PHRASES))
         m = _TITLE.search(f.body)

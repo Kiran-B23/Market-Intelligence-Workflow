@@ -123,7 +123,8 @@ def render(findings: Iterable[Finding], *, resolved: list[dict] | None = None,
            run_date: str = "", capability_note: str = "",
            inventory_size: int = 0, probed: int = 0,
            researched: int = 0, suppressed: int = 0, course: str = "",
-           nominations: Optional[dict] = None) -> str:
+           nominations: Optional[dict] = None,
+           coverage: Optional[dict] = None) -> str:
     """The weekly digest. With `course`, the numbers are that course's share.
 
     A per-course digest is rendered from findings already PROJECTED onto that course,
@@ -181,6 +182,25 @@ def render(findings: Iterable[Finding], *, resolved: list[dict] | None = None,
           f"inventoried · {probed} probed · "
           f"{researched} researched · {max(standing, suppressed)} unchanged finding(s) "
           f"still open and not repeated here_", ""]
+    # What "probed" actually covered. The bare count read as an assurance it could not
+    # give: 33 of 41 taught model ids came back `status="ok"` carrying
+    # `model_provider_unknown` - no configured authority serves that id, so nothing was
+    # checked - and the digest reported them beside genuinely verified ones. "Checked
+    # and healthy" and "never checked" have to be different sentences, or a reader
+    # cannot tell a quiet week from a blind one.
+    if coverage:
+        unchecked = coverage.get("unchecked") or 0
+        inconclusive = coverage.get("inconclusive") or 0
+        if unchecked or inconclusive:
+            parts = []
+            if unchecked:
+                parts.append(f"{unchecked} had no configured authority to check them "
+                             f"against")
+            if inconclusive:
+                parts.append(f"{inconclusive} could not be read this cycle")
+            L += [f"_Coverage: of {probed} probed, {coverage.get('checked', 0)} were "
+                  f"checked against a source; {' and '.join(parts)}. Those are not "
+                  f"findings of health._", ""]
     if nominations and nominations.get("total"):
         # Refutations are reported, never dropped. A nomination that failed is the only
         # way to tell "we looked and found nothing" apart from "nothing looked", and a
