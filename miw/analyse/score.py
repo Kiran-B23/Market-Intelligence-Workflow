@@ -16,6 +16,7 @@ Three rules shape this module:
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Optional
 
 from config.constants import ARTIFACT_ORDER, artifact_word
@@ -252,6 +253,14 @@ def scope_locations(dep: Dependency, f: Finding) -> None:
     evidence kind.
     """
     reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations)
+
+    # Counted before the cap, and recorded, because `locations` is a display list and
+    # every surface that counted it understated a busy finding by an order of magnitude.
+    counts: dict = {}
+    for l in reached:
+        counts[l.object_type] = counts.get(l.object_type, 0) + 1
+    f.affects_counts = counts
+    f.affects_total = len(reached)
 
     if not reached:
         # Structural refusal, the same discipline `supported=False` applies elsewhere:
@@ -635,20 +644,47 @@ def where_line(dep: Dependency, f: Finding) -> str:
                                    l.session_no or 999))
     head = _place(ranked[0])
 
-    by_type: dict[str, int] = {}
-    for l in f.locations:
-        by_type[l.object_type] = by_type.get(l.object_type, 0) + 1
+    # `affects_counts`, not `f.locations`: the list is capped at 12 and the sentence
+    # would then say "12 quiz questions" about 32 of them.
+    by_type = f.affects_counts or {}
     spread = ", ".join(f"{n} {artifact_word(t, n != 1)}"
                        for t in ARTIFACT_ORDER if (n := by_type.get(t, 0)))
 
-    if len(f.locations) == 1:
+    if (f.affects_total or len(f.locations)) == 1:
         return f" Affects {head}."
     return f" Affects {spread} - starting with {head}."
 
 
+def action_only(row: dict) -> str:
+    """The action from a serialised finding, without the clause about where it lands.
+
+    A list row is triaged from - severity, name, one instruction - and is read to decide
+    what to open next. The location clause belongs in the detail panel, which says it
+    better: grouped by session and by artifact type, counted, and deep-linked.
+
+    `recommendation` and `affects_line` are built together by `recommend()`, so this
+    removes a clause it can see rather than guessing at a sentence boundary. A
+    model-refined `what_to_act` never contains it and comes back untouched.
+    """
+    action = (row.get("what_to_act") or row.get("recommendation") or "").strip()
+    clause = (row.get("affects_line") or "").strip()
+    if clause and clause in action:
+        # The clause sits between two other sentences, so removing it leaves the space
+        # that separated them. Collapse rather than strip: "available.  Candidate" is a
+        # visible seam on every row that had an alternative attached.
+        action = re.sub(r"\s{2,}", " ", action.replace(clause, "")).strip()
+    return action
+
+
 def recommend(dep: Dependency, f: Finding) -> str:
-    """A concrete next action. Deterministic: no LLM required."""
+    """A concrete next action. Deterministic: no LLM required.
+
+    The location clause is also stored on `f.affects_line`, so a surface that wants the
+    action alone - the findings list, the run page - can drop it without string surgery
+    on a sentence it did not build.
+    """
     where = where_line(dep, f)
+    f.affects_line = where.strip()
 
     alt_txt = ""
     if f.alternatives:

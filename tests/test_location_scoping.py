@@ -186,3 +186,84 @@ def _state_takes_path() -> bool:
 
     from miw.state import State
     return "path" in inspect.signature(State.__init__).parameters
+
+
+# ------------------------------------------- the list row is not the detail panel
+
+def test_the_list_row_drops_the_clause_about_where_it_lands():
+    """A row is read to decide what to open next; the panel says where, and better."""
+    from miw.analyse.score import action_only
+    dep, f = composio(), finding(urls=[DEAD])
+    scope_locations(dep, f)
+    f.recommendation = recommend(dep, f)
+
+    assert f.affects_line and f.affects_line in f.recommendation
+    row = action_only({"recommendation": f.recommendation,
+                       "affects_line": f.affects_line})
+    assert f.affects_line not in row
+    assert "quiz question" not in row
+    # what remains is still the instruction, not a fragment
+    assert row.startswith("Repoint or replace the dead link")
+    assert "  " not in row                     # no seam where the clause was
+
+
+def test_a_model_refined_action_is_returned_untouched():
+    from miw.analyse.score import action_only
+    refined = "Swap the dashboard link for the new console URL in session 25."
+    assert action_only({"what_to_act": refined,
+                        "recommendation": "deterministic text",
+                        "affects_line": "Affects 2 quiz questions."}) == refined
+
+
+def test_a_finding_whose_recommendation_was_not_built_by_recommend_is_left_alone():
+    """S11 and S12 write their own line, and for a topic gap the session IS the point."""
+    from miw.analyse.score import action_only
+    gap = "Add “Parallel function calling” to AI for Finance session 9."
+    assert action_only({"recommendation": gap, "affects_line": ""}) == gap
+
+
+def test_the_counts_are_taken_before_the_display_cap():
+    """`locations` stops at 12. Counting it made a 32-place finding say 12."""
+    dep = Dependency(
+        kind="n8n_node", canonical_name="n8n-nodes-base.code", registry="n8n",
+        locations=[loc("n8n_mention", "OBJECTIVE_QUESTIONS", session=i)
+                   for i in range(1, 33)])
+    f = finding(signal="S9")
+    scope_locations(dep, f)
+    assert len(f.locations) == 12                    # the display cap still applies
+    assert f.affects_total == 32
+    assert f.affects_counts == {"OBJECTIVE_QUESTIONS": 32}
+    assert "32 quiz questions" in where_line(dep, f)
+
+
+def test_every_surface_reads_the_same_recorded_count():
+    """A row, the digest and the panel must not disagree about one finding."""
+    from miw.reporters.markdown import _loc_line
+    dep = Dependency(
+        kind="tool", canonical_name="Murf.AI",
+        locations=[loc("prose_name", "OBJECTIVE_QUESTIONS", session=1) for _ in range(40)]
+                  + [loc("prose_name", "LEARNING_RESOURCE", session=2) for _ in range(5)])
+    f = finding(signal="S4")
+    scope_locations(dep, f)
+    assert f.affects_counts == {"OBJECTIVE_QUESTIONS": 40, "LEARNING_RESOURCE": 5}
+    assert "40 quiz questions" in _loc_line(f)        # digest
+    assert "40 quiz questions" in where_line(dep, f)  # the panel's action sentence
+
+
+def test_a_projection_recounts_for_its_own_course():
+    from miw.analyse.project import project_finding
+    other = "Building LLM Applications"
+    dep = Dependency(
+        kind="tool", canonical_name="Murf.AI",
+        locations=[loc("prose_name", "OBJECTIVE_QUESTIONS", session=1) for _ in range(3)]
+                  + [Location(course=other, topic_name="T", unit_id="u", unit_name="U",
+                              content_id="c", field_path="f",
+                              evidence_source="prose_name",
+                              object_type="LEARNING_RESOURCE", session_no=4)])
+    f = finding(signal="S4")
+    f.courses = [COURSE, other]
+    scope_locations(dep, f)
+    assert f.affects_total == 4
+    local = project_finding(f, dep, COURSE)
+    assert local.affects_total == 3
+    assert local.affects_counts == {"OBJECTIVE_QUESTIONS": 3}

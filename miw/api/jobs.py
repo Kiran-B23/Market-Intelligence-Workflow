@@ -315,9 +315,11 @@ class JobRunner:
             for f in rows:
                 # `what_to_act` is the refined wording when a model rewrote the note
                 # and the deterministic one otherwise; `recommendation` is always the
-                # deterministic line. Prefer the first, fall back to the second, so the
-                # row says the same thing the digest and the panel say.
-                action = f.get("what_to_act") or f.get("recommendation") or ""
+                # deterministic line. Prefer the first, fall back to the second - minus
+                # the "starting with ... session 25" clause, which belongs in the panel:
+                # this is a list row, and it is read to decide what to open next.
+                from miw.analyse.score import action_only
+                action = action_only(f)
                 sessions = sorted({l.get("session_no") for l in (f.get("locations") or [])
                                    if l.get("session_no")})
                 self.conn.execute(

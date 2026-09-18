@@ -74,7 +74,9 @@ def _inventory_deps() -> dict:
 
     The projection MUST join back to these rather than read `Finding.locations`, which
     `score.py` truncates to 12 - projecting off the finding understates the busiest
-    course (measured: 9 locations instead of 15).
+    course (measured: 9 locations instead of 15). The findings LIST joins back for the
+    same reason: counting the stored twelve made a row say "4 quiz questions" beneath a
+    panel that said 101 about the same finding.
     """
     from miw.schema import Dependency, Location
     out = {}
@@ -282,6 +284,8 @@ def findings(course: str = "") -> dict:
     Gen AI, so a page that filtered without recomputing would overstate by 5.4x.
     """
     from miw import triage
+    from config.constants import ARTIFACT_ORDER, artifact_word
+    from miw.analyse.score import action_only
     from miw.state import State
 
     data = _read("findings_*.json")
@@ -304,9 +308,21 @@ def findings(course: str = "") -> dict:
     # questions" can. The counts come from `Finding.locations`, which is now the places
     # the SIGNAL reaches rather than every mention of the dependency, so the row and
     # the panel say the same thing.
+    # `affects_counts` is recorded by `scope_locations` over the UNCAPPED reached set.
+    # Counting `r["locations"]` instead - a 12-row display cap - made a list row say "4
+    # quiz questions" beneath a panel that said 101 about the same finding. A finding
+    # written before this field existed falls back to its locations, which is the old
+    # behaviour rather than a blank.
     for r in rows + standing:
-        r["affects"] = [{"count": g["count"], "label": g["label"]}
-                        for g in _artifact_groups(r.get("locations") or [])]
+        counts = r.get("affects_counts") or {
+            g["object_type"]: g["count"]
+            for g in _artifact_groups(r.get("locations") or [])}
+        r["affects"] = [{"count": counts[t], "label": artifact_word(t, counts[t] != 1)}
+                        for t in ARTIFACT_ORDER if counts.get(t)]
+        # The list row shows the action alone. The "starting with the quiz question in
+        # ... session 25" clause is the panel's job, and repeating it here made every
+        # row carry a sentence a reviewer has to read past to reach the next one.
+        r["action"] = action_only(r)
     state = State()
     for f in rows:
         d = state.latest_decision(f["finding_id"])
@@ -339,8 +355,7 @@ def findings(course: str = "") -> dict:
                           # this. `what_to_act` is the refined wording where a model
                           # rewrote it; `recommendation` is always the deterministic
                           # line, so it is the fallback rather than a second opinion.
-                          "action": (r.get("what_to_act")
-                                     or r.get("recommendation", "")),
+                          "action": action_only(r),
                           "sessions": sorted({l.get("session_no")
                                               for l in (r.get("locations") or [])
                                               if l.get("session_no")}),
@@ -416,6 +431,7 @@ def _as_int(v) -> Optional[int]:
         return int(str(v).strip())
     except (TypeError, ValueError):
         return None
+
 
 
 
@@ -631,7 +647,12 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
         locs = [to_jsonable(l) for l in dep.locations
                 if not title or l.course == title]
     else:
-        locs = row.get("locations", [])
+        # A topic gap has no inventory entry - its locations ARE the sessions it belongs
+        # in, and they live on the finding. Filter them by course like everything else:
+        # the heading above already says "in <course>", and listing every course's
+        # sessions under it made a course page claim two placements where it owns one.
+        locs = [l for l in (row.get("locations") or [])
+                if not title or l.get("course") == title]
     # The name is not always what was matched: a `link:a_href` location was attributed
     # because a URL in the text matched one of this dependency's referenced URLs, and
     # searching for the name alone leaves 20 of this S4's 40 locations unhighlighted.

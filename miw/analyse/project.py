@@ -88,7 +88,17 @@ def project_finding(f: Finding, dep: Dependency, course: str,
 
     # --- recomputed, every one of them ------------------------------------
     out.courses = [course]
-    out.locations = local.locations[:12]   # display cap only; counts come from `local`
+    # Scoped the same way the global finding is: this course's locations, narrowed to
+    # the ones this signal can actually reach. Without the second step a course page
+    # reintroduces exactly the bug `scope_locations` exists to fix - "Composio appears
+    # in 4 places in this course" under a finding about one dead URL - and it also
+    # recomputes `affects_counts` so the counts shown are this course's, not the
+    # curriculum's.
+    score.scope_locations(local, out)
+    if not out.locations and f.locations_scoped:
+        # The dependency is taught here, but nothing this signal touches is. That is
+        # not a small finding for this course; it is not this course's finding.
+        return None
     out.blast_radius = score.blast_radius(local)
     out.graded_locations = local.graded_locations
     executing = local.questions_that_execute_it

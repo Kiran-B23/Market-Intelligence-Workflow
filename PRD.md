@@ -3517,3 +3517,50 @@ footprints are finally honest.
 Applied across the whole workflow and confirmed stage by stage: extract → probe → analyse
 → gaps → changes → report → verify, with the live API re-checked for a wired node, a
 mention-only node and a merged one. 649 → 659 tests, eval 4/4 at 100%, `verify` clean.
+
+---
+
+## 37. A list row is not the detail panel
+
+Every finding row on the findings page ended with a sentence naming the course, the
+session and the artifact it started at. That is the panel's job, and the panel already
+does it better — grouped by session and by artifact type, counted, deep-linked — so the
+row was the panel printed badly, and a reviewer scanning for what to open next had to read
+past it on every line.
+
+`recommend()` builds the action and the location clause together, so the clause is now
+recorded separately as `Finding.affects_line` and `score.action_only()` removes exactly
+what was appended rather than guessing at a sentence boundary. A model-refined
+`what_to_act` never contains it and comes back untouched; an S11 or S12, whose line is
+written by `gaps.py`/`newer.py` and for which the session *is* the finding, is left alone.
+The findings list and the run page both read it. The panel and the digest keep the full
+sentence.
+
+Two things surfaced while checking the result.
+
+**The counts were the display cap.** `Finding.locations` stops at 12, and every surface
+that counted it understated a busy finding by an order of magnitude — a row said "4 quiz
+questions" beneath a panel saying 101 about the same finding. `scope_locations` now records
+`affects_counts` and `affects_total` over the **uncapped** reached set, and the row, the
+digest and the action sentence all read that one number. The panel still recomputes from
+the inventory, and the two now agree on all 56 findings on the all-course page and on each
+of the three course pages.
+
+**A correction to §35.** That section claims `project_finding` re-runs the scoping. It did
+not: the edit was written in the same step as a second one whose anchor did not match, the
+script aborted before writing, and the docstring change that landed alongside it made the
+file read as though it had. So course pages kept showing the dependency's whole footprint
+for that course — the §35 bug, surviving on exactly the pages whose purpose is to tell one
+course's owner how much work they have. It is applied now, and a projection that reaches
+nothing in a course correctly returns `None` rather than appearing there at all.
+
+A third, smaller, came out of the same check: a topic gap has no inventory entry, so the
+panel took the `dep is None` path and did not filter its locations by course — while the
+heading above them said "in *Building LLM Applications*". A gap placed in two courses
+claimed two placements on each of their pages.
+
+### Gates
+
+666 tests, eval 4/4, `verify` clean, and the whole workflow re-run — extract, probe,
+analyse, gaps, changes, report — with row-versus-panel agreement checked programmatically
+across every finding on every page.

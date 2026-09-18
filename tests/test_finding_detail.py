@@ -449,3 +449,33 @@ def test_the_places_it_does_not_affect_are_kept_not_discarded(tmp_path, monkeypa
     _composio_wired(tmp_path, monkeypatch)
     d = api.finding_detail("f-1")
     assert sum(g["count"] for g in d["mentions_groups"]) == d["mentions_total"] == 3
+
+
+def test_a_topic_gaps_sessions_are_filtered_by_course(tmp_path, monkeypatch):
+    """The heading says "in <course>"; it must not list another course's sessions.
+
+    A gap has no inventory entry - its locations ARE the sessions it belongs in - so it
+    took the `dep is None` path, which did not filter. A course page then claimed two
+    placements where it owns one, and disagreed with its own list row.
+    """
+    out = tmp_path / "out"; out.mkdir()
+    (out / "inventory.json").write_text(json.dumps({"dependencies": []}))
+    gap = {**FINDING, "finding_id": "g-1", "dep_id": "topic:parallel-calls",
+           "signal": "S11", "kind_of_signal": "opportunity",
+           "canonical_name": "Parallel function calling",
+           "locations": [
+               {"course": INTRO, "topic_name": "T", "unit_id": "u", "unit_name": "U",
+                "content_id": "c1", "field_path": "f", "evidence_source": "prose_name",
+                "object_type": "SESSION_PPT", "session_no": 9},
+               {"course": APPS, "topic_name": "T", "unit_id": "u", "unit_name": "U",
+                "content_id": "c2", "field_path": "f", "evidence_source": "prose_name",
+                "object_type": "SESSION_PPT", "session_no": 4}]}
+    (out / "findings_2026-01-01.json").write_text(json.dumps({
+        "analysed_at": "2026-01-01", "coverage": {}, "findings": [gap]}))
+    monkeypatch.setattr(api, "OUT", out)
+
+    everywhere = api.finding_detail("g-1")
+    assert everywhere["locations_total"] == 2
+    here = api.finding_detail("g-1", course="intro_to_gen_ai")
+    assert here["locations_total"] == 1
+    assert here["where"][0]["session_no"] == 9

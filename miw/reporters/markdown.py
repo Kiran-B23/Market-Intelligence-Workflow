@@ -33,9 +33,10 @@ def _loc_line(f: Finding) -> str:
     # bank sits in a unit called "Coding Practice", and printing it labelled 25 of 43
     # findings as coding work when none of them was.
     from config.constants import ARTIFACT_ORDER, artifact_word
-    counts: dict[str, int] = {}
-    for l in f.locations:
-        counts[l.object_type] = counts.get(l.object_type, 0) + 1
+    counts = f.affects_counts or {}
+    if not counts:                       # a finding written before the field existed
+        for l in f.locations:
+            counts[l.object_type] = counts.get(l.object_type, 0) + 1
     kinds = ", ".join(f"{n} {artifact_word(t, n != 1)}"
                       for t in ARTIFACT_ORDER if (n := counts.get(t, 0)))
     if not where and not f.locations_scoped:

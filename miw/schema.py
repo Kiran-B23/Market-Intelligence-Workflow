@@ -477,6 +477,19 @@ class Finding:
     # wrong" is not. Borrowed from the prior Curriculum Gap Analyzer's
     # what_to_act / why_to_act / when_to_act triad.
     recommendation: str = ""          # kept: the deterministic one-liner
+    # The "Affects N quiz questions - starting with ..." clause of `recommendation`,
+    # kept separately so a LIST row can leave it out. A row that names a tool, a
+    # severity and one action is what a reviewer triages from; the same row carrying a
+    # full sentence about sessions and artifact types is the detail panel printed
+    # twice, and the panel says it better - grouped, counted and deep-linked.
+    affects_line: str = ""
+    # How many places this finding reaches, per artifact type, over the UNCAPPED set.
+    # `locations` is a display cap of 12, so counting it made the digest and the list
+    # row say "4 quiz questions" about a finding whose panel said 101. Recorded once
+    # here, read by every surface, so they cannot disagree; recomputed per course by
+    # `analyse.project`, because a projection's counts are that course's.
+    affects_counts: dict = field(default_factory=dict)
+    affects_total: int = 0
     what_to_act: str = ""
     why_to_act: str = ""
     when_to_act: str = ""
