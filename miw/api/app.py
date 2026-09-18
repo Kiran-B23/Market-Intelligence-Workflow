@@ -694,7 +694,8 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
     from miw.analyse.score import reaching_locations
     locs, mentions = reaching_locations(row.get("signal", ""),
                                         row.get("affected_urls") or [], locs,
-                                        row.get("redirects") or [])
+                                        row.get("redirects") or [],
+                                        row.get("probe_signals") or [])
     total_locations = len(locs)
 
     # Grouping is computed over the FULL location list and costs nothing, because a

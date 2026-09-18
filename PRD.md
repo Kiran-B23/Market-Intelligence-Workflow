@@ -4018,3 +4018,121 @@ add it back.
 ### Gates
 
 726 tests, eval 4/4, `verify` clean.
+
+---
+
+## 42. Why it kept happening
+
+> *"Check why this happens and tighten the criteria to avoid such mistakes."*
+
+Six defects in this system have had one shape, and each was found by a reader rather than
+by the system:
+
+| | claimed | justified by |
+|---|---|---|
+| Composio S1 | the dependency's whole footprint | one dead URL |
+| OpenAI S5 | 21 reading materials that say "OpenAI" | a docs reorganisation |
+| lmOpenAi S9 | a wired n8n node | a row in a glossary table |
+| Nango S10 | "candidate replacement" | `verified`, i.e. the company exists |
+| "Coding Practice" | the artifact's type | the unit's *name* |
+| n8n agent | versions below 2 are removed | a node taught at typeVersion **2.2** |
+
+Each was patched at its own site, and the next one arrived. That is the signal that the
+patches were treating instances of a rule.
+
+### The rule
+
+**A finding's reach was declared against the finding SIGNAL, and a finding signal is a
+bucket.** Several different observations pour into each one:
+
+```
+S4   registry_missing | registry_deprecated | no_release_in_2y   a PACKAGE is dead
+     sunset_language_about_subject                               the VENDOR says so
+
+S3   free_tier_language_lost | pricing_restriction_language      money changed
+     pricing_page_changed                                        a PAGE was rewritten
+```
+
+A reach declared on the bucket is therefore **too wide for some of its members**, and too
+wide is the failure mode that ships: it reads as a bigger, more urgent finding, no test
+fails, and the reviewer is sent to places where nothing happened. Too narrow would be
+noticed immediately; too wide is invisible until somebody reads the output carefully.
+
+Laid out, the two still carrying it were plain:
+
+```
+S4  produced by: no_release_in_2y, registry_deprecated, registry_missing,
+                 sunset_language_about_subject
+    reaches    : everything            <- right for one of the four
+S3  produced by: free_tier_language_lost, pricing_page_changed,
+                 pricing_restriction_language
+    reaches    : everything            <- right for two of the three
+```
+
+### The tightening
+
+**Reach is keyed on the observation, not on the bucket.** `EVIDENCE_REACH` maps each
+*probe signal* to what it justifies, and `evidence_reach()` takes the union over the
+observations a finding actually carries. The per-signal table survives only as the
+fallback for findings the probe did not produce — S11 from `gaps.py`, S12 from
+`newer.py`.
+
+Three groups, and the third has to be argued for:
+
+* **a page event** (`url_gone`, `redirected_off_path`, `page_text_changed`,
+  `pricing_page_changed`, `access_wall_language`, `domain_parked`) reaches the places
+  that **link to that page** and nothing else;
+* **a registry event** (`registry_missing`, `no_release_in_2y`,
+  `major_behind_taught_pin`, …) reaches where the package is **installed, imported,
+  pinned or declared** — not every paragraph that names it;
+* **everywhere** is earned by exactly three observations — `sunset_language_about_subject`,
+  `free_tier_language_lost`, `pricing_restriction_language` — because those change what
+  the course should *teach*, wherever it is taught. A test names all three, so a fourth
+  cannot be added quietly.
+
+### Three guards, at three different distances
+
+1. **A new observation must declare its reach.** `test_every_observation_declares_what_it
+   _reaches` fails on any probe signal missing from the table. This is the one that stops
+   the rule decaying: without it, a new signal inherits the widest reading in silence.
+2. **The sentence may not out-claim the list.** `_assert_claim_fits` raises at analyse
+   time when a recommendation says "the *N* place(s)" and carries a different number.
+   That exact drift shipped once — "the 6 place(s) Composio is linked" printed directly
+   above twelve rows — because the sentence counted `dep.link_locations` and the list
+   held `dep.locations[:12]`.
+3. **`main.py verify` audits the artifact.** Every finding on file is re-derived against
+   its own observations, and a location the evidence cannot reach is an invariant
+   violation with the finding's name on it. Checked by breaking one on purpose:
+
+   ```
+   1 INVARIANT VIOLATION(S):
+     - LangChain (S1): claims a prose_name location, which url_gone does not reach
+   ```
+
+   The trust checks already asked *"is this finding sourced"*. Nothing asked *"is this
+   finding the right size"*, and that is where all six lived.
+
+### What it changed on the live artifact
+
+S4 stopped reaching question tags and prose. A package that left PyPI now points at the
+places the package is used:
+
+```
+finnhub    registry_missing   -> solution_import 4, sheet_declared 5
+bert_score no_release_in_2y   -> install_command 1, sheet_pin 4
+agents     no_release_in_2y   -> sheet_pin 12
+```
+
+### The honest limit
+
+This closes **scope** inflation — a claim wider than its evidence. It does not close
+**name** inflation, the second half of the same family: `verified` meaning "it exists",
+`n8n_workflow` labelling a glossary row, `screenshots_at_risk` counting images nobody
+looked at, S5 labelled "the taught steps changed" while every one of its findings is a
+redirect. Those are caught today only by reading the code next to the word, and the
+remedy — asserting that a rendered word matches what was measured — is not mechanical in
+the way this one is. Worth saying rather than implying the class is closed.
+
+### Gates
+
+738 tests, eval 4/4, `verify` clean with the new scope audit.

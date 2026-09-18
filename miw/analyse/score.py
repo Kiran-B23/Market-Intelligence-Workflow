@@ -171,6 +171,63 @@ def _fingerprint(*parts: str) -> str:
 # would be a guess dressed as a measurement.
 
 _LINK = ("link:a_href", "link:iframe", "link:bare", "link:markdown")
+_REGISTRY_USE = ("install_command", "solution_import", "sheet_pin", "n8n_workflow",
+                 "test_case_enum", "sheet_declared")
+
+# --------------------------------------------------------- reach, per OBSERVATION
+#
+# The rule that stops this table being rewritten every time somebody reports a finding
+# that claimed too much: **a finding may reach only what the observation behind it
+# justifies.**
+#
+# It was declared per FINDING SIGNAL before, and that is the bug generator. A finding
+# signal is a bucket, and several different observations pour into each one:
+#
+#     S4  registry_missing | registry_deprecated | no_release_in_2y  a PACKAGE is dead
+#         sunset_language_about_subject                              the VENDOR says so
+#     S3  free_tier_language_lost | pricing_restriction_language     money changed
+#         pricing_page_changed                                       a PAGE was rewritten
+#
+# A reach declared on the bucket is therefore either too wide for some members or too
+# narrow for others, and too wide is the one that ships: it reads as a bigger finding,
+# nobody's test fails, and the reviewer is sent to places nothing happened. Every defect
+# of this shape found so far is the same mistake at a different level -
+#
+#     Composio S1   the dependency's whole footprint, for one dead URL
+#     OpenAI   S5   21 reading materials that say "OpenAI", for a docs reorganisation
+#     lmOpenAi S9   a glossary row scored as a wired node
+#     Nango    S10  "verified" (it exists) rendered as "candidate replacement"
+#
+# - so it is fixed once, here, by keying on the observation instead.
+#
+# `None` means "everywhere the dependency is taught" and has to be EARNED: it is for
+# events that change the instruction itself, wherever it appears.
+EVIDENCE_REACH: dict[str, Optional[tuple]] = {
+    # A URL event reaches the places that link to that URL.
+    "url_gone": _LINK, "domain_parked": _LINK, "redirected_off_path": _LINK,
+    "access_wall_language": _LINK, "page_text_changed": _LINK,
+    "pricing_page_changed": _LINK,
+    # A registry event is about a package: it reaches where the package is installed,
+    # imported, pinned or declared - not every paragraph that names it.
+    "registry_missing": _REGISTRY_USE, "registry_deprecated": _REGISTRY_USE,
+    "no_release_in_2y": _REGISTRY_USE,
+    "new_release": _REGISTRY_USE, "major_behind_taught_pin": _REGISTRY_USE,
+    # The vendor itself saying it is sunsetting, or that the money changed. These change
+    # what the course should TEACH, so they reach everywhere it is taught.
+    "sunset_language_about_subject": None,
+    "free_tier_language_lost": None, "pricing_restriction_language": None,
+    # A model id is passed to an API; the workbook row names it too.
+    "model_shutdown_passed": ("model_id", "sheet_declared", "sheet_pin"),
+    "model_deprecation_declared": ("model_id", "sheet_declared", "sheet_pin"),
+    "model_tier_restricted": ("model_id", "sheet_declared", "sheet_pin"),
+    # n8n: the workflows that wire the node, and the tables that merely name it.
+    "node_removed_upstream": ("n8n_workflow", "n8n_mention"),
+    "breaking_change_declared": ("n8n_workflow", "n8n_mention"),
+    "breaking_change_possible": ("n8n_workflow", "n8n_mention"),
+    "n8n_new_release": ("n8n_workflow", "n8n_mention"),
+    "node_named_in_release_notes": ("n8n_workflow", "n8n_mention"),
+}
+
 _RUNTIME = ("install_command", "solution_import", "sheet_pin", "n8n_workflow",
             "test_case_enum")
 _DEPICTED = ("SESSION_PPT", "LEARNING_RESOURCE")
@@ -233,8 +290,15 @@ def s5_reach(redirects) -> str:
 
 
 def reaches(signal: str, loc, reach: str = "behaviour") -> bool:
-    """Can this signal's event invalidate what is at this location?"""
-    sources = SIGNAL_EVIDENCE.get(signal, None)
+    """Can this signal's event invalidate what is at this location?
+
+    Kept for callers that have a signal and no observations. `_reaches_with` is the
+    real test; this is it with the per-signal fallback already resolved.
+    """
+    return _reaches_with(signal, loc, reach, SIGNAL_EVIDENCE.get(signal, None))
+
+
+def _reaches_with(signal: str, loc, reach: str, sources: Optional[tuple]) -> bool:
     if sources is None:
         return True
     if _get(loc, "evidence_source") in sources:
@@ -252,15 +316,39 @@ def reaches(signal: str, loc, reach: str = "behaviour") -> bool:
     return False
 
 
+def evidence_reach(signal: str, probe_signals=()) -> Optional[tuple]:
+    """What the OBSERVATIONS behind this finding justify reaching.
+
+    The union over the probe signals actually present, because a finding can carry
+    several - a tool whose free-tier wording went AND whose pricing page was rewritten
+    reaches everywhere the first one does. `None` anywhere in the union means "the whole
+    footprint", and it stays `None`.
+
+    Falls back to the per-signal table only when there are no probe signals at all,
+    which means a research-only finding: nothing was observed, a source was quoted, and
+    the quote is about the dependency rather than about one of its pages.
+    """
+    known = [EVIDENCE_REACH[p] for p in probe_signals if p in EVIDENCE_REACH]
+    if not known:
+        return SIGNAL_EVIDENCE.get(signal, None)
+    if any(r is None for r in known):
+        return None
+    out: tuple = ()
+    for r in known:
+        out += tuple(x for x in r if x not in out)
+    return out
+
+
 def reaching_locations(signal: str, affected_urls, locations,
-                       redirects=()) -> tuple[list, list]:
+                       redirects=(), probe_signals=()) -> tuple[list, list]:
     """Split `locations` into (reached by this signal, merely mentioning).
 
     Uncapped, and usable on both `Location` objects and their serialised dicts, so the
     analyser and the detail panel cannot disagree about what a finding affects.
     """
     reach = s5_reach(redirects) if signal == "S5" else "behaviour"
-    reached = [l for l in locations if reaches(signal, l, reach)]
+    sources = evidence_reach(signal, probe_signals)
+    reached = [l for l in locations if _reaches_with(signal, l, reach, sources)]
     # S5 joins the URL narrowing when the redirect stayed inside the vendor's estate:
     # the event is "these links now land elsewhere", and the links are nameable.
     narrowing = ("S1", "S2", "S8") + (("S5",) if reach == "links" else ())
@@ -287,7 +375,7 @@ def scope_locations(dep: Dependency, f: Finding) -> None:
     evidence kind.
     """
     reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations,
-                                       f.redirects)
+                                       f.redirects, f.probe_signals)
 
     # Counted before the cap, and recorded, because `locations` is a display list and
     # every surface that counted it understated a busy finding by an order of magnitude.
@@ -334,6 +422,27 @@ def front_door_gone(dep: Dependency, affected_urls) -> bool:
     if not home:
         return False
     return any((u or "").rstrip("/").lower() == home for u in (affected_urls or []))
+
+
+
+_CLAIMED_N = re.compile(r"\bthe (\d+) place\(s\)|\bin the (\d+) place\(s\)")
+
+
+def _assert_claim_fits(f: Finding) -> None:
+    """A finding may not say a number the location list does not support.
+
+    Cheap, and it closes the specific way this goes wrong in production: the sentence
+    and the list are built from different sources and drift. `recommend()`'s S1 line
+    once read "the 6 place(s) Composio is linked" directly above twelve rows, because
+    the sentence counted `dep.link_locations` and the list held `dep.locations[:12]`.
+    Both now read `f.locations`, and this refuses to let them part again.
+    """
+    for m in _CLAIMED_N.finditer(f.recommendation or ""):
+        claimed = int(m.group(1) or m.group(2))
+        if claimed != len(f.locations):
+            raise AssertionError(
+                f"{f.finding_id} ({f.signal}) claims {claimed} place(s) but carries "
+                f"{len(f.locations)}")
 
 
 def findings_for(dep: Dependency, probe: Optional[ProbeResult],
@@ -622,6 +731,10 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
     for f in out.values():
         if not f.is_substantiated:
             continue
+        # The wording is generated from the location set, so the two can only disagree
+        # through a bug - but that bug is the one this system keeps making, and it is
+        # invisible without an assertion because a too-wide claim still reads fine.
+        # Checked after `recommend()` runs, below.
         # An n8n node the curriculum only NAMES cannot break a student's workflow,
         # because there is no workflow. Nine of the 41 taught nodes are in exactly that
         # position: 32 locations each, every one of them the same display-name
@@ -637,6 +750,7 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                          f"nothing a student runs is affected.")
         scope_locations(dep, f)
         f.recommendation = recommend(dep, f)
+        _assert_claim_fits(f)
         notes.compose(dep, f)          # deterministic triad; refine() may replace it
         final.append(f)
     return sorted(final, key=lambda x: (-SEVERITY_ORDER.index(x.severity), -x.blast_radius))

@@ -1578,11 +1578,43 @@ def cmd_verify(args) -> int:
                         f"{f['canonical_name']}: S7 with no authoritative claim - "
                         f"provider authority was not established")
 
+    # --- scope: a finding may not claim more than its own observation justifies ---
+    #
+    # The trust checks above ask "is this finding sourced". They never asked "is this
+    # finding the right SIZE", and that is where six separate defects have lived: the
+    # dependency's whole footprint attributed to one dead URL, 21 reading materials
+    # that say "OpenAI" attributed to a docs reorganisation, a glossary row scored as a
+    # wired n8n node. Each was caught by a reader rather than by the system, which is
+    # the part worth fixing.
+    from miw.analyse.score import evidence_reach
+    over = []
+    for f in findings:
+        reach = evidence_reach(f.get("signal", ""), f.get("probe_signals") or [])
+        if reach is None:
+            continue
+        for l in f.get("locations") or []:
+            src = l.get("evidence_source", "")
+            if src in reach:
+                continue
+            # S5's one earned widening: a product that moved OFF its own domain makes
+            # the prose that names it wrong too. `s5_reach` decides it; this repeats
+            # only the exemption, not the judgement.
+            if f["signal"] == "S5" and src in ("prose_name", "title") and any(
+                    r.get("off_site") for r in (f.get("redirects") or [])):
+                continue
+            over.append(f"{f['canonical_name']} ({f['signal']}): claims a "
+                        f"{src} location, which {', '.join(f.get('probe_signals') or ['its evidence'])} "
+                        f"does not reach")
+    for pr in sorted(set(over)):
+        problems.append(pr)
+
     if problems:
         print(f"\n  {len(problems)} INVARIANT VIOLATION(S):")
         for pr in problems[:20]:
             print(f"    - {pr}")
         return 1
+    print(f"\n  Scope: every finding's locations are reachable by the observation "
+          f"behind it.")
     print("\n  All trust invariants hold: every finding rests on a first-hand probe "
           "observation or an authoritative citation.")
     return 0

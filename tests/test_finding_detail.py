@@ -295,7 +295,8 @@ def test_the_shared_package_id_is_never_a_highlight_term(tmp_path, monkeypatch):
         # S1, because the location below is a link and `score.scope_locations` only
         # shows a finding the places its own signal can reach - an S7 about a retired
         # model id does not reach an `a href`.
-        "findings": [{**FINDING, "signal": "S1", "dep_id": node_dep.dep_id,
+        "findings": [{**FINDING, "signal": "S1", "probe_signals": ["url_gone"],
+                      "dep_id": node_dep.dep_id,
                       "canonical_name": node_dep.canonical_name}]}))
     monkeypatch.setattr(api, "OUT", out)
     courses = tmp_path / "courses"; courses.mkdir()
@@ -421,7 +422,11 @@ def _composio_wired(tmp_path, monkeypatch):
     (out / "inventory.json").write_text(json.dumps({"dependencies": [to_jsonable(dep)]}))
     (out / "findings_2026-01-01.json").write_text(json.dumps({
         "analysed_at": "2026-01-01", "coverage": {},
-        "findings": [{**FINDING, "signal": "S1", "dep_id": dep.dep_id,
+        # The observation has to match the signal: `evidence_reach` keys on the probe
+        # signals, so an S1 carrying `model_shutdown_passed` reaches model ids and not
+        # links - which is the rule working, and a fixture that did it was wrong.
+        "findings": [{**FINDING, "signal": "S1", "probe_signals": ["url_gone"],
+                      "dep_id": dep.dep_id,
                       "canonical_name": dep.canonical_name,
                       "affected_urls": [DEAD_URL], "locations": []}]}))
     monkeypatch.setattr(api, "OUT", out)
@@ -460,8 +465,11 @@ def test_a_topic_gaps_sessions_are_filtered_by_course(tmp_path, monkeypatch):
     """
     out = tmp_path / "out"; out.mkdir()
     (out / "inventory.json").write_text(json.dumps({"dependencies": []}))
+    # A topic gap is produced by `gaps.py`, not by the probe, so it carries no probe
+    # signals - and `evidence_reach` then falls back to the per-signal table, which
+    # says S11 reaches every session it was placed in.
     gap = {**FINDING, "finding_id": "g-1", "dep_id": "topic:parallel-calls",
-           "signal": "S11", "kind_of_signal": "opportunity",
+           "signal": "S11", "kind_of_signal": "opportunity", "probe_signals": [],
            "canonical_name": "Parallel function calling",
            "locations": [
                {"course": INTRO, "topic_name": "T", "unit_id": "u", "unit_name": "U",

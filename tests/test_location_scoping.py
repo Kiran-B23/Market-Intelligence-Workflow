@@ -42,10 +42,21 @@ def composio():
                    loc("prose_name", "OBJECTIVE_QUESTIONS", 24, unit="Coding Practice")])
 
 
-def finding(signal="S1", urls=()):
+# One coherent observation per signal. A finding carries the probe signals that
+# produced it, and since `evidence_reach` keys on those rather than on the signal
+# letter, a fixture that pairs "S3 pricing" with "a URL 404'd" is not a small
+# inaccuracy - it is the exact confusion the rule exists to catch.
+OBSERVED = {"S1": "url_gone", "S2": "access_wall_language",
+            "S3": "free_tier_language_lost", "S4": "sunset_language_about_subject",
+            "S5": "redirected_off_path", "S6": "major_behind_taught_pin",
+            "S7": "model_shutdown_passed", "S8": "page_text_changed",
+            "S9": "breaking_change_declared"}
+
+
+def finding(signal="S1", urls=(), observed=None):
     f = Finding(dep_id="d", canonical_name="Composio", signal=signal,
                 signal_label="Dead / moved URL", severity="high")
-    f.probe_signals = ["url_gone"]
+    f.probe_signals = [observed or OBSERVED.get(signal, "url_gone")]
     f.affected_urls = list(urls)
     return f
 
@@ -80,10 +91,29 @@ def test_a_signal_that_reaches_nothing_refuses_rather_than_showing_everything():
 
 
 def test_pricing_and_deprecation_reach_every_place_it_is_taught():
+    """Earned, not assumed: `free_tier_language_lost` and
+    `sunset_language_about_subject` are the vendor changing what the course should
+    TEACH, so they reach everywhere it is taught."""
     for signal in ("S3", "S4"):
         dep, f = composio(), finding(signal=signal)
         scope_locations(dep, f)
         assert len(f.locations) == len(dep.locations), signal
+
+
+def test_the_same_signal_reaches_differently_when_the_observation_differs():
+    """S4 is a bucket. `sunset_language_about_subject` is the vendor saying it is
+    winding down and reaches everywhere; `registry_missing` is a package that left
+    PyPI and reaches where the package is used. Declaring the reach on the bucket made
+    the second one claim the first one's blast radius."""
+    dep = composio()
+    everywhere = finding(signal="S4", observed="sunset_language_about_subject")
+    scope_locations(dep, everywhere)
+    assert len(everywhere.locations) == len(dep.locations)
+
+    package = finding(signal="S4", observed="registry_missing")
+    scope_locations(dep, package)
+    assert len(package.locations) < len(dep.locations)
+    assert all(l.evidence_source != "prose_name" for l in package.locations)
 
 
 def test_every_declared_signal_has_a_rule_or_is_deliberately_unscoped():
@@ -107,7 +137,7 @@ def test_the_exemplar_is_the_place_that_executes_it():
     dep = Dependency(kind="package", canonical_name="langchain", registry="pypi",
                      locations=[loc("prose_name", "OBJECTIVE_QUESTIONS", 2),
                                 loc("solution_import", "CODING_QUESTIONS", 9)])
-    f = finding(signal="S6")
+    f = finding(signal="S6", observed="major_behind_taught_pin")
     scope_locations(dep, f)
     # Only the runtime location survives S6's rule, and it is what the line names.
     assert "coding practice" in where_line(dep, f)
