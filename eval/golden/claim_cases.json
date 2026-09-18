@@ -1,0 +1,176 @@
+[
+ {
+  "name": "a vendor's own page with a real quote builds a claim",
+  "kind": "deprecation",
+  "statement": "n8n deprecated the Function node",
+  "source_url": "https://docs.n8n.io/release-notes/",
+  "quote": "The Function node has been deprecated and replaced by the Code node.",
+  "subject": {
+   "name": "n8n",
+   "homepage": "https://n8n.io",
+   "docs_url": "https://docs.n8n.io/"
+  },
+  "expect": {
+   "built": true,
+   "tier": "AUTHORITATIVE",
+   "substantiates": true
+  }
+ },
+ {
+  "name": "MUST REFUSE a claim with no source at all",
+  "kind": "deprecation",
+  "statement": "Acme is deprecated",
+  "source_url": "",
+  "quote": "Acme has been deprecated and will be removed.",
+  "subject": {
+   "name": "Acme",
+   "homepage": "https://acme.test"
+  },
+  "expect": {
+   "built": false,
+   "error_mentions": "no source"
+  }
+ },
+ {
+  "name": "MUST REFUSE a quote too short to verify",
+  "kind": "deprecation",
+  "statement": "Acme is deprecated",
+  "source_url": "https://acme.test/changelog",
+  "quote": "Deprecated",
+  "subject": {
+   "name": "Acme",
+   "homepage": "https://acme.test"
+  },
+  "expect": {
+   "built": false,
+   "error_mentions": "too short"
+  }
+ },
+ {
+  "name": "MUST REFUSE a claim with an empty statement",
+  "kind": "pricing",
+  "statement": "",
+  "source_url": "https://acme.test/pricing",
+  "quote": "The free tier has been discontinued for new projects.",
+  "subject": {
+   "name": "Acme",
+   "homepage": "https://acme.test"
+  },
+  "expect": {
+   "built": false,
+   "error_mentions": "empty statement"
+  }
+ },
+ {
+  "name": "MUST REFUSE an excluded source outright",
+  "kind": "deprecation",
+  "statement": "Acme is deprecated",
+  "source_url": "https://top10bestaitools.example/best-acme-alternatives-2026",
+  "quote": "Acme has been deprecated according to our research team.",
+  "subject": {
+   "name": "Acme",
+   "homepage": "https://acme.test"
+  },
+  "expect": {
+   "built": false,
+   "error_mentions": "excluded"
+  }
+ },
+ {
+  "name": "a third party builds a claim but MUST NOT substantiate a strict kind",
+  "kind": "deprecation",
+  "statement": "Acme is deprecated",
+  "source_url": "https://news.example/acme-shutting-down",
+  "quote": "Acme told us it will shut the service down next quarter.",
+  "subject": {
+   "name": "Acme",
+   "homepage": "https://acme.test"
+  },
+  "expect": {
+   "built": true,
+   "substantiates": false
+  }
+ },
+ {
+  "name": "a registry LENT to a package settles a version and MUST NOT settle a price",
+  "kind": "pricing",
+  "statement": "langchain is free",
+  "source_url": "https://pypi.org/project/langchain/",
+  "quote": "langchain 0.3.27 is the latest release on PyPI.",
+  "subject": {
+   "name": "langchain",
+   "registry": "pypi",
+   "registry_id": "langchain"
+  },
+  "expect": {
+   "built": true,
+   "tier": "CORROBORATING",
+   "substantiates": false
+  }
+ },
+ {
+  "name": "that same registry DOES settle the version it exists to publish",
+  "kind": "version",
+  "statement": "langchain's latest release is 0.3.27",
+  "source_url": "https://pypi.org/project/langchain/",
+  "quote": "langchain 0.3.27 is the latest release on PyPI.",
+  "subject": {
+   "name": "langchain",
+   "registry": "pypi",
+   "registry_id": "langchain"
+  },
+  "expect": {
+   "built": true,
+   "tier": "AUTHORITATIVE",
+   "substantiates": true
+  }
+ },
+ {
+  "name": "MUST NOT strip a vendor of authority over its own site that is also a registry",
+  "kind": "pricing",
+  "statement": "Hugging Face changed its Spaces pricing",
+  "source_url": "https://huggingface.co/pricing",
+  "quote": "Spaces hardware now starts at $0.60 per hour for the smallest GPU tier.",
+  "subject": {
+   "name": "Hugging Face",
+   "homepage": "https://huggingface.co"
+  },
+  "expect": {
+   "built": true,
+   "tier": "AUTHORITATIVE",
+   "substantiates": true
+  }
+ },
+ {
+  "name": "a model card on its own host still settles a deprecation about that model",
+  "kind": "deprecation",
+  "statement": "Qwen2.5-1.5B is deprecated",
+  "source_url": "https://huggingface.co/Qwen/Qwen2.5-1.5B",
+  "quote": "This model card is deprecated; use Qwen3 instead for new work.",
+  "subject": {
+   "name": "qwen2.5-1.5b",
+   "homepage": "https://huggingface.co/Qwen"
+  },
+  "expect": {
+   "built": true,
+   "tier": "AUTHORITATIVE",
+   "substantiates": true
+  }
+ },
+ {
+  "name": "a registry that is NOT the subject's site still answers only within its remit",
+  "kind": "pricing",
+  "statement": "SomeTool is free",
+  "source_url": "https://pypi.org/project/sometool/",
+  "quote": "sometool 1.2.0 is the latest release published on PyPI.",
+  "subject": {
+   "name": "SomeTool",
+   "homepage": "https://sometool.dev"
+  },
+  "expect": {
+   "built": true,
+   "tier": "CORROBORATING",
+   "substantiates": false
+  }
+ }
+]

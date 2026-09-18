@@ -1,0 +1,107 @@
+[
+ {
+  "name": "a first look records a baseline and raises nothing",
+  "baseline": null,
+  "seen": [
+   "The legacy v1 endpoint is deprecated and will be removed."
+  ],
+  "expect": {
+   "fires": false,
+   "records": true
+  }
+ },
+ {
+  "name": "an unchanged page raises nothing on the next run",
+  "baseline": [
+   "The legacy v1 endpoint is deprecated and will be removed."
+  ],
+  "seen": [
+   "The legacy v1 endpoint is deprecated and will be removed."
+  ],
+  "expect": {
+   "fires": false
+  }
+ },
+ {
+  "name": "a notice that was not there last week is news",
+  "baseline": [
+   "The legacy v1 endpoint is deprecated and will be removed."
+  ],
+  "seen": [
+   "The legacy v1 endpoint is deprecated and will be removed.",
+   "Acme Studio has been discontinued and will be shut down on March 1, 2027."
+  ],
+  "expect": {
+   "fires": true,
+   "new_notices": [
+    "Acme Studio has been discontinued and will be shut down on March 1, 2027."
+   ]
+  }
+ },
+ {
+  "name": "MUST NOT fire on a page that merely discusses deprecations",
+  "baseline": [
+   "The legacy v1 endpoint is deprecated and will be removed.",
+   "Gemini 1.0 Pro is deprecated.",
+   "The old batch endpoint will be shut down."
+  ],
+  "seen": [
+   "The legacy v1 endpoint is deprecated and will be removed.",
+   "Gemini 1.0 Pro is deprecated.",
+   "The old batch endpoint will be shut down."
+  ],
+  "expect": {
+   "fires": false
+  }
+ },
+ {
+  "name": "MUST NOT treat a second model's retirement as already seen",
+  "baseline": [
+   "gemini-2.5-flash is deprecated."
+  ],
+  "seen": [
+   "gemini-2.5-flash is deprecated.",
+   "gemini-3.8-flash is deprecated."
+  ],
+  "expect": {
+   "fires": true
+  }
+ },
+ {
+  "name": "MUST NOT treat a moved shutdown date as the same notice",
+  "baseline": [
+   "Acme is deprecated and will be shut down on March 1, 2027."
+  ],
+  "seen": [
+   "Acme is deprecated and will be shut down on June 1, 2027."
+  ],
+  "expect": {
+   "fires": true
+  }
+ },
+ {
+  "name": "case and whitespace alone are not a new notice",
+  "baseline": [
+   "The legacy v1 endpoint is deprecated and will be removed."
+  ],
+  "seen": [
+   "  THE LEGACY v1 endpoint IS DEPRECATED and will be removed.  "
+  ],
+  "expect": {
+   "fires": false
+  }
+ },
+ {
+  "name": "a notice that scrolls off the page is not re-raised when it returns",
+  "baseline": [
+   "The legacy v1 endpoint is deprecated and will be removed.",
+   "Acme Studio has been discontinued and will be shut down on March 1, 2027."
+  ],
+  "seen": [
+   "Acme Studio has been discontinued and will be shut down on March 1, 2027."
+  ],
+  "expect": {
+   "fires": false
+  }
+ }
+]

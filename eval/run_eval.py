@@ -42,14 +42,16 @@ from eval import cases                                               # noqa: E40
 from miw.analyse.score import SEVERITY_ORDER, findings_for            # noqa: E402
 from miw.extract.inventory import InventoryBuilder                    # noqa: E402
 from miw.registry import Registry                                     # noqa: E402
-from miw.schema import (Claim, ContentRecord, Dependency, Location,    # noqa: E402
-                        ProbeResult, ResearchResult, UncitedClaim)
+from miw.schema import (Claim, ContentRecord, Dependency, Finding,     # noqa: E402
+                        Location, ProbeResult, ResearchResult, UncitedClaim)
 from miw.trust import ClaimKind, Subject, Tier, classify, substantiates  # noqa: E402
 
 # Minimum share of cases that must pass for the suite to pass. Deterministic suites
 # are held to 100%: every case encodes a rule the code is supposed to enforce, so a
 # single failure is a regression, not noise.
-THRESHOLDS = {"trust": 1.0, "extraction": 1.0, "findings": 1.0, "discovery": 1.0}
+THRESHOLDS = {"trust": 1.0, "extraction": 1.0, "findings": 1.0, "discovery": 1.0,
+              "catalogue": 1.0, "probe": 1.0, "reach": 1.0, "news": 1.0,
+              "notice": 1.0, "newer": 1.0, "coverage": 1.0, "prose": 1.0}
 PRECISION_TARGET = 0.70          # PRD supporting metric, by week 4
 
 
@@ -73,6 +75,12 @@ class Suite:
         ok = self.rate >= thr
         print(f"\n  {self.name}: {self.passed}/{len(self.results)} "
               f"({self.rate:.0%}, need {thr:.0%})  {'PASS' if ok else 'FAIL'}")
+        # Name the gate, not just the suite. A failure here is a claim the system is
+        # now allowed to make and was not before, and the consequence is the thing
+        # worth reading at the moment it breaks.
+        gate = GATES.get(self.name)
+        if gate and (verbose or not ok):
+            print(f"    gate: {gate}")
         for label, cok, detail in self.results:
             if cok and not verbose:
                 continue
@@ -101,6 +109,47 @@ def suite_trust(verbose: bool) -> Suite:
         s.case(c["name"], ok,
                f"got tier={tier.name} substantiates={sub}, "
                f"want tier={c['expect_tier']} substantiates={c['expect_substantiates']}")
+
+    # `classify()` above decides what a source may settle. These decide whether a claim
+    # may EXIST - the constructor checks that make "there is no code path from model
+    # recall to a finding" true rather than merely intended. Added after
+    # `eval/mutations.py` found them unguarded: deleting the 12-character quote floor
+    # broke no case in any suite.
+    for c in _load("claim_cases"):
+        spec = c["subject"]
+        if spec.get("registry"):
+            # Built through `Dependency.subject()`, which is what LENDS a package the
+            # registry's authority. Constructing the Subject by hand instead would put
+            # `pypi.org` in `official_domains` as if it were the package's own site,
+            # and the remit exists precisely to tell those two apart.
+            subj = Dependency(kind="package", canonical_name=spec["name"],
+                              registry=spec["registry"],
+                              registry_id=spec.get("registry_id", "")).subject()
+        else:
+            subj = Subject(name=spec["name"], homepage=spec.get("homepage", ""),
+                           docs_url=spec.get("docs_url", "")).with_domains_from_urls()
+        exp, problems = c["expect"], []
+        try:
+            claim = Claim.build(kind=ClaimKind(c["kind"]), statement=c["statement"],
+                                source_url=c["source_url"], quote=c["quote"],
+                                subject=subj)
+        except UncitedClaim as exc:
+            if exp["built"]:
+                problems.append(f"refused a claim it should have built: {exc}")
+            elif exp.get("error_mentions", "").lower() not in str(exc).lower():
+                problems.append(f"refused for {str(exc)!r}, expected a reason "
+                                f"mentioning {exp['error_mentions']!r}")
+        else:
+            if not exp["built"]:
+                problems.append("built a claim that should have been refused")
+            else:
+                if "tier" in exp and claim.tier.name != exp["tier"]:
+                    problems.append(f"tier {claim.tier.name}, want {exp['tier']}")
+                if ("substantiates" in exp
+                        and claim.substantiating != exp["substantiates"]):
+                    problems.append(f"substantiates={claim.substantiating}, "
+                                    f"want {exp['substantiates']}")
+        s.case(c["name"], not problems, "; ".join(problems))
     return s
 
 
@@ -385,8 +434,302 @@ def suite_discovery(verbose: bool) -> Suite:
     return s
 
 
+# ------------------------------------------------------------------ the gates
+#
+# Everything above and below is organised around one question: where could this system
+# say something that is not so? Each suite guards one such place, and the must-not-fire
+# half of each is the half that matters — a missed change costs a cohort one broken
+# lab, and a fabricated one costs the team its willingness to read the next digest.
+
+
+def suite_catalogue(verbose: bool) -> Suite:
+    """Gate: a vendor's table -> what we claim it says.
+
+    The highest-risk fabrication surface in the system. A mis-bound column does not
+    fail loudly; it produces a confident, well-cited, wrong retirement on a model the
+    curriculum teaches in three figures of places.
+    """
+    from miw.probe.catalogue import entries as cat_entries
+
+    s = Suite("catalogue")
+    for c in _load("catalogue_cases"):
+        got = cat_entries(c["html"], evidence_url="https://vendor.test/models")
+        ids = {e.entry_id: e for e in got if e.column_role == "id"}
+        exp, problems = c["expect"], []
+
+        if exp.get("no_entries") and ids:
+            problems.append(f"claimed {sorted(ids)} from a table that role-types nothing")
+        for name, want in (exp.get("entries") or {}).items():
+            e = ids.get(name)
+            if e is None:
+                problems.append(f"{name} not read from the table")
+                continue
+            for field, value in want.items():
+                actual = getattr(e, field)
+                if actual != value:
+                    problems.append(f"{name}.{field} = {actual!r}, want {value!r}")
+        for name in exp.get("absent", []):
+            if name in ids:
+                problems.append(f"{name} was invented (exact lookup only)")
+        for name in exp.get("not_id_column", []):
+            if name in ids:
+                problems.append(f"{name} is a replacement, not a retired id")
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
+def suite_probe(verbose: bool) -> Suite:
+    """Gate: what an observation is allowed to mean.
+
+    Half of these are failure injections. The dangerous outcome is not a crash but a
+    cycle that completes and looks clean: a 200 whose table has moved used to read
+    exactly like a healthy check, for as long as the page stayed restructured.
+    """
+    from datetime import date
+
+    from miw.probe.catalogue import CatalogueEntry
+    from miw.probe.models import probe_model_dependency
+    from miw.vendors.base import Catalogue
+
+    s = Suite("probe")
+    for c in _load("probe_cases"):
+        spec = dict(c["catalogue"])
+        raw = spec.pop("entries", None)
+        cat = Catalogue(vendor="Vendor", **spec)
+        if raw is not None:
+            cat.entries = {k: CatalogueEntry(entry_id="m", **v) for k, v in raw.items()}
+
+        class Adapter:
+            key, vendor = "vendor", "Vendor"
+            official_domains = ("vendor.test",)
+            kinds = ("model",)
+
+            def catalogue(self, refresh=False):
+                return cat
+
+        res = probe_model_dependency(Dependency(kind="model", canonical_name="m"),
+                                     today=date(2026, 9, 18), adapters=[Adapter()])
+        exp, problems = c["expect"], []
+        if res.status != exp["status"]:
+            problems.append(f"status {res.status!r}, want {exp['status']!r}")
+        for f in exp.get("must_flag", []):
+            if f not in res.signals:
+                problems.append(f"{f} did not fire (fired: {res.signals or 'nothing'})")
+        for f in exp.get("must_not_flag", []):
+            if f in res.signals:
+                problems.append(f"{f} fired but must not have")
+        for token in exp.get("detail_mentions", []):
+            if token.lower() not in (res.detail or "").lower():
+                problems.append(f"detail never mentions {token!r}: {res.detail!r}")
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
+def suite_reach(verbose: bool) -> Suite:
+    """Gate: how much of the curriculum one observation is allowed to implicate.
+
+    The over-claim gate. A dead dashboard URL cannot make a quiz question that merely
+    says the vendor's name wrong, and attributing a dependency's whole footprint to
+    every signal is what made a 6-link finding list 12 locations.
+    """
+    from miw.analyse.score import reaching_locations
+
+    s = Suite("reach")
+    for c in _load("reach_cases"):
+        locs = c["locations"]
+        reached, _ = reaching_locations(c["signal"], c.get("affected_urls") or [], locs,
+                                        c.get("redirects") or [],
+                                        c.get("probe_signals") or [])
+        exp, problems = c["expect"], []
+        if "reached_count" in exp and len(reached) != exp["reached_count"]:
+            problems.append(f"reached {len(reached)}, want {exp['reached_count']}")
+        if "reached" in exp:
+            got = sorted(l["evidence_source"] for l in reached)
+            if got != sorted(exp["reached"]):
+                problems.append(f"reached {got}, want {sorted(exp['reached'])}")
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
+def suite_news(verbose: bool) -> Suite:
+    """Gate: is this news, and has anyone been told?
+
+    Two watermarks, and the difference between them is the whole gate. Classifying
+    against what the last RUN saw rather than what a human was last SHOWN meant a
+    second `analyse` on the same inputs consumed the week's findings and the digest
+    printed "No new or worsened findings this week."
+    """
+    import tempfile
+
+    from miw.state import State
+
+    s = Suite("news")
+    for c in _load("news_cases"):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.db"
+            st, problems, step_no = State(path), [], 0
+            for step in c["script"]:
+                step_no += 1
+                if step.get("reconnect"):
+                    st.close()
+                    st = State(path)
+                    continue
+                if step.get("resolve"):
+                    st.resolve_absent(set(), "t-resolve")
+                    continue
+                if "report" in step:
+                    st.mark_reported([("f", step["report"]["fp"],
+                                       step["report"]["sev"])], "t-report")
+                    continue
+                see = step["see"]
+                got = st.classify_finding(finding_id="f", dep_id="d", signal="S1",
+                                          severity=see["sev"], fingerprint=see["fp"],
+                                          now=f"t{step_no}")
+                if got != step["expect"]:
+                    problems.append(f"step {step_no}: got {got!r}, want {step['expect']!r}")
+            st.close()
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
+def suite_notice(verbose: bool) -> Suite:
+    """Gate: has a deprecation ARRIVED, as opposed to being discussed?
+
+    Neither existing detector could answer this. The page hash is tuned so rotating
+    banners do not read as change — on the live 5,790-word Gemini release notes,
+    adding a shutdown announcement moves 0 of 64 bits. The keyword flag is saturated
+    on exactly those pages, answering "now deprecated" every week before anything is
+    added. Only counting the notices themselves separates the two.
+    """
+    from miw.probe.http_probe import UrlObservation, notice_key
+    from miw.probe.runner import res_from_urls
+
+    s = Suite("notice")
+    for c in _load("notice_cases"):
+        o = UrlObservation(url="https://vendor.test/changelog")
+        o.reachable = True
+        o.sunset_sentences = list(c["seen"])
+        res = ProbeResult(dep_id="d", canonical_name="Acme")
+        base = (None if c["baseline"] is None
+                else {notice_key(x) for x in c["baseline"]})
+        res_from_urls(res, [o], "", None, seen_notices=base)
+
+        fired = "deprecation_notice_added" in res.signals
+        exp, problems = c["expect"], []
+        if fired != exp["fires"]:
+            problems.append(f"fired={fired}, want {exp['fires']}")
+        if exp.get("records") and not res.notice_keys:
+            problems.append("no baseline recorded on the first look")
+        if "new_notices" in exp and res.new_notices != exp["new_notices"]:
+            problems.append(f"new_notices={res.new_notices}, want {exp['new_notices']}")
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
+def suite_prose(verbose: bool) -> Suite:
+    """Gate: may a model's words become the reviewer's instruction?
+
+    The only place generated text reaches a human. `Claim.build` keeps the model out
+    of the evidence path entirely; this keeps it out of the ACTION path. It matters
+    even though refinement is opt-in and every finding on the live artifact reads
+    `note_source: "template"` — the day someone adds `--refine` to the cron, this is
+    the only thing standing between a fabricated version number and a curriculum edit.
+    """
+    from miw.analyse.notes import judge_rewrite
+
+    s = Suite("prose")
+    for c in _load("prose_cases"):
+        spec = c["finding"]
+        dep = Dependency(kind="package", canonical_name=spec["canonical_name"],
+                         homepage=spec.get("homepage", ""),
+                         taught_version=spec.get("taught_version"))
+        f = Finding(dep_id="d", canonical_name=spec["canonical_name"],
+                    signal=spec["signal"], signal_label="l", kind_of_signal="regression",
+                    severity=spec["severity"], summary=spec.get("summary", ""),
+                    latest_version=spec.get("latest_version", ""),
+                    affected_urls=list(spec.get("affected_urls") or []))
+        triad, reason = judge_rewrite(dep, f, c["reply"])
+        accepted = triad is not None
+        exp, problems = c["expect"], []
+        if accepted != exp["accepted"]:
+            problems.append(f"accepted={accepted} ({reason}), want {exp['accepted']}")
+        if exp.get("reason_mentions") and exp["reason_mentions"].lower() not in reason.lower():
+            problems.append(f"reason {reason!r} never mentions "
+                            f"{exp['reason_mentions']!r}")
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
+def suite_newer(verbose: bool) -> Suite:
+    """Gate: a "newer option" must actually be newer.
+
+    The diff path never needed this - an id absent from last week's snapshot is new by
+    construction. `--reconcile` considers everything a vendor lists today, which is how
+    it came to offer `gemini-2.5-flash-lite` as the newer option for the taught
+    `gemini-3.1-flash-lite`.
+    """
+    from miw.analyse.newer import _is_newer
+
+    s = Suite("newer")
+    for c in _load("newer_cases"):
+        got = _is_newer(c["candidate"], c["taught"])
+        s.case(c["name"], got == c["expect"],
+               f"_is_newer({c['candidate']!r}, {c['taught']!r}) = {got}, "
+               f"want {c['expect']}")
+    return s
+
+
+def suite_coverage(verbose: bool) -> Suite:
+    """Gate: the digest may not present an unchecked dependency as a healthy one.
+
+    `status="ok"` carries two different meanings and the digest reported only the
+    count. A reader cannot tell a quiet week from a blind one unless the two are
+    different sentences.
+    """
+    import main as cli
+
+    s = Suite("coverage")
+    for c in _load("coverage_cases"):
+        probes = {}
+        for i, spec in enumerate(c["probes"]):
+            r = ProbeResult(dep_id=f"d{i}", canonical_name=f"n{i}",
+                            status=spec["status"], signals=list(spec["signals"]),
+                            evidence_url=spec.get("evidence_url", ""))
+            probes[r.dep_id] = r
+        got = cli._probe_coverage(probes)
+        exp, problems = c["expect"], []
+        for key in ("checked", "unchecked", "inconclusive"):
+            if key in exp and got[key] != exp[key]:
+                problems.append(f"{key}={got[key]}, want {exp[key]}")
+        if "sums_to" in exp and sum(got.values()) != exp["sums_to"]:
+            problems.append(f"parts sum to {sum(got.values())}, want {exp['sums_to']}")
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
 SUITES = {"trust": suite_trust, "extraction": suite_extraction,
-          "findings": suite_findings, "discovery": suite_discovery}
+          "findings": suite_findings, "discovery": suite_discovery,
+          "catalogue": suite_catalogue, "probe": suite_probe, "reach": suite_reach,
+          "news": suite_news, "notice": suite_notice, "newer": suite_newer,
+          "coverage": suite_coverage, "prose": suite_prose}
+
+# What each suite guards, printed with the results so a failure names the consequence
+# rather than only the assertion.
+GATES = {
+    "trust":      "a claim needs a fetched source and a checkable quote, and may "
+                  "only settle what that source has authority over",
+    "extraction": "a dependency must be in the curriculum, not inferred from it",
+    "catalogue":  "a vendor's table means what it says, and nothing more",
+    "probe":      "a failed check is never a finding about the world",
+    "reach":      "an observation implicates only what it can actually invalidate",
+    "findings":   "the right signal, at a severity earned by what the course DOES",
+    "news":       "news is what a human has not been shown, not what a run has not seen",
+    "notice":     "a deprecation that ARRIVED, not a page that discusses deprecations",
+    "newer":      "a newer option is one the vendor released LATER, not merely one we do not teach",
+    "discovery":  "a replacement is verified on its own pages or it is refuted",
+    "coverage":   "an unchecked dependency is never reported as a healthy one",
+    "prose":      "a model may reword a finding; it may not add a fact to one",
+}
 
 
 def main() -> int:

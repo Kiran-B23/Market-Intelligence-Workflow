@@ -1,0 +1,197 @@
+[
+ {
+  "name": "network death is inconclusive, never a retirement",
+  "catalogue": {
+   "ok": false,
+   "error": "ai.google.dev: ConnectionError"
+  },
+  "expect": {
+   "status": "inconclusive",
+   "must_flag": [
+    "model_catalogue_unreadable"
+   ],
+   "must_not_flag": [
+    "model_shutdown_passed",
+    "model_deprecation_declared"
+   ]
+  }
+ },
+ {
+  "name": "HTTP 500 is inconclusive",
+  "catalogue": {
+   "ok": false,
+   "error": "ai.google.dev: http 500"
+  },
+  "expect": {
+   "status": "inconclusive",
+   "must_flag": [
+    "model_catalogue_unreadable"
+   ]
+  }
+ },
+ {
+  "name": "HTTP 429 is inconclusive, because rate limiting proves the host is alive",
+  "catalogue": {
+   "ok": false,
+   "error": "ai.google.dev: http 429"
+  },
+  "expect": {
+   "status": "inconclusive",
+   "must_flag": [
+    "model_catalogue_unreadable"
+   ],
+   "must_not_flag": [
+    "model_shutdown_passed"
+   ]
+  }
+ },
+ {
+  "name": "a 200 whose table has moved is inconclusive, not ok",
+  "catalogue": {
+   "ok": true,
+   "supported": false,
+   "error": "no role-typed catalogue table found"
+  },
+  "expect": {
+   "status": "inconclusive",
+   "must_flag": [
+    "model_catalogue_unreadable"
+   ],
+   "must_not_flag": [
+    "model_listed_available"
+   ]
+  }
+ },
+ {
+  "name": "a readable catalogue that simply does not serve this id stays quiet",
+  "catalogue": {
+   "ok": true,
+   "supported": true,
+   "entries": {}
+  },
+  "expect": {
+   "status": "ok",
+   "must_flag": [
+    "model_provider_unknown"
+   ],
+   "must_not_flag": [
+    "model_catalogue_unreadable"
+   ]
+  }
+ },
+ {
+  "name": "a listed model with no announced date is ok",
+  "catalogue": {
+   "ok": true,
+   "supported": true,
+   "entries": {
+    "m": {
+     "status": "available"
+    }
+   }
+  },
+  "expect": {
+   "status": "ok",
+   "must_flag": [
+    "model_listed_available"
+   ],
+   "must_not_flag": [
+    "model_deprecation_declared"
+   ]
+  }
+ },
+ {
+  "name": "a listed model with a FUTURE announced shutdown is an advance warning",
+  "catalogue": {
+   "ok": true,
+   "supported": true,
+   "entries": {
+    "m": {
+     "status": "deprecated",
+     "shutdown_date": "May 7, 2099",
+     "replacement_ids": [
+      "m-next"
+     ]
+    }
+   }
+  },
+  "expect": {
+   "status": "changed",
+   "must_flag": [
+    "model_deprecation_declared",
+    "vendor_named_replacement"
+   ],
+   "must_not_flag": [
+    "model_shutdown_passed"
+   ]
+  }
+ },
+ {
+  "name": "a PASSED shutdown date is an outage, not a warning",
+  "catalogue": {
+   "ok": true,
+   "supported": true,
+   "entries": {
+    "m": {
+     "status": "deprecated",
+     "shutdown_date": "May 7, 2020"
+    }
+   }
+  },
+  "expect": {
+   "status": "broken",
+   "must_flag": [
+    "model_shutdown_passed"
+   ],
+   "must_not_flag": [
+    "model_deprecation_declared"
+   ]
+  }
+ },
+ {
+  "name": "retired on the developer plan but still sold is not 'shut down'",
+  "catalogue": {
+   "ok": true,
+   "supported": true,
+   "entries": {
+    "m": {
+     "status": "deprecated",
+     "shutdown_date": "01/01/20",
+     "still_listed": true,
+     "listed_price": "Contact Sales"
+    }
+   }
+  },
+  "expect": {
+   "status": "broken",
+   "must_flag": [
+    "model_tier_restricted"
+   ],
+   "must_not_flag": [
+    "model_shutdown_passed"
+   ],
+   "detail_mentions": [
+    "developer plan"
+   ]
+  }
+ },
+ {
+  "name": "an announced date on a model the vendor still lists as available warns",
+  "catalogue": {
+   "ok": true,
+   "supported": true,
+   "entries": {
+    "m": {
+     "status": "available",
+     "shutdown_date": "May 7, 2099"
+    }
+   }
+  },
+  "expect": {
+   "status": "changed",
+   "must_flag": [
+    "model_deprecation_declared"
+   ]
+  }
+ }
+]

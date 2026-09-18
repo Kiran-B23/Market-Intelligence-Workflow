@@ -1,0 +1,266 @@
+[
+ {
+  "name": "a dead URL reaches the links to it, not the prose that names the tool",
+  "signal": "S1",
+  "probe_signals": [
+   "url_gone"
+  ],
+  "affected_urls": [
+   "https://x.example/d"
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": "https://x.example/d"
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached": [
+    "link:a_href"
+   ]
+  }
+ },
+ {
+  "name": "a registry removal reaches installs and imports, never a paragraph",
+  "signal": "S4",
+  "probe_signals": [
+   "registry_missing"
+  ],
+  "locations": [
+   {
+    "evidence_source": "install_command",
+    "object_type": "CODING_QUESTIONS",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached": [
+    "install_command"
+   ]
+  }
+ },
+ {
+  "name": "an in-site redirect reaches only the links (S5 'links')",
+  "signal": "S5",
+  "probe_signals": [
+   "redirected_off_path"
+  ],
+  "redirects": [
+   {
+    "from": "https://x.example/a",
+    "to": "https://x.example/b",
+    "off_site": false
+   }
+  ],
+  "affected_urls": [
+   "https://x.example/a"
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": "https://x.example/a"
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "SESSION_PPT",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached": [
+    "link:a_href"
+   ]
+  }
+ },
+ {
+  "name": "a move OFF the vendor's domain also reaches the prose that names it",
+  "signal": "S5",
+  "probe_signals": [
+   "redirected_off_path"
+  ],
+  "redirects": [
+   {
+    "from": "https://x.example/a",
+    "to": "https://y.example/",
+    "off_site": true
+   }
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "SESSION_PPT",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached": [
+    "link:a_href",
+    "prose_name"
+   ]
+  }
+ },
+ {
+  "name": "a researched behaviour change reaches what DEPICTS the UI",
+  "signal": "S5",
+  "probe_signals": [],
+  "locations": [
+   {
+    "evidence_source": "prose_name",
+    "object_type": "SESSION_PPT",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "OBJECTIVE_QUESTIONS",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached_count": 1
+  }
+ },
+ {
+  "name": "MUST NOT let a docs rewrite reach a quiz question that says the word",
+  "signal": "S8",
+  "probe_signals": [
+   "page_text_changed"
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "OBJECTIVE_QUESTIONS",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached": [
+    "link:a_href"
+   ]
+  }
+ },
+ {
+  "name": "MUST NOT let a paywall reach every mention of the tool",
+  "signal": "S2",
+  "probe_signals": [
+   "access_wall_language"
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached": [
+    "link:a_href"
+   ]
+  }
+ },
+ {
+  "name": "money changing DOES reach everywhere, because it changes the instruction",
+  "signal": "S3",
+  "probe_signals": [
+   "free_tier_language_lost"
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "solution_import",
+    "object_type": "CODING_QUESTIONS",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached_count": 3
+  }
+ },
+ {
+  "name": "a newly-arrived deprecation notice reaches everywhere it is taught",
+  "signal": "S4",
+  "probe_signals": [
+   "deprecation_notice_added"
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "solution_import",
+    "object_type": "CODING_QUESTIONS",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached_count": 3
+  }
+ },
+ {
+  "name": "MUST NOT drop every location when the URL narrowing matches nothing",
+  "signal": "S1",
+  "probe_signals": [
+   "url_gone"
+  ],
+  "affected_urls": [
+   "https://x.example/d"
+  ],
+  "locations": [
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached_count": 2
+  }
+ }
+]

@@ -42,6 +42,11 @@ jobs:
       # instead of failing.
       - run: python3 -m pytest tests/ -q
       - run: python3 eval/run_eval.py
+      # Does the eval catch anything? Each gate has one defect restored against it and
+      # must turn red. A suite that has never been shown to fail is indistinguishable
+      # from one that asserts nothing, and this suite is what stands between a bad
+      # parse and a fabricated retirement in a digest somebody acts on.
+      - run: python3 eval/mutations.py
       # State carries week-over-week memory: without it every run reports the same
       # standing facts, forgets every reviewer decision, and the digest becomes a flood
       # that gets read once.

@@ -1,0 +1,190 @@
+[
+ {
+  "name": "a finding is news the first time it is seen",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   }
+  ]
+ },
+ {
+  "name": "re-running analyse without reporting does NOT consume the news",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   },
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   },
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   }
+  ]
+ },
+ {
+  "name": "after a digest is written, the same finding stops being news",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   },
+   {
+    "report": {
+     "fp": "a",
+     "sev": "high"
+    }
+   },
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "unchanged"
+   }
+  ]
+ },
+ {
+  "name": "a worsened severity is news again",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   },
+   {
+    "report": {
+     "fp": "a",
+     "sev": "high"
+    }
+   },
+   {
+    "see": {
+     "fp": "a",
+     "sev": "critical"
+    },
+    "expect": "worsened"
+   }
+  ]
+ },
+ {
+  "name": "an improvement is reported as an improvement, not a deterioration",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "critical"
+    },
+    "expect": "new"
+   },
+   {
+    "report": {
+     "fp": "a",
+     "sev": "critical"
+    }
+   },
+   {
+    "see": {
+     "fp": "a",
+     "sev": "low"
+    },
+    "expect": "improved"
+   }
+  ]
+ },
+ {
+  "name": "new evidence at the same severity is a change",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   },
+   {
+    "report": {
+     "fp": "a",
+     "sev": "high"
+    }
+   },
+   {
+    "see": {
+     "fp": "b",
+     "sev": "high"
+    },
+    "expect": "changed"
+   }
+  ]
+ },
+ {
+  "name": "MUST NOT stamp rows as reported on a later connection",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   },
+   {
+    "reconnect": true
+   },
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   }
+  ]
+ },
+ {
+  "name": "a finding that was resolved and came back is news again",
+  "script": [
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   },
+   {
+    "report": {
+     "fp": "a",
+     "sev": "high"
+    }
+   },
+   {
+    "resolve": true
+   },
+   {
+    "see": {
+     "fp": "a",
+     "sev": "high"
+    },
+    "expect": "new"
+   }
+  ]
+ }
+]

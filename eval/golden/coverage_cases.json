@@ -1,0 +1,118 @@
+[
+ {
+  "name": "a model checked against a vendor catalogue counts as checked",
+  "probes": [
+   {
+    "status": "ok",
+    "signals": [
+     "model_listed_available"
+    ],
+    "evidence_url": "https://vendor.test/models"
+   }
+  ],
+  "expect": {
+   "checked": 1,
+   "unchecked": 0,
+   "inconclusive": 0
+  }
+ },
+ {
+  "name": "a URL that answered with nothing to say still counts as checked",
+  "probes": [
+   {
+    "status": "ok",
+    "signals": [],
+    "evidence_url": "https://pypi.org/project/x/"
+   }
+  ],
+  "expect": {
+   "checked": 1,
+   "unchecked": 0
+  }
+ },
+ {
+  "name": "MUST NOT report a model no authority serves as checked",
+  "probes": [
+   {
+    "status": "ok",
+    "signals": [
+     "model_provider_unknown"
+    ],
+    "evidence_url": ""
+   }
+  ],
+  "expect": {
+   "checked": 0,
+   "unchecked": 1
+  }
+ },
+ {
+  "name": "MUST NOT report a dependency with no source at all as checked",
+  "probes": [
+   {
+    "status": "ok",
+    "signals": [],
+    "evidence_url": ""
+   }
+  ],
+  "expect": {
+   "checked": 0,
+   "unchecked": 1
+  }
+ },
+ {
+  "name": "MUST NOT report an unreadable source as checked",
+  "probes": [
+   {
+    "status": "inconclusive",
+    "signals": [
+     "model_catalogue_unreadable"
+    ],
+    "evidence_url": "https://vendor.test/models"
+   }
+  ],
+  "expect": {
+   "checked": 0,
+   "inconclusive": 1
+  }
+ },
+ {
+  "name": "a mixed cycle splits three ways and the parts sum to the whole",
+  "probes": [
+   {
+    "status": "ok",
+    "signals": [
+     "model_listed_available"
+    ],
+    "evidence_url": "u"
+   },
+   {
+    "status": "ok",
+    "signals": [
+     "model_provider_unknown"
+    ],
+    "evidence_url": ""
+   },
+   {
+    "status": "inconclusive",
+    "signals": [
+     "model_catalogue_unreadable"
+    ],
+    "evidence_url": "u"
+   },
+   {
+    "status": "broken",
+    "signals": [
+     "url_gone"
+    ],
+    "evidence_url": "u"
+   }
+  ],
+  "expect": {
+   "checked": 2,
+   "unchecked": 1,
+   "inconclusive": 1,
+   "sums_to": 4
+  }
+ }
+]

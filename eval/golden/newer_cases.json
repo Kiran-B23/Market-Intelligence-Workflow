@@ -1,0 +1,44 @@
+[
+ {
+  "name": "a later version of a taught model is a newer option",
+  "candidate": "gemini-3.8-flash",
+  "taught": "gemini-2.5-flash",
+  "expect": true
+ },
+ {
+  "name": "a later minor within the same major counts",
+  "candidate": "gemini-3.5-flash-lite",
+  "taught": "gemini-3.1-flash-lite",
+  "expect": true
+ },
+ {
+  "name": "a point release over a bare major counts",
+  "candidate": "gemini-3.1-pro-preview",
+  "taught": "gemini-3-pro-preview",
+  "expect": true
+ },
+ {
+  "name": "MUST NOT offer an OLDER model as the newer option",
+  "candidate": "gemini-2.5-flash-lite",
+  "taught": "gemini-3.1-flash-lite",
+  "expect": false
+ },
+ {
+  "name": "MUST NOT claim a direction it cannot establish (no version on one side)",
+  "candidate": "gemini-omni-flash",
+  "taught": "gemini-2.5-flash",
+  "expect": false
+ },
+ {
+  "name": "MUST NOT call a model newer than itself",
+  "candidate": "gemini-2.5-flash",
+  "taught": "gemini-2.5-flash",
+  "expect": false
+ },
+ {
+  "name": "MUST NOT read 10 as older than 9",
+  "candidate": "acme-1.10-turbo",
+  "taught": "acme-1.9-turbo",
+  "expect": true
+ }
+]
