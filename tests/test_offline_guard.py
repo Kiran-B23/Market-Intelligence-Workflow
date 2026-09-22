@@ -86,3 +86,32 @@ def test_the_network_marker_lifts_the_guard():
     being in a suite that gates every change."""
     assert socket.getaddrinfo.__module__ == "socket"
     assert not isinstance(requests.request, type(lambda: None).__class__)
+
+
+def test_no_committed_fixture_carries_a_credential():
+    """Fixtures are saved verbatim from public documentation, and documentation prints
+    example credentials.
+
+    Stripe's charges reference embeds `sk_test_…` in its curl samples, and the first
+    push of these fixtures was blocked by GitHub's secret scanning — correctly. The key
+    is Stripe's own published test key and harmless, and it still has no business in a
+    commit: the next fixture captured this way may be from a page that prints something
+    that is not.
+    """
+    import re
+
+    PAT = re.compile(r"(sk|pk|rk)_(test|live)_[A-Za-z0-9]{8,}"
+                     r"|xai-[A-Za-z0-9]{12,}|sk-[A-Za-z0-9]{20,}"
+                     r"|AIza[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9]{20,}"
+                     r"|ghp_[A-Za-z0-9]{20,}")
+    root = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
+    offenders = []
+    for f in root.rglob("*"):
+        if not f.is_file() or f.suffix not in (".txt", ".html", ".json", ".ts"):
+            continue
+        m = PAT.search(f.read_text(errors="replace"))
+        if m:
+            offenders.append(f"{f.relative_to(root)}: {m.group(0)[:12]}…")
+    assert not offenders, (
+        "a fixture carries a credential-shaped string; redact it to "
+        f"REDACTED_EXAMPLE_CREDENTIAL: {offenders}")

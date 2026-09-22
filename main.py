@@ -203,6 +203,16 @@ def cmd_extract(args) -> int:
     b.feed_prose(records)
     deps = b.finish()
 
+    # What the course puts INSIDE the request, bound to whichever dependency could be
+    # asked about it. Candidates only: the probe confirms each against that vendor's
+    # own reference page and discards anything the vendor does not document, which is
+    # what keeps a key written near two tools from being attributed to the wrong one.
+    from miw.extract.params import attach as attach_params
+    n_params = attach_params(records, deps)
+    with_params = sum(1 for d in deps if d.taught_params)
+    print(f"  taught API fields: {n_params} candidate(s) across {with_params} "
+          f"dependency(ies) — checked against each vendor's own reference at probe time")
+
     placed = sum(1 for d in deps for l in d.locations
                  if l.evidence_source.startswith("sheet") and l.session_no)
     unplaced = sum(1 for d in deps for l in d.locations
@@ -494,6 +504,49 @@ def _probe_coverage(probes: dict) -> dict:
             checked += 1
     return {"checked": checked, "unchecked": unchecked,
             "inconclusive": inconclusive}
+
+
+def _opinion_violations(f: dict) -> list[str]:
+    """Alternatives on this finding that carry a model opinion and nothing else.
+
+    A function rather than a loop body so the gate can exercise the real check. The
+    version inlined here read `substantiating` off the row; that is a property on
+    `Claim` and is never serialised, so it saw `None` for every claim ever written and
+    could only ever fail — it stayed green by never being reached, until a finding
+    finally carried an alternative with an opinion.
+    """
+    name = f.get("canonical_name")
+    out = []
+    for a in f.get("alternatives") or []:
+        op = a.get("opinion")
+        if not op:
+            continue
+        if not [c for c in (a.get("claims") or []) if _claim_substantiates(c)]:
+            out.append(
+                f"{name}: alternative {a.get('name')!r} carries a model opinion but "
+                f"no substantiating claim - an opinion must never travel alone")
+        if op.get("source") != "llm":
+            out.append(
+                f"{name}: alternative {a.get('name')!r} opinion is not labelled as a "
+                f"model judgement")
+        blob = json.dumps(a.get("claims") or [])
+        if "fit_score" in blob or "one_line" in blob:
+            out.append(f"{name}: a fit judgement leaked into a claim")
+    return out
+
+
+def _claim_substantiates(c: dict) -> bool:
+    """Does this serialised claim carry enough authority for its own kind?
+
+    The artifact stores `tier` and `kind` but not the verdict, so `verify` has to
+    reach the same conclusion `Claim.substantiating` would, from the outside — which
+    is the point of `verify` existing at all.
+    """
+    from miw.trust import ClaimKind, Tier, substantiates
+    try:
+        return substantiates(Tier[str(c.get("tier"))], ClaimKind(c.get("kind")))
+    except (KeyError, ValueError):
+        return False
 
 
 def _prior_findings_count() -> int:
@@ -1623,24 +1676,7 @@ def cmd_verify(args) -> int:
             # invariant against the artifact anyway: this is the one thing in the
             # digest a model asserted rather than a page stated, and the whole point
             # of `verify` is that the guarantee is checkable from the outside.
-            for a in f.get("alternatives") or []:
-                op = a.get("opinion")
-                if not op:
-                    continue
-                if not [c for c in (a.get("claims") or [])
-                        if c.get("substantiating")]:
-                    problems.append(
-                        f"{f['canonical_name']}: alternative {a.get('name')!r} carries "
-                        f"a model opinion but no substantiating claim - an opinion "
-                        f"must never travel alone")
-                if op.get("source") != "llm":
-                    problems.append(
-                        f"{f['canonical_name']}: alternative {a.get('name')!r} opinion "
-                        f"is not labelled as a model judgement")
-                blob = json.dumps(a.get("claims") or [])
-                if "fit_score" in blob or "one_line" in blob:
-                    problems.append(
-                        f"{f['canonical_name']}: a fit judgement leaked into a claim")
+            problems += _opinion_violations(f)
             # Provider widening is the one place the trust layer was loosened, so it is
             # asserted here: an S7 finding must name the provider that granted the
             # authority, and that provider must have been discovered by its own

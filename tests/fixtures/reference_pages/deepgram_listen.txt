@@ -1,0 +1,127 @@
+# source: https://developers.deepgram.com/reference/listen-file
+Pre-Recorded Audio | Deepgram's Docs
+For AI agents: a documentation index is available at the root level at /llms.txt. Append /llms.txt to any URL for a page-level index, or .md for the markdown version of any page.
+Transcribe audio and video using Deepgram’s speech-to-text REST API
+Authentication
+Authorization Token
+Use Authorization: Token <API_KEY>
+Example: Authorization: Token 12345abcdef
+OR
+Authorization Bearer
+Use Authorization: Bearer <JWT>
+Example: Authorization: Bearer eyJhbGciOiJ...
+Query parameters
+callback string Optional
+URL to which we'll make the callback request
+callback_method enum Optional Defaults to POST
+HTTP method by which the callback request will be made
+Allowed values : POST PUT
+extra string or list of strings Optional
+Arbitrary key-value pairs that are attached to the API response for usage in downstream processing
+Show 2 variants
+sentiment boolean Optional Defaults to false
+Recognizes the sentiment throughout a transcript or text
+summarize enum or boolean Optional
+Summarize content. For Listen API, supports string version option. For Read API, accepts boolean only.
+Show 2 variants
+tag string or list of strings Optional
+Label your requests for the purpose of identification during usage reporting
+Show 2 variants
+topics boolean Optional Defaults to false
+Detect topics throughout a transcript or text
+custom_topic string or list of strings Optional
+Custom topics you want the model to detect within your input audio or text if present Submit up to 100 .
+Show 2 variants
+custom_topic_mode enum Optional Defaults to extended
+Sets how the model will interpret strings submitted to the `custom_topic` param. When `strict`, the model will only return topics submitted using the `custom_topic` param. When `extended`, the model will return its own detected topics in addition to those submitted using the `custom_topic` param
+Allowed values : extended strict
+intents boolean Optional Defaults to false
+Recognizes speaker intent throughout a transcript or text
+custom_intent string or list of strings Optional
+Custom intents you want the model to detect within your input audio if present
+Show 2 variants
+custom_intent_mode enum Optional Defaults to extended
+Sets how the model will interpret intents submitted to the custom_intent param. When strict , the model will only return intents submitted using the custom_intent param. When extended , the model will return its own detected intents in the custom_intent param.
+Allowed values : extended strict
+detect_entities boolean Optional Defaults to false
+Identifies and extracts key entities from content in submitted audio
+detect_language boolean or list of strings Optional
+Identifies the dominant language spoken in submitted audio
+Show 2 variants
+diarize boolean Optional Defaults to false Deprecated
+Deprecated: use diarize_model instead. Recognize speaker changes. Each word in the transcript will be assigned a speaker number starting at 0.
+diarize_model enum Optional
+Select and enable a specific diarization model version. Specifying this parameter enables diarization and selects the model — you do not need to also set the deprecated `diarize=true` parameter. For batch, supported values are `latest` (currently v2), `v1`, and `v2`. For streaming, supported values are `latest` (currently v1) and `v1`; `v2` returns a validation error on streaming requests.
+Allowed values : latest v1 v2
+dictation boolean Optional Defaults to false
+Dictation mode for controlling formatting with dictated speech
+encoding enum Optional
+Specify the expected encoding of your submitted audio
+Show 8 enum values
+filler_words boolean Optional Defaults to false
+Filler Words can help transcribe interruptions in your audio, like "uh" and "um"
+keyterm list of strings Optional
+Key term prompting improves recognition of specialized terminology and brands. Only compatible with Nova-3.
+`keyterm` accepts plain terms only. Unlike the legacy `keywords` feature, it does not support weights or intensifiers. Appending one (for example, `keyterm=term:0.15`) is not rejected—the weight is silently ignored and the entire value is treated as a literal keyterm.
+To boost multiple separate keyterms, repeat the `keyterm` parameter (for example, `keyterm=term1&keyterm=term2`). To boost one multi-word phrase as a single keyterm, join the words with `%20` or `+` (for example, `keyterm=customer%20service`). Do not separate keyterms with commas, semicolons, or line breaks.
+keywords string or list of strings Optional
+Keywords can boost or suppress specialized terminology and brands. keywords is not supported with Nova-3 models; use keyterm instead.
+Show 2 variants
+language string Optional Defaults to en
+The [BCP-47 language tag](https://tools.ietf.org/html/bcp47) that hints at the primary spoken language. Depending on the Model and API endpoint you choose only certain languages are available
+measurements boolean Optional Defaults to false
+Spoken measurements will be converted to their corresponding abbreviations
+model enum or string Optional Defaults to base-general
+AI model used to process submitted audio
+Show 2 variants
+multichannel boolean Optional Defaults to false
+Transcribe each audio channel independently
+numerals boolean Optional Defaults to false
+Numerals converts numbers from written format to numerical format
+paragraphs boolean Optional Defaults to false
+Splits audio into paragraphs to improve transcript readability
+profanity_filter boolean Optional Defaults to false
+Profanity Filter looks for recognized profanity and converts it to the nearest recognized non-profane word or removes it from the transcript completely
+punctuate boolean Optional Defaults to false
+Add punctuation and capitalization to the transcript
+redact string or list of enums Optional Defaults to false
+Redaction removes sensitive information from your transcripts
+Show 2 variants
+replace string or list of strings Optional
+Search for terms or phrases in submitted audio and replaces them
+Show 2 variants
+search string or list of strings Optional
+Search for terms or phrases in submitted audio
+Show 2 variants
+smart_format boolean Optional Defaults to false
+Apply formatting to transcript output. When set to true, additional formatting will be applied to transcripts to improve readability
+utterances boolean Optional Defaults to false
+Segments speech into meaningful semantic units
+utt_split double Optional Defaults to 0.8
+Seconds to wait before detecting a pause between words in submitted audio
+version enum or string Optional Defaults to latest
+Version of an AI model to use
+Show 2 variants
+mip_opt_out boolean Optional Defaults to false
+Opts out requests from the Deepgram Model Improvement Program. Refer to our Docs for pricing impacts before setting this to true. https://dpgr.am/deepgram-mip
+Request
+application/json
+Transcribe an audio or video file
+url string Required format: "uri"
+Response
+Returns either transcription results, or a request_id when using a callback.
+ListenV1Response object
+The standard transcription response
+OR
+ListenV1AcceptedResponse object
+Accepted response for asynchronous transcription requests
+Errors
+400 Bad Request Error
+Sets how the model will interpret strings submitted to the custom_topic param. When strict , the model will only return topics submitted using the custom_topic param. When extended , the model will return its own detected topics in addition to those submitted using the custom_topic param
+Select and enable a specific diarization model version. Specifying this parameter enables diarization and selects the model — you do not need to also set the deprecated diarize=true parameter. For batch, supported values are latest (currently v2), v1 , and v2 . For streaming, supported values are latest (currently v1) and v1 ; v2 returns a validation error on streaming requests.
+Key term prompting improves recognition of specialized terminology and brands. Only compatible with Nova-3.
+keyterm accepts plain terms only. Unlike the legacy keywords feature, it does not support weights or intensifiers. Appending one (for example, keyterm=term:0.15 ) is not rejected—the weight is silently ignored and the entire value is treated as a literal keyterm.
+To boost multiple separate keyterms, repeat the keyterm parameter (for example, keyterm=term1&keyterm=term2 ). To boost one multi-word phrase as a single keyterm, join the words with %20 or + (for example, keyterm=customer%20service ). Do not separate keyterms with commas, semicolons, or line breaks.
+The BCP-47 language tag
+that hints at the primary spoken language. Depending on the Model and API endpoint you choose only certain languages are available
+Opts out requests from the Deepgram Model Improvement Program. Refer to our Docs for pricing impacts before setting this to true. https://dpgr.am/deepgram-mip

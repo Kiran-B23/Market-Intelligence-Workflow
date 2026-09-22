@@ -51,7 +51,8 @@ from miw.trust import ClaimKind, Subject, Tier, classify, substantiates  # noqa:
 # single failure is a regression, not noise.
 THRESHOLDS = {"trust": 1.0, "extraction": 1.0, "findings": 1.0, "discovery": 1.0,
               "catalogue": 1.0, "probe": 1.0, "reach": 1.0, "news": 1.0,
-              "notice": 1.0, "newer": 1.0, "coverage": 1.0, "prose": 1.0}
+              "notice": 1.0, "newer": 1.0, "coverage": 1.0, "fields": 1.0,
+              "prose": 1.0}
 PRECISION_TARGET = 0.70          # PRD supporting metric, by week 4
 
 
@@ -149,6 +150,43 @@ def suite_trust(verbose: bool) -> Suite:
                         and claim.substantiating != exp["substantiates"]):
                     problems.append(f"substantiates={claim.substantiating}, "
                                     f"want {exp['substantiates']}")
+                if exp.get("through_verify"):
+                    # Through the real check, not its helper: a finding whose
+                    # alternative carries an opinion AND this substantiating claim must
+                    # raise nothing. The inlined version read a verdict the artifact
+                    # never carries, so it flagged every such alternative.
+                    import main as cli
+                    from miw.schema import to_jsonable
+                    row = to_jsonable(claim)
+                    finding = {"canonical_name": subj.name,
+                               "alternatives": [{"name": subj.name,
+                                                 "opinion": {"does_taught_job": 0.9, "source": "llm"},
+                                                 "claims": [row]}]}
+                    got = cli._opinion_violations(finding)
+                    if got:
+                        problems.append(f"verify rejected a substantiated "
+                                        f"alternative: {got[0]}")
+                    # ...and an opinion with nothing behind it must still be caught.
+                    bare = {"canonical_name": subj.name,
+                            "alternatives": [{"name": subj.name,
+                                              "opinion": {"does_taught_job": 0.9, "source": "llm"},
+                                              "claims": []}]}
+                    if not cli._opinion_violations(bare):
+                        problems.append("verify let an opinion travel alone")
+                if exp.get("serialised_verdict_absent"):
+                    # The artifact carries tier and kind, never the verdict, so any
+                    # check reading it from the row gets None for every claim ever
+                    # written. `main._claim_substantiates` has to reach the same
+                    # answer from the outside, and this pins both halves.
+                    import main as cli
+                    from miw.schema import to_jsonable
+                    row = to_jsonable(claim)
+                    if row.get("substantiating"):
+                        problems.append("the verdict IS serialised now — a check may "
+                                        "read it, and this case should be retired")
+                    if not cli._claim_substantiates(row):
+                        problems.append("recomputing from the serialised row "
+                                        "disagrees with Claim.substantiating")
         s.case(c["name"], not problems, "; ".join(problems))
     return s
 
@@ -707,11 +745,50 @@ def suite_coverage(verbose: bool) -> Suite:
     return s
 
 
+def suite_fields(verbose: bool) -> Suite:
+    """Gate: a vendor's reference page -> which taught fields it retires.
+
+    Six of the eight fixtures are HELD OUT — saved from vendors the detector was never
+    shown while it was being written. That split is the whole point of the suite, and it
+    was added after a reviewer observed that the method here had been: see an example,
+    encode the example, verify against the example. A detector fitted to two pages
+    passes those two whatever it does.
+
+    Run held out, it found two real defects immediately. On Stripe it reported the
+    field `Create`, out of the section heading "Create a charge deprecated"; requiring a
+    field to declare a type rejects that and keeps every true positive, because a
+    reference page states one. And ElevenLabs' `use_pvc_as_ivc` row says "we won't use
+    PVC versioning", from which the bare cue `use` lifted `PVC` — a capitalised acronym
+    mid-sentence offered to a reviewer as the field to rename to.
+    """
+    from miw.probe.http_probe import deprecated_fields
+
+    fx = ROOT / "tests" / "fixtures" / "reference_pages"
+    s = Suite("fields")
+    for c in _load("field_cases"):
+        text = (fx / f"{c['fixture']}.txt").read_text()
+        got = {d["field"]: d["successor"] for d in deprecated_fields(text)}
+        exp, problems = c["expect"], []
+        for field, successor in (exp.get("must_find") or {}).items():
+            if field not in got:
+                problems.append(f"missed {field!r} (found {sorted(got) or 'nothing'})")
+            elif successor and got[field] != successor:
+                problems.append(f"{field}: successor {got[field]!r}, want {successor!r}")
+        for field, forbidden in (exp.get("successor_must_not_be") or {}).items():
+            if got.get(field) == forbidden:
+                problems.append(f"{field}: lifted {forbidden!r} out of prose")
+        if "max_fields" in exp and len(got) > exp["max_fields"]:
+            problems.append(f"claimed {got}, expected at most {exp['max_fields']}")
+        s.case(c["name"], not problems, "; ".join(problems))
+    return s
+
+
 SUITES = {"trust": suite_trust, "extraction": suite_extraction,
           "findings": suite_findings, "discovery": suite_discovery,
           "catalogue": suite_catalogue, "probe": suite_probe, "reach": suite_reach,
           "news": suite_news, "notice": suite_notice, "newer": suite_newer,
-          "coverage": suite_coverage, "prose": suite_prose}
+          "coverage": suite_coverage, "fields": suite_fields,
+          "prose": suite_prose}
 
 # What each suite guards, printed with the results so a failure names the consequence
 # rather than only the assertion.
@@ -728,6 +805,8 @@ GATES = {
     "newer":      "a newer option is one the vendor released LATER, not merely one we do not teach",
     "discovery":  "a replacement is verified on its own pages or it is refuted",
     "coverage":   "an unchecked dependency is never reported as a healthy one",
+    "fields":     "a field the course writes is retired only when the vendor's own "
+                  "reference says so — measured on vendors it was never fitted to",
     "prose":      "a model may reword a finding; it may not add a fact to one",
 }
 

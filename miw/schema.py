@@ -102,6 +102,15 @@ class Dependency:
     vendor: str = ""
     locations: list[Location] = field(default_factory=list)
     watch_tier: str = "standard"
+    # API fields the curriculum writes into this dependency's request payloads, bound
+    # by `miw/extract/params.py`. The inventory's unit is the dependency and a vendor
+    # can retire a field without retiring anything else the system watches, so without
+    # this there is no way to ask the question at all.
+    taught_params: list[str] = field(default_factory=list)
+    # `{field: [content_id, ...]}` — the records that actually write each field. The
+    # scope of a field finding, which `evidence_source` cannot express: it says how the
+    # DEPENDENCY was found in a record, not what the record contains.
+    taught_param_at: dict = field(default_factory=dict)
     review_status: str = "registry"   # registry | proposed | approved | rejected
     first_seen: str = field(default_factory=utcnow)
     notes: str = ""
@@ -294,6 +303,9 @@ class ProbeResult:
     # `state.probe_save` stores; `new_notices` is the news.
     notice_keys: list[str] = field(default_factory=list)
     new_notices: list[str] = field(default_factory=list)
+    # Fields the course writes that the vendor's own reference marks deprecated, each
+    # with the successor the vendor names and the verbatim row that says so.
+    deprecated_fields: list[dict] = field(default_factory=list)
     detail: str = ""
     evidence_url: str = ""
     consecutive_failures: int = 0
@@ -602,6 +614,9 @@ class Finding:
     # beats a severity-derived deadline: severity says how bad, this says when, and
     # they routinely disagree by months.
     shutdown_date: str = ""
+    # Fields the course writes that the vendor's own reference marks deprecated, each
+    # with the successor the vendor names and the verbatim row that says so.
+    deprecated_fields: list[dict] = field(default_factory=list)
     screenshots_at_risk: int = 0
     questions_executing: int = 0
     questions_mentioning: int = 0

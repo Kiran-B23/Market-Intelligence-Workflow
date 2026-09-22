@@ -1,0 +1,285 @@
+# source: https://docs.anthropic.com/en/api/messages
+Messages - Claude API Reference
+Cookie settings
+We use cookies to deliver and improve our services, analyze site usage, and if you agree, to customize or personalize your experience and market our services to you. You can read our Cookie Policy here .
+Customize Customize Cookie Settings Reject Reject All Cookies Accept Accept All Cookies
+ Copy page
+
+cURL 
+Messages
+Create a Message
+ POST /v1/messages
+Send a structured list of input messages with text and/or image content, and the model will generate the next message in the conversation.
+Count tokens in a Message
+ POST /v1/messages/count_tokens
+Count the number of tokens in a Message.
+Models
+
+Base64ImageSource object { type : "base64" , data , media_type } 
+type : "base64" 
+
+data : string 
+format byte
+
+media_type : "image/jpeg" or "image/png" or "image/gif" or "image/webp" 
+One of the following:
+"image/jpeg" 
+"image/png" 
+"image/gif" 
+"image/webp" 
+
+Base64PDFSource object { type : "base64" , data , media_type } 
+type : "base64" 
+
+data : string 
+format byte
+media_type : "application/pdf" 
+
+BashCodeExecutionOutputBlock object { type : "bash_code_execution_output" , file_id } 
+
+type : "bash_code_execution_output" 
+default bash_code_execution_output
+file_id : string 
+
+BashCodeExecutionOutputBlockParam object { type : "bash_code_execution_output" , file_id } 
+type : "bash_code_execution_output" 
+file_id : string 
+
+BashCodeExecutionResultBlock object { type : "bash_code_execution_result" , content , return_code , 2 more } 
+
+type : "bash_code_execution_result" 
+default bash_code_execution_result
+
+content : array of BashCodeExecutionOutputBlock { type : "bash_code_execution_output" , file_id } 
+
+type : "bash_code_execution_output" 
+default bash_code_execution_output
+file_id : string 
+return_code : number 
+stderr : string 
+stdout : string 
+
+BashCodeExecutionResultBlockParam object { type : "bash_code_execution_result" , content , return_code , 2 more } 
+type : "bash_code_execution_result" 
+
+content : array of BashCodeExecutionOutputBlockParam { type : "bash_code_execution_output" , file_id } 
+type : "bash_code_execution_output" 
+file_id : string 
+return_code : number 
+stderr : string 
+stdout : string 
+
+BashCodeExecutionToolResultBlock object { type : "bash_code_execution_tool_result" , content , tool_use_id } 
+
+BashCodeExecutionToolResultBlockParam object { type : "bash_code_execution_tool_result" , content , tool_use_id , cache_control } 
+
+BashCodeExecutionToolResultError object { type : "bash_code_execution_tool_result_error" , error_code } 
+
+type : "bash_code_execution_tool_result_error" 
+default bash_code_execution_tool_result_error
+
+error_code : BashCodeExecutionToolResultErrorCode 
+One of the following:
+"invalid_tool_input" 
+"unavailable" 
+"too_many_requests" 
+"execution_time_exceeded" 
+"output_file_too_large" 
+
+BashCodeExecutionToolResultErrorCode = "invalid_tool_input" or "unavailable" or "too_many_requests" or 2 more 
+One of the following:
+"invalid_tool_input" 
+"unavailable" 
+"too_many_requests" 
+"execution_time_exceeded" 
+"output_file_too_large" 
+
+BashCodeExecutionToolResultErrorParam object { type : "bash_code_execution_tool_result_error" , error_code } 
+type : "bash_code_execution_tool_result_error" 
+
+error_code : BashCodeExecutionToolResultErrorCode 
+One of the following:
+"invalid_tool_input" 
+"unavailable" 
+"too_many_requests" 
+"execution_time_exceeded" 
+"output_file_too_large" 
+
+BrowserCloseTabConfig object { defer_loading , enabled } 
+close_tab 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserDoubleClickConfig object { defer_loading , enabled } 
+double_click 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserFileUploadConfig object { defer_loading , enabled } 
+file_upload 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserFindConfig object { defer_loading , enabled } 
+find 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserFormInputConfig object { defer_loading , enabled } 
+form_input 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserGetPageTextConfig object { defer_loading , enabled } 
+get_page_text 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserHoldKeyConfig object { defer_loading , enabled } 
+hold_key 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserHoverConfig object { defer_loading , enabled } 
+hover 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserJavascriptExecConfig object { defer_loading , enabled } 
+javascript_exec 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserKeyConfig object { defer_loading , enabled } 
+key 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserLeftClickConfig object { defer_loading , enabled } 
+left_click 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserLeftClickDragConfig object { defer_loading , enabled } 
+left_click_drag 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserLeftMouseDownConfig object { defer_loading , enabled } 
+left_mouse_down 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserLeftMouseUpConfig object { defer_loading , enabled } 
+left_mouse_up 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserListTabsConfig object { defer_loading , enabled } 
+list_tabs 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserMiddleClickConfig object { defer_loading , enabled } 
+middle_click 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserMouseMoveConfig object { defer_loading , enabled } 
+mouse_move 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserNavigateConfig object { defer_loading , enabled } 
+navigate 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserNewTabConfig object { defer_loading , enabled } 
+new_tab 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserReadConsoleConfig object { defer_loading , enabled } 
+read_console 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserReadNetworkConfig object { defer_loading , enabled } 
+read_network 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserReadPageConfig object { defer_loading , enabled } 
+read_page 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserRightClickConfig object { defer_loading , enabled } 
+right_click 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserScreenshotConfig object { defer_loading , enabled } 
+screenshot 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserScrollConfig object { defer_loading , enabled } 
+scroll 's config overrides.
+defer_loading : optional boolean or null 
+Defer loading for this member. Must resolve to the same value on every enabled member of the toolset.
+enabled : optional boolean or null 
+Whether this member is offered to the model. Default is per member, per the toolset's documentation. A member whose enabled resolves false is withheld from the served schema.
+
+BrowserScrollToConfig object { defer_loading , enabled } 
+scroll_to 's config overrides.
+defer_loading : optional boolean or null <button type="button" data-cds="Button" data-cds-icon-only="" data-cds-ghost=""

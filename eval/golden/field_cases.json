@@ -1,0 +1,81 @@
+[
+ {
+  "fixture": "murf_generate",
+  "held_out": false,
+  "name": "BUILD Murf: the field and the successor it names",
+  "expect": {
+   "must_find": {
+    "multiNativeLocale": "locale"
+   }
+  }
+ },
+ {
+  "fixture": "groq_api_reference",
+  "held_out": false,
+  "name": "BUILD Groq: several fields, each with its own successor",
+  "expect": {
+   "must_find": {
+    "exclude_domains": "search_settings.exclude_domains",
+    "function_call": "tool_choice",
+    "functions": "tools",
+    "max_tokens": "max_completion_tokens"
+   }
+  }
+ },
+ {
+  "fixture": "deepgram_listen",
+  "held_out": true,
+  "name": "HELD-OUT Deepgram: a field whose row names its replacement",
+  "expect": {
+   "must_find": {
+    "diarize": "diarize_model"
+   }
+  }
+ },
+ {
+  "fixture": "elevenlabs_tts",
+  "held_out": true,
+  "name": "HELD-OUT ElevenLabs: two deprecated fields, neither naming a successor",
+  "expect": {
+   "must_find": {
+    "optimize_streaming_latency": "",
+    "use_pvc_as_ivc": ""
+   },
+   "successor_must_not_be": {
+    "use_pvc_as_ivc": "PVC"
+   }
+  }
+ },
+ {
+  "fixture": "stripe_charges",
+  "held_out": true,
+  "name": "HELD-OUT Stripe: a section HEADING carrying the badge is not a field",
+  "expect": {
+   "max_fields": 0
+  }
+ },
+ {
+  "fixture": "assemblyai_transcript",
+  "held_out": true,
+  "name": "HELD-OUT AssemblyAI: a long reference with nothing deprecated stays silent",
+  "expect": {
+   "max_fields": 0
+  }
+ },
+ {
+  "fixture": "tavily_search",
+  "held_out": true,
+  "name": "HELD-OUT Tavily: same, on a page full of field declarations",
+  "expect": {
+   "max_fields": 0
+  }
+ },
+ {
+  "fixture": "anthropic_messages",
+  "held_out": true,
+  "name": "HELD-OUT Anthropic: same",
+  "expect": {
+   "max_fields": 0
+  }
+ }
+]

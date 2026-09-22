@@ -1,912 +1,974 @@
 [
-  {
-    "name": "a confirmed dead referenced URL fires S1 at high severity",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "CodeToTutorial",
-      "homepage": "https://codetotutorial.com",
-      "official_domains": [
-        "codetotutorial.com"
-      ],
-      "referenced_urls": [
-        "https://codetotutorial.com/"
-      ],
-      "watch_tier": "standard",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 4
-        },
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 5
-        }
-      ]
+ {
+  "name": "a confirmed dead referenced URL fires S1 at high severity",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "CodeToTutorial",
+   "homepage": "https://codetotutorial.com",
+   "official_domains": [
+    "codetotutorial.com"
+   ],
+   "referenced_urls": [
+    "https://codetotutorial.com/"
+   ],
+   "watch_tier": "standard",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 4
     },
-    "probe": {
-      "status": "broken",
-      "signals": [
-        "url_gone"
-      ],
-      "affected_urls": [
-        "https://codetotutorial.com/"
-      ],
-      "detail": "https://codetotutorial.com/ returns 404"
-    },
-    "expect": {
-      "must_fire": [
-        "S1"
-      ],
-      "severity_range": [
-        "critical",
-        "high"
-      ],
-      "min_findings": 1,
-      "must_mention": [
-        "codetotutorial.com"
-      ]
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 5
     }
+   ]
   },
-  {
-    "name": "a healthy tool fires nothing at all",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Ollama",
-      "homepage": "https://ollama.com",
-      "official_domains": [
-        "ollama.com"
-      ],
-      "referenced_urls": [
-        "https://ollama.com/"
-      ],
-      "watch_tier": "standard",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 7
-        }
-      ]
-    },
-    "probe": {
-      "status": "ok",
-      "signals": [],
-      "detail": ""
-    },
-    "expect": {
-      "max_findings": 0
-    }
+  "probe": {
+   "status": "broken",
+   "signals": [
+    "url_gone"
+   ],
+   "affected_urls": [
+    "https://codetotutorial.com/"
+   ],
+   "detail": "https://codetotutorial.com/ returns 404"
   },
-  {
-    "name": "our own network failure is never reported as a broken tool",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Murf.AI",
-      "homepage": "https://murf.ai",
-      "official_domains": [
-        "murf.ai"
-      ],
-      "referenced_urls": [
-        "https://murf.ai/"
-      ],
-      "watch_tier": "standard",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 12
-        }
-      ]
-    },
-    "probe": {
-      "status": "unreachable",
-      "signals": [],
-      "detail": "no response: ConnectionError"
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "an anti-bot 403 is never reported as a broken tool",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Perplexity",
-      "homepage": "https://perplexity.ai",
-      "official_domains": [
-        "perplexity.ai"
-      ],
-      "referenced_urls": [
-        "https://perplexity.ai/"
-      ],
-      "watch_tier": "standard",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 3
-        }
-      ]
-    },
-    "probe": {
-      "status": "inconclusive",
-      "signals": [
-        "blocked_by_host"
-      ],
-      "detail": "http 403"
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "a robots.txt refusal is never reported as a broken tool",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Gamma",
-      "homepage": "https://gamma.app",
-      "official_domains": [
-        "gamma.app"
-      ],
-      "referenced_urls": [
-        "https://gamma.app/"
-      ],
-      "watch_tier": "standard",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 2
-        }
-      ]
-    },
-    "probe": {
-      "status": "inconclusive",
-      "signals": [
-        "disallowed_by_robots"
-      ],
-      "detail": "robots.txt asks us not to fetch"
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "a major-version gap fires S6 and names both versions",
-    "dependency": {
-      "kind": "package",
-      "canonical_name": "google-genai",
-      "registry": "pypi",
-      "registry_id": "google-genai",
-      "taught_version": "1.60.0",
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "solution_import",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 3,
-          "content_id": "q1"
-        },
-        {
-          "evidence_source": "install_command",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 3
-        }
-      ]
-    },
-    "probe": {
-      "status": "changed",
-      "signals": [
-        "major_behind_taught_pin"
-      ],
-      "latest_version": "2.22.0",
-      "detail": "1.60.0 -> 2.22.0"
-    },
-    "expect": {
-      "must_fire": [
-        "S6"
-      ],
-      "min_findings": 1,
-      "must_mention": [
-        "1.60.0",
-        "2.22.0"
-      ]
-    }
-  },
-  {
-    "name": "a package still at its taught major version fires nothing",
-    "dependency": {
-      "kind": "package",
-      "canonical_name": "gradio",
-      "registry": "pypi",
-      "registry_id": "gradio",
-      "taught_version": "6.6.0",
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "solution_import",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 8,
-          "content_id": "q2"
-        }
-      ]
-    },
-    "probe": {
-      "status": "ok",
-      "signals": [],
-      "latest_version": "6.26.0",
-      "detail": ""
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "docs prose churn on a passing mention is not news",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Wikipedia-ish",
-      "homepage": "https://example-tool.test",
-      "official_domains": [
-        "example-tool.test"
-      ],
-      "watch_tier": "mention-only",
-      "locations": [
-        {
-          "evidence_source": "prose_name",
-          "object_type": "OBJECTIVE_QUESTIONS",
-          "session_no": 5,
-          "content_id": "m1"
-        }
-      ]
-    },
-    "probe": {
-      "status": "changed",
-      "signals": [
-        "page_text_changed"
-      ],
-      "detail": "prose changed"
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "a graded item that executes a dead dependency is surfaced as fallout",
-    "dependency": {
-      "kind": "package",
-      "canonical_name": "deadpkg",
-      "registry": "pypi",
-      "registry_id": "deadpkg",
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "solution_import",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 9,
-          "content_id": "cq1"
-        },
-        {
-          "evidence_source": "test_case_enum",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 9,
-          "content_id": "cq2"
-        }
-      ]
-    },
-    "probe": {
-      "status": "broken",
-      "signals": [
-        "registry_missing"
-      ],
-      "detail": "pypi has no project 'deadpkg'"
-    },
-    "expect": {
-      "must_fire": [
-        "S4"
-      ],
-      "min_findings": 1,
-      "min_questions_executing": 2
-    }
-  },
-  {
-    "name": "a claim from a non-authoritative source cannot raise a finding on its own",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "SomeTool",
-      "homepage": "https://sometool.test",
-      "official_domains": [
-        "sometool.test"
-      ],
-      "watch_tier": "standard",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 1
-        }
-      ]
-    },
-    "probe": {
-      "status": "ok",
-      "signals": [],
-      "detail": ""
-    },
-    "research": {
-      "claims": [
-        {
-          "kind": "deprecation",
-          "statement": "SomeTool is deprecated",
-          "source_url": "https://random-blog.example/post",
-          "quote": "I heard they shut it down last month"
-        }
-      ]
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "a node that no longer exists upstream fires S9 at critical",
-    "dependency": {
-      "kind": "n8n_node",
-      "canonical_name": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-      "registry": "n8n",
-      "taught_version": "1.3",
-      "watch_tier": "critical",
-      "official_domains": [
-        "docs.n8n.io",
-        "n8n.io"
-      ],
-      "homepage": "https://n8n.io",
-      "docs_url": "https://docs.n8n.io/integrations/",
-      "locations": [
-        {
-          "evidence_source": "n8n_workflow",
-          "object_type": "OBJECTIVE_QUESTIONS",
-          "session_no": 17,
-          "content_id": "q-n8n-1"
-        },
-        {
-          "evidence_source": "n8n_workflow",
-          "object_type": "OBJECTIVE_QUESTIONS",
-          "session_no": 18,
-          "content_id": "q-n8n-2"
-        }
-      ]
-    },
-    "probe": {
-      "status": "broken",
-      "signals": [
-        "node_removed_upstream"
-      ],
-      "latest_version": "2.38.4",
-      "detail": "@n8n/n8n-nodes-langchain.memoryBufferWindow is no longer in n8n's shipped node set"
-    },
-    "expect": {
-      "must_fire": [
-        "S9"
-      ],
-      "severity_range": [
-        "critical"
-      ],
-      "min_findings": 1,
-      "must_mention": [
-        "memoryBufferWindow"
-      ],
-      "min_questions_executing": 2
-    }
-  },
-  {
-    "name": "a vendor-declared breaking change is cited from the vendor's own docs",
-    "dependency": {
-      "kind": "n8n_node",
-      "canonical_name": "n8n-nodes-base.spontit",
-      "registry": "n8n",
-      "taught_version": "1",
-      "watch_tier": "critical",
-      "official_domains": [
-        "docs.n8n.io",
-        "n8n.io"
-      ],
-      "homepage": "https://n8n.io",
-      "docs_url": "https://docs.n8n.io/integrations/",
-      "locations": [
-        {
-          "evidence_source": "n8n_workflow",
-          "object_type": "OBJECTIVE_QUESTIONS",
-          "session_no": 17,
-          "content_id": "q-n8n-1"
-        },
-        {
-          "evidence_source": "n8n_workflow",
-          "object_type": "OBJECTIVE_QUESTIONS",
-          "session_no": 18,
-          "content_id": "q-n8n-2"
-        }
-      ]
-    },
-    "probe": {
-      "status": "changed",
-      "signals": [
-        "breaking_change_declared"
-      ],
-      "latest_version": "2.38.4",
-      "detail": "n8n declares a breaking change affecting this node: Removed Deprecated Nodes",
-      "declared_changes": [
-        {
-          "rule_id": "removed-nodes-v2",
-          "n8n_version": "v2",
-          "title": "Removed Deprecated Nodes",
-          "description": "Several deprecated nodes have been removed and will no longer work",
-          "severity": "low",
-          "doc_url": "https://docs.n8n.io/2-0-breaking-changes/#removed-nodes-for-retired-services",
-          "node_types": [
-            "n8n-nodes-base.spontit"
-          ],
-          "actions": []
-        }
-      ]
-    },
-    "expect": {
-      "must_fire": [
-        "S9"
-      ],
-      "min_findings": 1,
-      "must_mention": [
-        "Removed Deprecated Nodes"
-      ]
-    }
-  },
-  {
-    "name": "GitHub being unreachable is never reported as a removed node",
-    "dependency": {
-      "kind": "n8n_node",
-      "canonical_name": "n8n-nodes-base.gmail",
-      "registry": "n8n",
-      "taught_version": "2.1",
-      "watch_tier": "critical",
-      "official_domains": [
-        "docs.n8n.io",
-        "n8n.io"
-      ],
-      "homepage": "https://n8n.io",
-      "docs_url": "https://docs.n8n.io/integrations/",
-      "locations": [
-        {
-          "evidence_source": "n8n_workflow",
-          "object_type": "OBJECTIVE_QUESTIONS",
-          "session_no": 17,
-          "content_id": "q-n8n-1"
-        },
-        {
-          "evidence_source": "n8n_workflow",
-          "object_type": "OBJECTIVE_QUESTIONS",
-          "session_no": 18,
-          "content_id": "q-n8n-2"
-        }
-      ]
-    },
-    "probe": {
-      "status": "inconclusive",
-      "signals": [
-        "n8n_upstream_unreachable"
-      ],
-      "detail": "could not read n8n's source of truth: tree: http 503"
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "free-tier wording disappearing fires S3, the strongest pricing signal",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Hugging Face",
-      "homepage": "https://huggingface.co",
-      "official_domains": [
-        "huggingface.co"
-      ],
-      "referenced_urls": [
-        "https://huggingface.co/docs"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        },
-        {
-          "evidence_source": "install_command",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 6
-        }
-      ]
-    },
-    "probe": {
-      "status": "changed",
-      "signals": [
-        "free_tier_language_lost"
-      ],
-      "detail": "free-tier wording disappeared from https://huggingface.co/pricing: 'free tier' no longer present",
-      "evidence_url": "https://huggingface.co/pricing"
-    },
-    "expect": {
-      "must_fire": [
-        "S3"
-      ],
-      "severity_range": [
-        "critical",
-        "high"
-      ],
-      "min_findings": 1,
-      "must_mention": [
-        "free tier"
-      ]
-    }
-  },
-  {
-    "name": "a pricing page rewrite alone is a research lead, not a money finding",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Groq",
-      "homepage": "https://groq.com",
-      "official_domains": [
-        "groq.com"
-      ],
-      "referenced_urls": [
-        "https://groq.com/docs"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        },
-        {
-          "evidence_source": "install_command",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 6
-        }
-      ]
-    },
-    "probe": {
-      "status": "changed",
-      "signals": [
-        "pricing_page_changed"
-      ],
-      "detail": "https://groq.com/pricing changed substantially since the last run",
-      "evidence_url": "https://groq.com/pricing"
-    },
-    "expect": {
-      "must_fire": [
-        "S3"
-      ],
-      "severity_range": [
-        "low",
-        "info"
-      ],
-      "min_findings": 1
-    }
-  },
-  {
-    "name": "the first sight of a pricing page fires nothing",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Murf.AI",
-      "homepage": "https://murf.ai",
-      "official_domains": [
-        "murf.ai"
-      ],
-      "referenced_urls": [
-        "https://murf.ai/docs"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        },
-        {
-          "evidence_source": "install_command",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 6
-        }
-      ]
-    },
-    "probe": {
-      "status": "ok",
-      "signals": [
-        "pricing_baseline_recorded"
-      ],
-      "detail": ""
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "an unreadable pricing page fires nothing",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Gamma",
-      "homepage": "https://gamma.app",
-      "official_domains": [
-        "gamma.app"
-      ],
-      "referenced_urls": [
-        "https://gamma.app/docs"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        },
-        {
-          "evidence_source": "install_command",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 6
-        }
-      ]
-    },
-    "probe": {
-      "status": "ok",
-      "signals": [
-        "pricing_page_unreadable"
-      ],
-      "detail": ""
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "a docs change on a screenshot-heavy flow reports the captures at risk",
-    "dependency": {
-      "kind": "service",
-      "canonical_name": "Google",
-      "homepage": "https://cloud.google.com",
-      "official_domains": [
-        "cloud.google.com"
-      ],
-      "watch_tier": "standard",
-      "referenced_urls": [
-        "https://cloud.google.com/docs/oauth"
-      ],
-      "locations": [
-        {
-          "evidence_source": "link:a_href",
-          "object_type": "LEARNING_RESOURCE",
-          "session_no": 13
-        }
-      ]
-    },
-    "probe": {
-      "status": "changed",
-      "signals": [
-        "redirected_off_path"
-      ],
-      "final_url": "https://docs.cloud.google.com/docs/oauth",
-      "affected_urls": [
-        "https://cloud.google.com/docs/oauth"
-      ],
-      "detail": "redirected"
-    },
-    "expect": {
-      "must_fire": [
-        "S5"
-      ],
-      "min_findings": 1
-    }
-  },
-  {
-    "name": "a model whose provider shutdown date has passed fires S7 at critical",
-    "dependency": {
-      "kind": "model",
-      "canonical_name": "llama-3.3-70b-versatile",
-      "vendor": "Meta",
-      "official_domains": [
-        "ai.meta.com",
-        "llama.com"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q0"
-        },
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        }
-      ]
-    },
-    "probe": {
-      "status": "broken",
-      "signals": [
-        "model_shutdown_passed",
-        "vendor_named_replacement"
-      ],
-      "provider": "Groq",
-      "provider_domains": [
-        "groq.com",
-        "console.groq.com"
-      ],
-      "evidence_url": "https://console.groq.com/docs/deprecations",
-      "declared_changes": [
-        {
-          "rule_id": "groq:llama-3.3-70b-versatile",
-          "n8n_version": "",
-          "title": "llama-3.3-70b-versatile is deprecated on Groq",
-          "description": "llama-3.3-70b-versatile | 08/16/26 | openai/gpt-oss-120b or qwen/qwen3.6-27b",
-          "severity": "critical",
-          "doc_url": "https://console.groq.com/docs/deprecations",
-          "node_types": [
-            "llama-3.3-70b-versatile"
-          ],
-          "actions": [],
-          "replacement_ids": [
-            "openai/gpt-oss-120b"
-          ],
-          "shutdown_date": "08/16/26"
-        }
-      ],
-      "alternatives_verified": [
-        {
-          "name": "openai/gpt-oss-120b",
-          "homepage": "https://console.groq.com/docs/models",
-          "quote": "GPT OSS 120B openai/gpt-oss-120b | 1000 | ...",
-          "status": "available"
-        }
-      ],
-      "detail": "Groq lists llama-3.3-70b-versatile as deprecated with shutdown 08/16/26 - 24 days ago"
-    },
-    "expect": {
-      "must_fire": [
-        "S7"
-      ],
-      "must_not_fire": [
-        "S1",
-        "S4"
-      ],
-      "severity_range": [
-        "critical"
-      ],
-      "min_findings": 1,
-      "must_mention": [
-        "08/16/26",
-        "openai/gpt-oss-120b"
-      ],
-      "min_questions_executing": 2
-    }
-  },
-  {
-    "name": "a provider page we could not read is never a retirement",
-    "dependency": {
-      "kind": "model",
-      "canonical_name": "llama-3.3-70b-versatile",
-      "vendor": "Meta",
-      "official_domains": [
-        "ai.meta.com",
-        "llama.com"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q0"
-        },
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        }
-      ]
-    },
-    "probe": {
-      "status": "inconclusive",
-      "signals": [
-        "model_catalogue_unreadable"
-      ],
-      "detail": "groq: http 503"
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "a model its provider still lists fires nothing",
-    "dependency": {
-      "kind": "model",
-      "canonical_name": "gemini-2.5-flash",
-      "vendor": "Meta",
-      "official_domains": [
-        "ai.meta.com",
-        "llama.com"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q0"
-        },
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        }
-      ]
-    },
-    "probe": {
-      "status": "ok",
-      "signals": [
-        "model_listed_available"
-      ],
-      "provider": "Google",
-      "provider_domains": [
-        "ai.google.dev"
-      ]
-    },
-    "expect": {
-      "max_findings": 0
-    }
-  },
-  {
-    "name": "a model no configured provider serves asserts nothing",
-    "dependency": {
-      "kind": "model",
-      "canonical_name": "qwen3.5",
-      "vendor": "Meta",
-      "official_domains": [
-        "ai.meta.com",
-        "llama.com"
-      ],
-      "watch_tier": "critical",
-      "locations": [
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q0"
-        },
-        {
-          "evidence_source": "model_id",
-          "object_type": "CODING_QUESTIONS",
-          "session_no": 6,
-          "content_id": "q1"
-        }
-      ]
-    },
-    "probe": {
-      "status": "ok",
-      "signals": [
-        "model_provider_unknown"
-      ],
-      "detail": "no configured provider lists this id"
-    },
-    "expect": {
-      "max_findings": 0
-    }
+  "expect": {
+   "must_fire": [
+    "S1"
+   ],
+   "severity_range": [
+    "critical",
+    "high"
+   ],
+   "min_findings": 1,
+   "must_mention": [
+    "codetotutorial.com"
+   ]
   }
+ },
+ {
+  "name": "a healthy tool fires nothing at all",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Ollama",
+   "homepage": "https://ollama.com",
+   "official_domains": [
+    "ollama.com"
+   ],
+   "referenced_urls": [
+    "https://ollama.com/"
+   ],
+   "watch_tier": "standard",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 7
+    }
+   ]
+  },
+  "probe": {
+   "status": "ok",
+   "signals": [],
+   "detail": ""
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "our own network failure is never reported as a broken tool",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Murf.AI",
+   "homepage": "https://murf.ai",
+   "official_domains": [
+    "murf.ai"
+   ],
+   "referenced_urls": [
+    "https://murf.ai/"
+   ],
+   "watch_tier": "standard",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 12
+    }
+   ]
+  },
+  "probe": {
+   "status": "unreachable",
+   "signals": [],
+   "detail": "no response: ConnectionError"
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "an anti-bot 403 is never reported as a broken tool",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Perplexity",
+   "homepage": "https://perplexity.ai",
+   "official_domains": [
+    "perplexity.ai"
+   ],
+   "referenced_urls": [
+    "https://perplexity.ai/"
+   ],
+   "watch_tier": "standard",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 3
+    }
+   ]
+  },
+  "probe": {
+   "status": "inconclusive",
+   "signals": [
+    "blocked_by_host"
+   ],
+   "detail": "http 403"
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a robots.txt refusal is never reported as a broken tool",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Gamma",
+   "homepage": "https://gamma.app",
+   "official_domains": [
+    "gamma.app"
+   ],
+   "referenced_urls": [
+    "https://gamma.app/"
+   ],
+   "watch_tier": "standard",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 2
+    }
+   ]
+  },
+  "probe": {
+   "status": "inconclusive",
+   "signals": [
+    "disallowed_by_robots"
+   ],
+   "detail": "robots.txt asks us not to fetch"
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a major-version gap fires S6 and names both versions",
+  "dependency": {
+   "kind": "package",
+   "canonical_name": "google-genai",
+   "registry": "pypi",
+   "registry_id": "google-genai",
+   "taught_version": "1.60.0",
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "solution_import",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 3,
+     "content_id": "q1"
+    },
+    {
+     "evidence_source": "install_command",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 3
+    }
+   ]
+  },
+  "probe": {
+   "status": "changed",
+   "signals": [
+    "major_behind_taught_pin"
+   ],
+   "latest_version": "2.22.0",
+   "detail": "1.60.0 -> 2.22.0"
+  },
+  "expect": {
+   "must_fire": [
+    "S6"
+   ],
+   "min_findings": 1,
+   "must_mention": [
+    "1.60.0",
+    "2.22.0"
+   ]
+  }
+ },
+ {
+  "name": "a package still at its taught major version fires nothing",
+  "dependency": {
+   "kind": "package",
+   "canonical_name": "gradio",
+   "registry": "pypi",
+   "registry_id": "gradio",
+   "taught_version": "6.6.0",
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "solution_import",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 8,
+     "content_id": "q2"
+    }
+   ]
+  },
+  "probe": {
+   "status": "ok",
+   "signals": [],
+   "latest_version": "6.26.0",
+   "detail": ""
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "docs prose churn on a passing mention is not news",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Wikipedia-ish",
+   "homepage": "https://example-tool.test",
+   "official_domains": [
+    "example-tool.test"
+   ],
+   "watch_tier": "mention-only",
+   "locations": [
+    {
+     "evidence_source": "prose_name",
+     "object_type": "OBJECTIVE_QUESTIONS",
+     "session_no": 5,
+     "content_id": "m1"
+    }
+   ]
+  },
+  "probe": {
+   "status": "changed",
+   "signals": [
+    "page_text_changed"
+   ],
+   "detail": "prose changed"
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a graded item that executes a dead dependency is surfaced as fallout",
+  "dependency": {
+   "kind": "package",
+   "canonical_name": "deadpkg",
+   "registry": "pypi",
+   "registry_id": "deadpkg",
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "solution_import",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 9,
+     "content_id": "cq1"
+    },
+    {
+     "evidence_source": "test_case_enum",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 9,
+     "content_id": "cq2"
+    }
+   ]
+  },
+  "probe": {
+   "status": "broken",
+   "signals": [
+    "registry_missing"
+   ],
+   "detail": "pypi has no project 'deadpkg'"
+  },
+  "expect": {
+   "must_fire": [
+    "S4"
+   ],
+   "min_findings": 1,
+   "min_questions_executing": 2
+  }
+ },
+ {
+  "name": "a claim from a non-authoritative source cannot raise a finding on its own",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "SomeTool",
+   "homepage": "https://sometool.test",
+   "official_domains": [
+    "sometool.test"
+   ],
+   "watch_tier": "standard",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 1
+    }
+   ]
+  },
+  "probe": {
+   "status": "ok",
+   "signals": [],
+   "detail": ""
+  },
+  "research": {
+   "claims": [
+    {
+     "kind": "deprecation",
+     "statement": "SomeTool is deprecated",
+     "source_url": "https://random-blog.example/post",
+     "quote": "I heard they shut it down last month"
+    }
+   ]
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a node that no longer exists upstream fires S9 at critical",
+  "dependency": {
+   "kind": "n8n_node",
+   "canonical_name": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+   "registry": "n8n",
+   "taught_version": "1.3",
+   "watch_tier": "critical",
+   "official_domains": [
+    "docs.n8n.io",
+    "n8n.io"
+   ],
+   "homepage": "https://n8n.io",
+   "docs_url": "https://docs.n8n.io/integrations/",
+   "locations": [
+    {
+     "evidence_source": "n8n_workflow",
+     "object_type": "OBJECTIVE_QUESTIONS",
+     "session_no": 17,
+     "content_id": "q-n8n-1"
+    },
+    {
+     "evidence_source": "n8n_workflow",
+     "object_type": "OBJECTIVE_QUESTIONS",
+     "session_no": 18,
+     "content_id": "q-n8n-2"
+    }
+   ]
+  },
+  "probe": {
+   "status": "broken",
+   "signals": [
+    "node_removed_upstream"
+   ],
+   "latest_version": "2.38.4",
+   "detail": "@n8n/n8n-nodes-langchain.memoryBufferWindow is no longer in n8n's shipped node set"
+  },
+  "expect": {
+   "must_fire": [
+    "S9"
+   ],
+   "severity_range": [
+    "critical"
+   ],
+   "min_findings": 1,
+   "must_mention": [
+    "memoryBufferWindow"
+   ],
+   "min_questions_executing": 2
+  }
+ },
+ {
+  "name": "a vendor-declared breaking change is cited from the vendor's own docs",
+  "dependency": {
+   "kind": "n8n_node",
+   "canonical_name": "n8n-nodes-base.spontit",
+   "registry": "n8n",
+   "taught_version": "1",
+   "watch_tier": "critical",
+   "official_domains": [
+    "docs.n8n.io",
+    "n8n.io"
+   ],
+   "homepage": "https://n8n.io",
+   "docs_url": "https://docs.n8n.io/integrations/",
+   "locations": [
+    {
+     "evidence_source": "n8n_workflow",
+     "object_type": "OBJECTIVE_QUESTIONS",
+     "session_no": 17,
+     "content_id": "q-n8n-1"
+    },
+    {
+     "evidence_source": "n8n_workflow",
+     "object_type": "OBJECTIVE_QUESTIONS",
+     "session_no": 18,
+     "content_id": "q-n8n-2"
+    }
+   ]
+  },
+  "probe": {
+   "status": "changed",
+   "signals": [
+    "breaking_change_declared"
+   ],
+   "latest_version": "2.38.4",
+   "detail": "n8n declares a breaking change affecting this node: Removed Deprecated Nodes",
+   "declared_changes": [
+    {
+     "rule_id": "removed-nodes-v2",
+     "n8n_version": "v2",
+     "title": "Removed Deprecated Nodes",
+     "description": "Several deprecated nodes have been removed and will no longer work",
+     "severity": "low",
+     "doc_url": "https://docs.n8n.io/2-0-breaking-changes/#removed-nodes-for-retired-services",
+     "node_types": [
+      "n8n-nodes-base.spontit"
+     ],
+     "actions": []
+    }
+   ]
+  },
+  "expect": {
+   "must_fire": [
+    "S9"
+   ],
+   "min_findings": 1,
+   "must_mention": [
+    "Removed Deprecated Nodes"
+   ]
+  }
+ },
+ {
+  "name": "GitHub being unreachable is never reported as a removed node",
+  "dependency": {
+   "kind": "n8n_node",
+   "canonical_name": "n8n-nodes-base.gmail",
+   "registry": "n8n",
+   "taught_version": "2.1",
+   "watch_tier": "critical",
+   "official_domains": [
+    "docs.n8n.io",
+    "n8n.io"
+   ],
+   "homepage": "https://n8n.io",
+   "docs_url": "https://docs.n8n.io/integrations/",
+   "locations": [
+    {
+     "evidence_source": "n8n_workflow",
+     "object_type": "OBJECTIVE_QUESTIONS",
+     "session_no": 17,
+     "content_id": "q-n8n-1"
+    },
+    {
+     "evidence_source": "n8n_workflow",
+     "object_type": "OBJECTIVE_QUESTIONS",
+     "session_no": 18,
+     "content_id": "q-n8n-2"
+    }
+   ]
+  },
+  "probe": {
+   "status": "inconclusive",
+   "signals": [
+    "n8n_upstream_unreachable"
+   ],
+   "detail": "could not read n8n's source of truth: tree: http 503"
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "free-tier wording disappearing fires S3, the strongest pricing signal",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Hugging Face",
+   "homepage": "https://huggingface.co",
+   "official_domains": [
+    "huggingface.co"
+   ],
+   "referenced_urls": [
+    "https://huggingface.co/docs"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    },
+    {
+     "evidence_source": "install_command",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 6
+    }
+   ]
+  },
+  "probe": {
+   "status": "changed",
+   "signals": [
+    "free_tier_language_lost"
+   ],
+   "detail": "free-tier wording disappeared from https://huggingface.co/pricing: 'free tier' no longer present",
+   "evidence_url": "https://huggingface.co/pricing"
+  },
+  "expect": {
+   "must_fire": [
+    "S3"
+   ],
+   "severity_range": [
+    "critical",
+    "high"
+   ],
+   "min_findings": 1,
+   "must_mention": [
+    "free tier"
+   ]
+  }
+ },
+ {
+  "name": "a pricing page rewrite alone is a research lead, not a money finding",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Groq",
+   "homepage": "https://groq.com",
+   "official_domains": [
+    "groq.com"
+   ],
+   "referenced_urls": [
+    "https://groq.com/docs"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    },
+    {
+     "evidence_source": "install_command",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 6
+    }
+   ]
+  },
+  "probe": {
+   "status": "changed",
+   "signals": [
+    "pricing_page_changed"
+   ],
+   "detail": "https://groq.com/pricing changed substantially since the last run",
+   "evidence_url": "https://groq.com/pricing"
+  },
+  "expect": {
+   "must_fire": [
+    "S3"
+   ],
+   "severity_range": [
+    "low",
+    "info"
+   ],
+   "min_findings": 1
+  }
+ },
+ {
+  "name": "the first sight of a pricing page fires nothing",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Murf.AI",
+   "homepage": "https://murf.ai",
+   "official_domains": [
+    "murf.ai"
+   ],
+   "referenced_urls": [
+    "https://murf.ai/docs"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    },
+    {
+     "evidence_source": "install_command",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 6
+    }
+   ]
+  },
+  "probe": {
+   "status": "ok",
+   "signals": [
+    "pricing_baseline_recorded"
+   ],
+   "detail": ""
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "an unreadable pricing page fires nothing",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Gamma",
+   "homepage": "https://gamma.app",
+   "official_domains": [
+    "gamma.app"
+   ],
+   "referenced_urls": [
+    "https://gamma.app/docs"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    },
+    {
+     "evidence_source": "install_command",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 6
+    }
+   ]
+  },
+  "probe": {
+   "status": "ok",
+   "signals": [
+    "pricing_page_unreadable"
+   ],
+   "detail": ""
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a docs change on a screenshot-heavy flow reports the captures at risk",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Google",
+   "homepage": "https://cloud.google.com",
+   "official_domains": [
+    "cloud.google.com"
+   ],
+   "watch_tier": "standard",
+   "referenced_urls": [
+    "https://cloud.google.com/docs/oauth"
+   ],
+   "locations": [
+    {
+     "evidence_source": "link:a_href",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 13
+    }
+   ]
+  },
+  "probe": {
+   "status": "changed",
+   "signals": [
+    "redirected_off_path"
+   ],
+   "final_url": "https://docs.cloud.google.com/docs/oauth",
+   "affected_urls": [
+    "https://cloud.google.com/docs/oauth"
+   ],
+   "detail": "redirected"
+  },
+  "expect": {
+   "must_fire": [
+    "S5"
+   ],
+   "min_findings": 1
+  }
+ },
+ {
+  "name": "a model whose provider shutdown date has passed fires S7 at critical",
+  "dependency": {
+   "kind": "model",
+   "canonical_name": "llama-3.3-70b-versatile",
+   "vendor": "Meta",
+   "official_domains": [
+    "ai.meta.com",
+    "llama.com"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q0"
+    },
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    }
+   ]
+  },
+  "probe": {
+   "status": "broken",
+   "signals": [
+    "model_shutdown_passed",
+    "vendor_named_replacement"
+   ],
+   "provider": "Groq",
+   "provider_domains": [
+    "groq.com",
+    "console.groq.com"
+   ],
+   "evidence_url": "https://console.groq.com/docs/deprecations",
+   "declared_changes": [
+    {
+     "rule_id": "groq:llama-3.3-70b-versatile",
+     "n8n_version": "",
+     "title": "llama-3.3-70b-versatile is deprecated on Groq",
+     "description": "llama-3.3-70b-versatile | 08/16/26 | openai/gpt-oss-120b or qwen/qwen3.6-27b",
+     "severity": "critical",
+     "doc_url": "https://console.groq.com/docs/deprecations",
+     "node_types": [
+      "llama-3.3-70b-versatile"
+     ],
+     "actions": [],
+     "replacement_ids": [
+      "openai/gpt-oss-120b"
+     ],
+     "shutdown_date": "08/16/26"
+    }
+   ],
+   "alternatives_verified": [
+    {
+     "name": "openai/gpt-oss-120b",
+     "homepage": "https://console.groq.com/docs/models",
+     "quote": "GPT OSS 120B openai/gpt-oss-120b | 1000 | ...",
+     "status": "available"
+    }
+   ],
+   "detail": "Groq lists llama-3.3-70b-versatile as deprecated with shutdown 08/16/26 - 24 days ago"
+  },
+  "expect": {
+   "must_fire": [
+    "S7"
+   ],
+   "must_not_fire": [
+    "S1",
+    "S4"
+   ],
+   "severity_range": [
+    "critical"
+   ],
+   "min_findings": 1,
+   "must_mention": [
+    "08/16/26",
+    "openai/gpt-oss-120b"
+   ],
+   "min_questions_executing": 2
+  }
+ },
+ {
+  "name": "a provider page we could not read is never a retirement",
+  "dependency": {
+   "kind": "model",
+   "canonical_name": "llama-3.3-70b-versatile",
+   "vendor": "Meta",
+   "official_domains": [
+    "ai.meta.com",
+    "llama.com"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q0"
+    },
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    }
+   ]
+  },
+  "probe": {
+   "status": "inconclusive",
+   "signals": [
+    "model_catalogue_unreadable"
+   ],
+   "detail": "groq: http 503"
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a model its provider still lists fires nothing",
+  "dependency": {
+   "kind": "model",
+   "canonical_name": "gemini-2.5-flash",
+   "vendor": "Meta",
+   "official_domains": [
+    "ai.meta.com",
+    "llama.com"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q0"
+    },
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    }
+   ]
+  },
+  "probe": {
+   "status": "ok",
+   "signals": [
+    "model_listed_available"
+   ],
+   "provider": "Google",
+   "provider_domains": [
+    "ai.google.dev"
+   ]
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a model no configured provider serves asserts nothing",
+  "dependency": {
+   "kind": "model",
+   "canonical_name": "qwen3.5",
+   "vendor": "Meta",
+   "official_domains": [
+    "ai.meta.com",
+    "llama.com"
+   ],
+   "watch_tier": "critical",
+   "locations": [
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q0"
+    },
+    {
+     "evidence_source": "model_id",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 6,
+     "content_id": "q1"
+    }
+   ]
+  },
+  "probe": {
+   "status": "ok",
+   "signals": [
+    "model_provider_unknown"
+   ],
+   "detail": "no configured provider lists this id"
+  },
+  "expect": {
+   "max_findings": 0
+  }
+ },
+ {
+  "name": "a taught field the vendor deprecated fires S13 and names the successor",
+  "dependency": {
+   "kind": "service",
+   "canonical_name": "Murf.AI",
+   "homepage": "https://murf.ai",
+   "official_domains": [
+    "murf.ai"
+   ],
+   "watch_tier": "critical",
+   "taught_params": [
+    "multiNativeLocale",
+    "voiceId"
+   ],
+   "locations": [
+    {
+     "evidence_source": "solution_import",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 18
+    },
+    {
+     "evidence_source": "solution_import",
+     "object_type": "CODING_QUESTIONS",
+     "session_no": 19
+    },
+    {
+     "evidence_source": "prose_name",
+     "object_type": "LEARNING_RESOURCE",
+     "session_no": 20
+    }
+   ]
+  },
+  "probe": {
+   "status": "changed",
+   "signals": [
+    "taught_field_deprecated"
+   ],
+   "affected_urls": [
+    "https://murf.ai/api/docs/api-reference/text-to-speech/generate"
+   ],
+   "deprecated_fields": [
+    {
+     "field": "multiNativeLocale",
+     "successor": "locale",
+     "quote": "multiNativeLocale string Optional deprecated This field is superseded by locale field.",
+     "evidence_url": "https://murf.ai/api/docs/api-reference/text-to-speech/generate"
+    }
+   ],
+   "detail": ""
+  },
+  "expect": {
+   "must_fire": [
+    "S13"
+   ],
+   "min_findings": 1,
+   "must_mention": [
+    "multiNativeLocale",
+    "locale"
+   ],
+   "max_findings": 1
+  }
+ }
 ]

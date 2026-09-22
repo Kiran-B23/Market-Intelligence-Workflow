@@ -97,6 +97,9 @@ class UrlObservation:
     # on Google's release notes `sunset_near_subject` reads ["now deprecated",
     # "will be shut down"] every week, unchanged, whatever was announced this week.
     sunset_sentences: list[str] = field(default_factory=list)
+    # Fields this page labels deprecated, with the successor it names. See
+    # `deprecated_fields` for why a reference page needs its own reader.
+    deprecated_fields: list[dict] = field(default_factory=list)
     paid_phrases: list[str] = field(default_factory=list)
     parked: bool = False
     title: str = ""
@@ -126,6 +129,106 @@ def _sunset_sentences(text: str, subject_terms: tuple[str, ...] = (),
         if terms and not any(t in low for t in terms):
             continue
         out.append(sent)
+        if len(out) >= limit:
+            break
+    return out
+
+
+# --- deprecation as a REFERENCE PAGE writes it ------------------------------
+#
+# `SUNSET_PHRASES_*` were written for changelogs, which announce in sentences. An API
+# reference does not: it prints a definition list and hangs a badge on the field.
+#
+#   multiNativeLocale  string  Optional  Deprecated
+#     This field is superseded by locale field. Please migrate to locale field.
+#
+#   exclude_domains    array or null  Optional  Deprecated
+#     Deprecated: Use search_settings.exclude_domains instead.
+#
+# Measured across the doc pages the curriculum links to: of the sampled pages that say
+# something is ending, NONE matched a strong phrase. Both examples above are live, on
+# two different vendors, and the curriculum sends the first one in three sessions.
+#
+# The field name is the point. A bare "Deprecated" anywhere on a page is worthless -
+# it matches a nav item, a filter chip, a changelog heading. Bound to the identifier it
+# labels, and to the successor named beside it, it is a fact specific enough to act on.
+_FIELD = r"[A-Za-z_][A-Za-z0-9_.]{2,48}"
+_SUCCESSOR_CUE = (r"superseded by|use|in favou?r of|migrate to|replaced by|"
+                  r"please use|instead use")
+# The badge follows the field within a short window of type/optionality words, so an
+# unrelated "Deprecated" further down the page cannot reach back and label it.
+# The successor is usually on the line AFTER the badge — the badge ends the signature
+# line and the explanation starts the next one — so the tail spans a bounded couple of
+# lines rather than stopping at the first newline.
+_DEPRECATED_FIELD = re.compile(
+    rf"\b({_FIELD})\b(?P<between>[^.!?\n]{{0,80}}?)\bdeprecated\b"
+    rf"(?P<after>[^\n]{{0,160}}(?:\n[^\n]{{0,200}}){{0,2}})", re.I)
+_NAMED_SUCCESSOR = re.compile(
+    rf"(?:{_SUCCESSOR_CUE})\s+`?({_FIELD})`?", re.I)
+# Words that mean the match is prose about the page, not a labelled field.
+_NOT_A_FIELD = {"the", "this", "is", "are", "was", "were", "has", "have", "be", "been",
+                "it", "they", "which", "that", "api", "field", "parameter", "method",
+                "endpoint", "model", "and", "or", "now", "all", "any", "these", "those"}
+
+# A field declaration states a TYPE. That is what a reference page IS, and it is the
+# rule that separates a parameter from a heading that happens to carry the same badge.
+#
+# Found by holding out every vendor the detector was built from and running it against
+# ones it had never seen. It behaved on Deepgram (`diarize` -> `diarize_model`) and
+# ElevenLabs, and on Stripe it reported the field `Create` out of
+#
+#     Create a charge  deprecated  Ask about this section
+#
+# which is a section heading. Requiring a type token in the window rejects it and keeps
+# all four true positives, because every one of them declares one:
+#
+#     multiNativeLocale  string   Optional  deprecated        (Murf)
+#     exclude_domains    deprecated  array or null  Optional  (Groq)
+#     optimize_streaming_latency  integer or null  Optional  deprecated  (ElevenLabs)
+#     diarize  boolean  Optional  Defaults to false  deprecated          (Deepgram)
+_TYPE_TOKEN = re.compile(
+    r"\b(string|str|boolean|bool|integer|int|number|float|double|long|array|list|"
+    r"object|map|dict|enum|null|uuid|date|datetime|timestamp|file|binary|any)\b", re.I)
+
+# A successor is an identifier, not an English word. `use_pvc_as_ivc`'s row reads
+# "we won't use PVC versioning", and the bare cue `use` lifted `PVC` out of it — a
+# capitalised acronym mid-sentence, not a field anyone can rename to.
+_LOOKS_LIKE_FIELD = re.compile(r"^(?=.*[a-z])([a-z][A-Za-z0-9_.]*|[A-Za-z0-9]+[_.][A-Za-z0-9_.]+)$")
+
+
+def deprecated_fields(text: str, limit: int = 30) -> list[dict]:
+    """Fields a reference page labels deprecated, with the successor it names.
+
+    Returns `{"field":, "successor":, "quote":}` per hit. The quote is verbatim and
+    long enough to clear `Claim.build`'s floor, because this is evidence a reviewer
+    will be asked to act on.
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    for m in _DEPRECATED_FIELD.finditer(text or ""):
+        field = m.group(1)
+        if field.lower() in _NOT_A_FIELD or field.lower() in seen:
+            continue
+        # Between the name and the badge there may be a type and an optionality, and
+        # nothing else. A sentence in that gap means the two are not bound.
+        between = (m.group("between") or "").strip(" \t:|-—,")
+        if len(between.split()) > 6:
+            continue
+        after = m.group("after") or ""
+        # See `_TYPE_TOKEN`: no declared type, no field.
+        if not _TYPE_TOKEN.search(between + " " + after[:60]):
+            continue
+        succ = _NAMED_SUCCESSOR.search(after)
+        successor = succ.group(1) if succ else ""
+        if (successor.lower() in _NOT_A_FIELD
+                or not _LOOKS_LIKE_FIELD.match(successor or "x")):
+            successor = ""
+        quote = re.sub(r"\s+", " ",
+                       " ".join(x for x in (field, between, "deprecated", after) if x)).strip()
+        if len(quote) < 12:
+            continue
+        seen.add(field.lower())
+        out.append({"field": field, "successor": successor, "quote": quote[:280]})
         if len(out) >= limit:
             break
     return out
@@ -164,6 +267,7 @@ def observe(url: str, subject_terms: tuple[str, ...] = ()) -> UrlObservation:
         o.sunset_phrases = _hits(text, SUNSET_PHRASES)
         o.sunset_near_subject = _hits_near(text, SUNSET_PHRASES_STRONG, subject_terms)
         o.sunset_sentences = _sunset_sentences(text, subject_terms)
+        o.deprecated_fields = deprecated_fields(text)
         o.paid_phrases = _hits(text, PAID_PHRASES)
         o.parked = bool(_hits(text, PARKED_PHRASES))
         m = _TITLE.search(f.body)

@@ -54,6 +54,11 @@ SIGNALS = {
     # taught job" - a fit judgement. S12 asserts only what the vendor's own catalogue
     # says: this exists, it is served, and we do not teach it.
     "S12": ("Newer option from a vendor we already use", "opportunity", "low"),
+    # A field INSIDE a live API. Every other regression signal asks whether the
+    # dependency is still there; this one asks whether what the course puts in the
+    # request still exists. High rather than critical by default: the vendor still
+    # serves the field today, and `severity_for` lifts it where the course executes it.
+    "S13": ("Taught API field deprecated", "regression", "high"),
 }
 
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
@@ -123,6 +128,7 @@ PROBE_TO_SIGNAL = {
     # rather than duplicating into S3, which is how 8 findings appeared where there
     # were 4 in Phase 2.
     "model_tier_restricted": "S7",
+    "taught_field_deprecated": "S13",
 }
 
 # n8n states a severity on each of its own breaking-change rules. Honour it rather
@@ -220,6 +226,12 @@ EVIDENCE_REACH: dict[str, Optional[tuple]] = {
     # what the course should TEACH, so they reach everywhere it is taught.
     "sunset_language_about_subject": None,
     "deprecation_notice_added": None,
+    # A retired field reaches the records that WRITE it, and that is not expressible
+    # here: `evidence_source` records how the DEPENDENCY was found, not what the record
+    # contains. `scope_locations` special-cases S13 onto `Dependency.taught_param_at`,
+    # which the extractor measured. `None` keeps `verify`'s over-reach check from
+    # second-guessing a scope that is already narrower than any rule it could apply.
+    "taught_field_deprecated": None,
     "free_tier_language_lost": None, "pricing_restriction_language": None,
     # A model id is passed to an API; the workbook row names it too.
     "model_shutdown_passed": ("model_id", "sheet_declared", "sheet_pin"),
@@ -379,8 +391,19 @@ def scope_locations(dep: Dependency, f: Finding) -> None:
     rule that silently empties a finding on old data is worse than one that stops at
     evidence kind.
     """
-    reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations,
-                                       f.redirects, f.probe_signals)
+    if f.signal == "S13":
+        # Scoped by the records that WRITE the field, which is a fact the extractor
+        # measured rather than a rule about evidence kinds. See
+        # `Dependency.taught_param_at`: the locations that carry a deprecated field are
+        # ordinary reading materials that happen to contain a code block, so every
+        # evidence-kind rule scopes this finding to zero.
+        wanted = {cid for fld in (x.get("field") for x in f.deprecated_fields or [])
+                  for cid in (dep.taught_param_at or {}).get(fld or "", [])}
+        reached = [l for l in dep.locations if l.content_id in wanted]
+        rest = [l for l in dep.locations if l.content_id not in wanted]
+    else:
+        reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations,
+                                           f.redirects, f.probe_signals)
 
     # Counted before the cap, and recorded, because `locations` is a display list and
     # every surface that counted it understated a busy finding by an order of magnitude.
@@ -500,6 +523,7 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f.affected_urls = list(probe.affected_urls)
             f.successors = list(probe.successors)
             f.redirects = list(probe.redirects)
+            f.deprecated_fields = list(probe.deprecated_fields)
             f.latest_version = probe.latest_version or ""
             if not f.summary:
                 f.summary = _probe_summary(sig, dep, probe)
@@ -779,6 +803,19 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
     return sorted(final, key=lambda x: (-SEVERITY_ORDER.index(x.severity), -x.blast_radius))
 
 
+def _field_summary(dep: Dependency, probe: ProbeResult) -> str:
+    """What the vendor said, in the vendor's own terms."""
+    rows = probe.deprecated_fields or []
+    if not rows:
+        return f"{dep.canonical_name} marks a field the course uses as deprecated."
+    first = rows[0]
+    more = f" (and {len(rows) - 1} more field(s))" if len(rows) > 1 else ""
+    to = (f"; {dep.canonical_name} names `{first['successor']}` as its replacement"
+          if first.get("successor") else "")
+    return (f"{dep.canonical_name}'s own API reference marks `{first['field']}` "
+            f"deprecated{to}. The course writes it{more}.")
+
+
 def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
     """A summary specific to this signal, not the probe's single detail string."""
     urls = probe.affected_urls or ([probe.evidence_url] if probe.evidence_url else [])
@@ -812,6 +849,7 @@ def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
         "breaking_change_possible": probe.detail,
         "n8n_upstream_unreachable": probe.detail,
         "sunset_language_about_subject": probe.detail,
+        "taught_field_deprecated": _field_summary(dep, probe),
         "deprecation_notice_added": (
             f"{dep.canonical_name}'s own pages carry a deprecation notice that was not "
             f"there at the last check: \u201c{(probe.new_notices or [''])[0][:200]}\u201d"),
@@ -980,6 +1018,23 @@ def recommend(dep: Dependency, f: Finding) -> str:
                          f"is the page the session meant.")
             break
 
+    # The field edit, named exactly. `deprecated_fields` carries what the vendor's own
+    # reference says, so the sentence can be specific without inferring anything.
+    fields = f.deprecated_fields or []
+    if fields:
+        first = fields[0]
+        rename = (f"rename it to `{first['successor']}`" if first.get("successor")
+                  else "check the reference for its replacement")
+        extra = (f" {len(fields) - 1} other taught field(s) are deprecated too: "
+                 + ", ".join(f"`{x['field']}`" for x in fields[1:4]) + "."
+                 if len(fields) > 1 else "")
+        s13 = (f"{dep.canonical_name} still serves `{first['field']}` but its own API "
+               f"reference marks it deprecated - {rename} in the session's request "
+               f"payloads before the field is removed.{extra}")
+    else:
+        s13 = (f"A field the course sends to {dep.canonical_name} is marked deprecated "
+               f"on its own API reference; check the payloads in the session.")
+
     reach = s5_reach(f.redirects)
     moved = next((r for r in (f.redirects or []) if r.get("off_site")), None)
     if reach == "links":
@@ -1061,6 +1116,10 @@ def recommend(dep: Dependency, f: Finding) -> str:
         "S10": f"A lead worth a look, not a conclusion: something in the same space as "
                f"{dep.canonical_name} exists and was pointed at by a third party.",
         "S11": "Review course coverage against current industry expectations.",
+        # Names the field and the successor, because that IS the edit. "Review Murf"
+        # would send a reviewer to read a healthy status page; "rename
+        # multiNativeLocale to locale" is a find-and-replace they can do today.
+        "S13": s13,
     }[f.signal]
     # Assessment fallout: the reading material is only half the edit.
     q = ""

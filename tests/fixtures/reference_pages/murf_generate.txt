@@ -1,0 +1,58 @@
+# source: https://murf.ai/api/docs/api-reference/text-to-speech/generate
+Synthesize Speech | Murf API | Documentation
+For AI agents: a documentation index is available at the root level at /llms.txt. Append /llms.txt to any URL for a page-level index, or .md for the markdown version of any page.
+Returns a url to the generated audio file along with other associated properties.
+Headers
+api-key string Optional
+Request
+This endpoint expects an object.
+text string Required
+The text that is to be synthesised. e.g. ‘Hello there [pause 1s] friend’
+voiceId string Required
+Use the GET /v1/speech/voices API to find supported voiceIds. You can use either the voiceId (e.g. en-US-natalie) or just the voice actor’s name (e.g. natalie).
+audioDuration double Optional >=0
+This parameter allows specifying the duration (in seconds) for the generated audio. If the value is 0, this parameter will be ignored. Only available for Gen2 model.
+channelType string Optional Defaults to MONO
+Valid values: STEREO, MONO
+encodeAsBase64 boolean Optional
+Set to true to receive audio in response as a Base64 encoded string instead of a url. This enables zero retention of audio data on Murf's servers.
+format string Optional Defaults to WAV
+Format of the generated audio file. Valid values: MP3, WAV, FLAC, ALAW, ULAW, PCM, OGG
+modelVersion enum Optional Defaults to GEN2
+Valid values: GEN2. Audio will be generated using the new and advanced GEN2 model. Outputs from GEN2 sound more natural and high-quality compared to earlier models.
+locale string Optional
+Specifies the language for the generated audio, enabling a voice to speak in multiple languages natively. Only available in the Gen2 model.
+Valid values: “en-US”, “en-UK”, “es-ES”, etc. Use the GET /v1/speech/voices endpoint to retrieve the list of available voices and languages.
+pitch integer Optional -50-50
+Pitch of the voiceover
+rate integer Optional -50-50
+Speed of the voiceover
+sampleRate double Optional Defaults to 44100
+Valid values are 8000, 24000, 44100, 48000
+style string Optional
+The voice style to be used for voiceover generation.
+variation integer Optional 0-5 Defaults to 1
+Higher values will add more variation in terms of Pause, Pitch, and Speed to the voice. Only available for Gen2 model.
+wordDurationsAsOriginalText boolean Optional Defaults to false
+If set to true, the word durations in response will return words as the original input text. (English only)
+multiNativeLocale string Optional Deprecated
+This field is superseded by locale field. Please migrate to locale field to ensure compatibility with future API versions.
+Specifies the language for the generated audio, enabling a voice to speak in multiple languages natively. Only available in the Gen2 model.
+Valid values: “en-US”, “en-UK”, “es-ES”, etc. Use the GET /v1/speech/voices endpoint to retrieve the list of available voices and languages.
+Response
+Ok
+audioFile string format: "url"
+audioLengthInSeconds double
+remainingCharacterCount long
+Remaining number of characters available for synthesis in the current billing cycle.
+wordDurations list of objects
+encodedAudio string Optional
+warning string Optional
+consumedCharacterCount long Optional Deprecated
+Number of characters consumed so far in the current billing cycle.
+Errors
+400 Bad Request Error
+402 Payment Required Error
+403 Forbidden Error
+500 Internal Server Error
+503 Service Unavailable Error

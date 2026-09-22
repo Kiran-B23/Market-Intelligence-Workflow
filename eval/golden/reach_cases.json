@@ -262,5 +262,38 @@
   "expect": {
    "reached_count": 2
   }
+ },
+ {
+  "name": "a retired API field is NOT scoped by evidence kind \u2014 see scope_locations, which uses the records that write it",
+  "signal": "S13",
+  "probe_signals": [
+   "taught_field_deprecated"
+  ],
+  "locations": [
+   {
+    "evidence_source": "solution_import",
+    "object_type": "CODING_QUESTIONS",
+    "url": ""
+   },
+   {
+    "evidence_source": "n8n_workflow",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "prose_name",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   },
+   {
+    "evidence_source": "link:a_href",
+    "object_type": "LEARNING_RESOURCE",
+    "url": ""
+   }
+  ],
+  "expect": {
+   "reached_count": 4
+  },
+  "note": "`None` reach here means the evidence-kind rule abstains. The real narrowing is `Dependency.taught_param_at`, measured by the extractor: Murf's four field-writing records carry link:a_href, link:markdown and prose_name, so any evidence-kind rule would scope this finding to nothing."
  }
 ]

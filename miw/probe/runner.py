@@ -15,6 +15,7 @@ So:
 from __future__ import annotations
 
 import re
+from urllib.parse import urljoin
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
@@ -25,7 +26,19 @@ from miw.schema import Dependency, ProbeResult, utcnow
 from miw.state import State
 
 MIN_CONSECUTIVE_FAILURES = 2
-MAX_URLS_PER_DEP = 4
+# How many of the curriculum's own links to a dependency the probe opens.
+#
+# It was a flat 4 against 313 referenced URLs, so 139 of them — 44% of every link the
+# course sends a student to — were never opened by anything. The miss is concentrated
+# where it hurts: LangChain has 44 referenced URLs and 40 unseen, Google 36 and 32, the
+# n8n agent node 31 and 27, and Murf's unread reference page is the one that carries
+# `multiNativeLocale`'s deprecation. All but one of the 16 dependencies over the old cap
+# are `critical`.
+#
+# Tiered rather than simply raised: a `mention-only` dependency with nine links does not
+# earn nine requests, and the whole budget is one fetch per URL per week.
+MAX_URLS_BY_TIER = {"critical": 12, "standard": 6, "mention-only": 3}
+MAX_URLS_PER_DEP = 4                      # the floor, and what the tests name
 
 
 def _days_since(iso: str) -> Optional[int]:
@@ -38,16 +51,90 @@ def _days_since(iso: str) -> Optional[int]:
     return (datetime.now(timezone.utc) - dt).days
 
 
-def _targets(dep: Dependency) -> list[str]:
-    """Curriculum-referenced URLs first, then the vendor's own entry points."""
-    seen, out = set(), []
-    for u in list(dep.referenced_urls) + [dep.docs_url, dep.homepage]:
-        if u and u not in seen:
-            seen.add(u)
-            out.append(u)
-        if len(out) >= MAX_URLS_PER_DEP:
+# A path that looks like documentation rather than marketing. Preferred within the
+# budget because that is where a vendor states a deprecation, and where the old
+# first-N-in-order rule was least likely to land: Murf's four probed URLs were the
+# homepage twice, the API-keys page, and one overview.
+_DOCS_PATH = re.compile(r"/(docs?|api|reference|guide|developer|changelog|release)",
+                        re.I)
+
+
+# An API-reference path on the vendor's own site. Narrow on purpose: this is a link
+# the system follows without being told to, so it may only reach the part of a
+# vendor's documentation that states a field's contract.
+# `/api/docs/api` was in this list, which is Murf's URL shape and nobody else's — the
+# kind of thing that passes on the instance it was written from and generalises to
+# nothing. What every vendor shares is a path segment that says "reference": the word
+# itself, or an OpenAPI document. Anything narrower is a rule about one site.
+_REFERENCE_PATH = re.compile(r"/(api-reference|reference|openapi|swagger)(/|$)", re.I)
+MAX_REFERENCE_PAGES = 4
+_HREF = re.compile(r"""href=["']([^"'#?]+)""", re.I)
+# A docs site serves its own assets from under the same paths; `/api/docs/api/…` also
+# matches a favicon. Anything with a file extension that is not a page is not a
+# contract.
+_ASSET = re.compile(r"\.(ico|png|jpe?g|svg|gif|webp|css|js|mjs|woff2?|ttf|map|"
+                    r"json|xml|txt|pdf|zip)$", re.I)
+
+
+def _reference_pages(dep: Dependency, obs: list, terms: tuple) -> list:
+    """One hop from the docs pages already fetched, to the reference they link to.
+
+    Only for a dependency whose taught fields we are checking, and only when nothing
+    fetched so far documented one — so this costs nothing for the rest of the
+    inventory.
+
+    It exists because the page carrying a field's deprecation is routinely not the page
+    the course links to. Murf's curriculum links reach its overview, its API-keys page
+    and its product pages; the sentence saying `multiNativeLocale` is superseded by
+    `locale` is on `/api/docs/api-reference/text-to-speech/generate`, which the course
+    never links to and which the overview links to twice. Following the vendor's own
+    navigation is the difference between reading the docs and reading the doorway.
+    """
+    if not dep.taught_params:
+        return []
+    taught = {k.lower() for k in dep.taught_params}
+    if any(f.get("field", "").lower() in taught
+           for o in obs for f in o.deprecated_fields):
+        return []                      # already found the contract; no need to wander
+    from miw.extract.links import registrable
+    from miw.net import domain, fetch
+    own = {registrable(d) for d in dep.official_domains if d} | {
+        registrable(domain(dep.homepage or ""))} - {""}
+    found, out = [], []
+    for o in obs:
+        if not o.reachable:
+            continue
+        body = fetch(o.url, timeout=20).body or ""
+        base = o.final_url or o.url
+        for href in _HREF.findall(body):
+            url = urljoin(base, href)
+            if not _REFERENCE_PATH.search(url) or _ASSET.search(url):
+                continue
+            if registrable(domain(url)) not in own:
+                continue               # a vendor's contract, on the vendor's own site
+            if url not in found and url != base:
+                found.append(url)
+        if len(found) >= MAX_REFERENCE_PAGES:
             break
+    for url in found[:MAX_REFERENCE_PAGES]:
+        out.append(observe(url, terms))
     return out
+
+
+def _targets(dep: Dependency) -> list[str]:
+    """Curriculum-referenced URLs first, then the vendor's own entry points.
+
+    Documentation paths are taken first within the tier's budget. Order is otherwise
+    preserved, so a course's own first link stays the primary observation.
+    """
+    cap = MAX_URLS_BY_TIER.get(dep.watch_tier, MAX_URLS_PER_DEP)
+    seen, docs, rest = set(), [], []
+    for u in list(dep.referenced_urls) + [dep.docs_url, dep.homepage]:
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        (docs if _DOCS_PATH.search(u) else rest).append(u)
+    return (docs + rest)[:cap]
 
 
 def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
@@ -108,6 +195,7 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
         terms = tuple({dep.canonical_name, dep.canonical_name.rsplit(".", 1)[-1],
                        *dep.aliases} - {""})
         obs = [observe(u, terms) for u in _targets(dep)]
+        obs += _reference_pages(dep, obs, terms)
         if not obs:
             res.status = "inconclusive"
             res.detail = "no URL known for this dependency"
@@ -390,6 +478,35 @@ def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str,
     if fresh and seen_notices is not None:
         res.flag("deprecation_notice_added")
         res.new_notices = fresh[:3]
+
+    # A field the course writes that this vendor's own reference now marks deprecated.
+    #
+    # This is the one check that looks INSIDE the request. Everything else here asks
+    # whether the dependency is still there; a vendor can retire a field without
+    # retiring anything else the system watches, and Murf is the live proof —
+    # `murf.ai` answers 200, its pricing is up, its docs are up, and its reference says
+    # `multiNativeLocale` is superseded by `locale` while the curriculum sends the old
+    # key in three sessions, eight of those places graded.
+    #
+    # The vendor's page is also what BINDS the field. `extract/params.py` offers every
+    # key written near a dependency, because a lesson record names a dozen tools at once
+    # and picking one is a guess; a page that documents the field is the proof it is
+    # that vendor's, and it arrives as a verbatim quote rather than an inference.
+    taught = {k.lower(): k for k in (dep.taught_params if dep else [])}
+    if taught:
+        for o in obs:
+            for f in o.deprecated_fields:
+                hit = taught.get((f.get("field") or "").lower())
+                if not hit:
+                    continue
+                if any(d.get("field") == hit for d in res.deprecated_fields):
+                    continue
+                res.flag("taught_field_deprecated")
+                res.deprecated_fields.append(
+                    {"field": hit, "successor": f.get("successor", ""),
+                     "quote": f.get("quote", ""), "evidence_url": o.url})
+                if o.url not in res.affected_urls:
+                    res.affected_urls.append(o.url)
 
     for o in obs:
         if o.sunset_near_subject:

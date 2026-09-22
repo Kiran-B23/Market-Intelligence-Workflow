@@ -53,7 +53,16 @@ def test_reaching_everywhere_is_rare_and_every_case_is_named():
     everywhere = sorted(k for k, v in EVIDENCE_REACH.items() if v is None)
     assert everywhere == ["deprecation_notice_added", "free_tier_language_lost",
                           "pricing_restriction_language",
-                          "sunset_language_about_subject"], everywhere
+                          "sunset_language_about_subject",
+                          "taught_field_deprecated"], everywhere
+    # `taught_field_deprecated` is the one entry here that is not a widening. It abstains,
+    # because the question this table asks — which EVIDENCE KINDS does an observation
+    # reach — is the wrong question for a field. `evidence_source` says how the
+    # dependency was found in a record, not what the record contains, and Murf's four
+    # records writing `multiNativeLocale` carry link:a_href, link:markdown and
+    # prose_name. `scope_locations` narrows S13 by `Dependency.taught_param_at` instead,
+    # which is measured rather than inferred and is strictly narrower than any rule
+    # available here.
     # The argument for the newest member, made here because this test exists to force
     # one: `deprecation_notice_added` fires when the vendor's own pages gained a
     # sentence saying this dependency is ending. That is a fact about the DEPENDENCY,

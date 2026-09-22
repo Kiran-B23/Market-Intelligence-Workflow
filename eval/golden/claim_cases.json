@@ -172,5 +172,23 @@
    "tier": "CORROBORATING",
    "substantiates": false
   }
+ },
+ {
+  "name": "an invariant must recompute substantiation, not read a field nobody writes",
+  "kind": "pricing",
+  "statement": "Wellsaid publishes its pricing",
+  "source_url": "https://wellsaid.io/pricing",
+  "quote": "Wellsaid plans start at $44 per month for the Creator tier.",
+  "subject": {
+   "name": "Wellsaid",
+   "homepage": "https://wellsaid.io"
+  },
+  "expect": {
+   "built": true,
+   "tier": "AUTHORITATIVE",
+   "substantiates": true,
+   "serialised_verdict_absent": true,
+   "through_verify": true
+  }
  }
 ]

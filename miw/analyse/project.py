@@ -53,7 +53,7 @@ VENDOR_FACTS = ("finding_id", "dep_id", "canonical_name", "signal", "signal_labe
                 "kind_of_signal", "severity", "diff_class", "summary", "probe_signals",
                 "claims", "alternatives", "latest_version", "raised_at",
                 "affected_urls", "locations_scoped", "redirects", "successors",
-                "shutdown_date")
+                "shutdown_date", "deprecated_fields")
 
 
 def course_dependency(dep: Dependency, course: str) -> Dependency:

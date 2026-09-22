@@ -99,6 +99,21 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "        elif False:"),
      "coverage"),
 
+    # --- S13: a field inside a live API, and the two defects the held-out
+    # fixtures caught. Both mutations restore an overfit that passed on the pages
+    # the detector was written from and failed on pages it was not.
+    ("S13 a field need not declare a type, so a section heading becomes a field",
+     "miw/probe/http_probe.py",
+     ('        if not _TYPE_TOKEN.search(between + " " + after[:60]):\n            continue\n',
+      ""),
+     "fields"),
+    ("S13 a successor need not look like an identifier, so prose becomes a field name",
+     "miw/probe/http_probe.py",
+     ("        if (successor.lower() in _NOT_A_FIELD\n"
+      "                or not _LOOKS_LIKE_FIELD.match(successor or \"x\")):",
+      "        if successor.lower() in _NOT_A_FIELD:"),
+     "fields"),
+
     # --- M1: the only place generated text reaches a human ------------------
     ("M1 only invented URLs are rejected; versions, dates and prices pass",
      "miw/analyse/notes.py",
@@ -131,6 +146,11 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
     ("trust the remit is applied to a vendor's own site, not only to a lent registry",
      "miw/trust.py",
      ("    if not (own and not lent):", "    if True:"),
+     "trust"),
+    ("trust an invariant reads the verdict off the row instead of recomputing it",
+     "main.py",
+     ("        if not [c for c in (a.get(\"claims\") or []) if _claim_substantiates(c)]:",
+      '        if not [c for c in (a.get("claims") or []) if c.get("substantiating")]:'),
      "trust"),
     ("trust a package's borrowed registry is treated as its own site",
      "miw/schema.py",
