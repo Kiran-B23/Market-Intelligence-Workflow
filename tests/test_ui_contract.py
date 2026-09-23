@@ -650,3 +650,27 @@ def test_every_probe_outcome_that_becomes_a_finding_has_a_plain_word():
     have = set(re.findall(r"(?:^|[{,\s])'?([a-z0-9_]+)'?\s*:\s*'", block))
     missing = set(PROBE_TO_SIGNAL) - have
     assert not missing, f"no plain word for {sorted(missing)}"
+
+
+def test_the_digest_says_what_it_could_not_check_at_all():
+    """Two different silences, and the reader has to be able to tell them apart.
+
+    "Checked and came back uninformative" is a coverage number. "No official domain, so
+    nothing can aim anywhere" is a worklist — 161 taught names on the live inventory,
+    including `RSS Feed` at 68 locations and `Julius AI` at 39. The second was visible
+    only in a summary line inside `verify`, which nobody reads weekly, so a reference-only
+    tool could sit unverifiable for months and the digest would look calm.
+    """
+    from miw.reporters.markdown import render
+
+    out = render([], run_date="2026-09-23", inventory_size=436, probed=277,
+                 coverage={"checked": 227, "unchecked": 40, "inconclusive": 10,
+                           "no_authority": 161})
+    assert "227 were checked against a source" in out
+    assert "161 taught name(s) carry no official domain" in out
+    assert "needs_domain.yaml" in out
+    # ...and it stays quiet when there is nothing to say.
+    clean = render([], run_date="2026-09-23", inventory_size=436, probed=277,
+                   coverage={"checked": 277, "unchecked": 0, "inconclusive": 0,
+                             "no_authority": 0})
+    assert "no official domain" not in clean

@@ -214,6 +214,18 @@ def cmd_extract(args) -> int:
     print(f"  taught API fields: {n_params} candidate(s) across {with_params} "
           f"dependency(ies) — checked against each vendor's own reference at probe time")
 
+    # Names the curriculum teaches that nothing can check. A dependency with no official
+    # domain produces no deprecation, pricing or version finding — and for the 153
+    # workbook-declared names in that position, not even the cheap "is it still alive"
+    # check has anywhere to aim. That is half the reference-only half of the inventory,
+    # and until now the only place it was visible was a summary line in `verify`.
+    #
+    # Written as a worklist rather than guessed at: `research/nominate.py` refuses to
+    # turn a bare name into a URL on purpose, because a guess that happens to resolve
+    # looks exactly like evidence. A human adds the domain to `registry/tools.yaml`
+    # once and it stays resolved; the ranking says which ones are worth the minute.
+    _write_needs_domain(deps)
+
     placed = sum(1 for d in deps for l in d.locations
                  if l.evidence_source.startswith("sheet") and l.session_no)
     unplaced = sum(1 for d in deps for l in d.locations
@@ -516,6 +528,16 @@ def _probe_coverage(probes: dict) -> dict:
             "inconclusive": inconclusive}
 
 
+def _no_authority_count() -> int:
+    """Taught names with no official domain, from the worklist `extract` wrote."""
+    try:
+        import yaml
+        d = yaml.safe_load(NEEDS_DOMAIN.read_text()) or {}
+        return len(d.get("needs_domain") or [])
+    except (OSError, ValueError):
+        return 0
+
+
 def _opinion_violations(f: dict) -> list[str]:
     """Alternatives on this finding that carry a model opinion and nothing else.
 
@@ -543,6 +565,39 @@ def _opinion_violations(f: dict) -> list[str]:
         if "fit_score" in blob or "one_line" in blob:
             out.append(f"{name}: a fit judgement leaked into a claim")
     return out
+
+
+NEEDS_DOMAIN = Path("registry") / "needs_domain.yaml"
+
+
+def _write_needs_domain(deps) -> None:
+    """Rank the taught names that cannot be checked, so the gap is somebody's work."""
+    import yaml
+
+    rows = []
+    for d in deps:
+        if d.subject().official_domains:
+            continue
+        rows.append({"name": d.canonical_name, "kind": d.kind,
+                     "locations": len(d.locations),
+                     "watch_tier": d.watch_tier,
+                     "courses": sorted({l.course for l in d.locations if l.course})})
+    rows.sort(key=lambda r: (-r["locations"], r["name"].lower()))
+    NEEDS_DOMAIN.parent.mkdir(parents=True, exist_ok=True)
+    head = ["# Taught names with no official domain, so nothing can check them -",
+            "# not even whether they still work. Add the domain to",
+            "# `registry/tools.yaml` and the next run picks it up; leave concepts,",
+            "# techniques and datasets alone - they are not vendors and will never",
+            "# have one.",
+            "#",
+            f"# {len(rows)} name(s), most-taught first. Written by `extract`."]
+    NEEDS_DOMAIN.write_text(
+        "\n".join(head) + "\n"
+        + yaml.safe_dump({"needs_domain": rows}, sort_keys=False,
+                         allow_unicode=True))
+    checkable = sum(1 for d in deps if d.subject().official_domains)
+    print(f"  authority: {checkable} of {len(deps)} dependencies can be checked at all; "
+          f"{len(rows)} taught name(s) have no official domain -> {NEEDS_DOMAIN}")
 
 
 def _scoring_scope(scope):
@@ -1202,7 +1257,9 @@ def cmd_report(args) -> int:
                 capability_note=settings.capability_note(),
                 inventory_size=len(inv["dependencies"]), probed=len(probes),
                 researched=len(research), suppressed=raw.get("suppressed_unchanged", 0),
-                nominations=noms, coverage=_probe_coverage(probes))
+                nominations=noms,
+                coverage={**_probe_coverage(probes),
+                          "no_authority": _no_authority_count()})
     out = OUT / f"digest_{_today()}.md"
     out.write_text(md)
     print(f"  {len(findings)} findings -> {out}")

@@ -137,6 +137,11 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    ("B the digest stops saying which taught names cannot be checked at all",
+     "miw/reporters/markdown.py",
+     ('        blind = coverage.get("no_authority") or 0', "        blind = 0"),
+     "pytest:tests/test_ui_contract.py"),
+
     # --- the UI vocabulary, which nothing enumerated until a signal shipped
     # rendering as the literal string "S13" in five places.
     ("UI a drift code ships with no plain word, rendering as raw jargon",

@@ -201,6 +201,15 @@ def render(findings: Iterable[Finding], *, resolved: list[dict] | None = None,
             L += [f"_Coverage: of {probed} probed, {coverage.get('checked', 0)} were "
                   f"checked against a source; {' and '.join(parts)}. Those are not "
                   f"findings of health._", ""]
+        # The names nothing can check at all. Distinct from the line above: those were
+        # looked at and came back uninformative, these have no official domain, so not
+        # even "is it still alive" has anywhere to aim. It is a worklist, not a defect,
+        # and it stays invisible unless the digest says it.
+        blind = coverage.get("no_authority") or 0
+        if blind:
+            L += [f"_{blind} taught name(s) carry no official domain, so nothing can "
+                  f"check them — see `registry/needs_domain.yaml`, most-taught first._",
+                  ""]
     if nominations and nominations.get("total"):
         # Refutations are reported, never dropped. A nomination that failed is the only
         # way to tell "we looked and found nothing" apart from "nothing looked", and a
