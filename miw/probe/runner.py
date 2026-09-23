@@ -274,6 +274,27 @@ def _taught_field_pass(dep: Dependency, res: ProbeResult,
     _match_taught_fields(dep, obs, res)
 
 
+
+def _advisory_pass(dep: Dependency, res: ProbeResult) -> None:
+    """Known vulnerabilities in the version this course teaches.
+
+    Deliberately keyed on `taught_version`, not on the package: the union of every
+    advisory ever filed against `transformers` is a fact about transformers, and the
+    question a curriculum owner has is whether the version their students install has a
+    hole in it. No pinned version means no answer, and `supported=False` says so.
+    """
+    from miw.probe.advisories import advisories as _osv
+    got = _osv(dep.registry_id or dep.canonical_name, dep.registry, dep.taught_version)
+    res.advisories = got
+    if got.get("supported") and got.get("found"):
+        res.flag("advisory_affects_pinned_version")
+        n, worst = got["count"], got.get("worst") or "unrated"
+        res.detail = (f"{n} published advisor{'y' if n == 1 else 'ies'} affect "
+                      f"{dep.canonical_name} {got['version']} (worst: {worst.lower()})")
+        if res.status == "ok":
+            res.status = "changed"
+
+
 def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
     res = ProbeResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name)
     # Set only by the URL branch, which has already fetched the vendor's pages; the
@@ -315,6 +336,11 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             stale = _days_since(res.version_released_at)
             if stale is not None and stale > 730:
                 res.flag("no_release_in_2y")
+        # Published advisories against the exact version the course pins. Asked even
+        # when the registry lookup failed above - the two are independent questions,
+        # and a package missing from PyPI today can still have a taught version with a
+        # known hole in it. Costs one request and no model, like every other probe.
+        _advisory_pass(dep, res)
 
     elif dep.kind == "model":
         from miw.probe.models import probe_model_dependency, verified_replacements

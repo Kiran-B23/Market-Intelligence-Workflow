@@ -174,6 +174,39 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    # --- S17: a known hole in the version the course pins --------------------
+    ("S17 the row count is reported, so one CVE in two databases counts twice",
+     "miw/probe/advisories.py",
+     ('        cve = next((a for a in (v.get("aliases") or []) if a.startswith("CVE-")),\n'
+      '                   v.get("id", ""))',
+      '        cve = v.get("id", "")'),
+     "pytest:tests/test_advisories.py"),
+    ("S17 a withdrawn advisory is still counted as a vulnerability",
+     "miw/probe/advisories.py",
+     ('        if v.get("withdrawn"):\n            continue',
+      '        if False:\n            continue'),
+     "pytest:tests/test_advisories.py"),
+    ("S17 the package is asked about instead of the version the course pins",
+     "miw/probe/advisories.py",
+     ('    if not version:\n        return {"supported": False,',
+      '    if False:\n        return {"supported": False,'),
+     "pytest:tests/test_advisories.py"),
+    ("S17 a release candidate is offered as the version to upgrade to",
+     "miw/probe/advisories.py",
+     ("    if not parts or not all(p.isdigit() for p in parts):\n        return None",
+      "    if not parts:\n        return None"),
+     "pytest:tests/test_advisories.py"),
+    ("S17 severity ignores whether the course actually runs the package",
+     "miw/analyse/score.py",
+     ("    if not any(dep._executes(l) for l in dep.locations):\n        return _bump(base, -1)",
+      "    if False:\n        return _bump(base, -1)"),
+     "pytest:tests/test_advisories.py"),
+    ("S17 OSV being unreachable reads as a clean bill of health",
+     "miw/probe/advisories.py",
+     ('        return {"supported": False, "reason": f"OSV unreachable: "',
+      '        return {"supported": True, "found": False, "reason": f"OSV unreachable: "'),
+     "pytest:tests/test_advisories.py"),
+
     # --- F: how a vendor lets you in ----------------------------------------
     # The bar moved into `_attach_claim` when `findings_for` was split; the defect is
     # the same one, restored where the policy now lives.

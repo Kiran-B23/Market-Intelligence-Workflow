@@ -1635,6 +1635,7 @@ const WORDS = {
             model_price_changed: 'the price changed',
             model_rate_limit_changed: 'the usage limit changed',
             auth_method_changed: 'signing in changed',
+            advisory_affects_pinned_version: 'published advisories against the pinned version',
             taught_api_version_sunset: 'the API version we call is closing'},
   // How a finding moved since the last check. "worsened" and "improved" describe the
   // severity, which is not what a reader assumes the word refers to.
@@ -1660,7 +1661,8 @@ const WORDS = {
            S13: 'a field or method we use is deprecated',
            S14: 'a promise nothing covers',
            S15: 'signing in changed',
-           S16: 'the API version we call is closing'},
+           S16: 'the API version we call is closing',
+           S17: 'known vulnerability in the version we pin'},
   /* How the tool was found at this location. The chip used to print the raw
      `evidence_source`, which is fine for `prose_name` and useless for the one
      distinction that now matters most: `n8n_workflow` means a workflow BUILDS with the

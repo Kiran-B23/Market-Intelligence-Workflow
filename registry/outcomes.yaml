@@ -1,0 +1,23 @@
+# Outcomes a course promises, and the areas that serve them.
+#
+# Human-owned, like `topics.yaml`, and for the same reason: an outcome is
+# a promise made to a student, and nothing in the course exports or the
+# workbooks records it as one. An empty file reports nothing.
+#
+# Each `areas` entry must name an `area_id` from `topics.yaml`, so the
+# corroboration rules there apply unchanged - two independent official
+# sources, or the area reports nothing and says so.
+#
+# outcomes:
+#   - outcome_id: build-a-rag-pipeline
+#     course: Building LLM Applications
+#     statement: Build a retrieval-augmented pipeline end to end
+#     areas: [embeddings-and-retrieval, evaluation-and-observability]
+#
+# Observed today - which areas each course's sessions already fall inside.
+# A starting point for the `areas` lists above, not a set of outcomes:
+#   AI for Finance: agents-and-orchestration, embeddings-and-retrieval, evaluation-and-observability, fine-tuning, image-generation, prompting-techniques, responsible-ai-and-safety, speech-and-audio-generation, structured-output, tool-use-and-function-calling
+#   Building LLM Applications: agents-and-orchestration, embeddings-and-retrieval, evaluation-and-observability, fine-tuning, image-generation, prompting-techniques, responsible-ai-and-safety, speech-and-audio-generation, structured-output, tool-use-and-function-calling
+#   Intro to Gen AI: agents-and-orchestration, embeddings-and-retrieval, evaluation-and-observability, fine-tuning, image-generation, prompting-techniques, responsible-ai-and-safety, speech-and-audio-generation, structured-output, tool-use-and-function-calling
+
+outcomes: []

@@ -224,10 +224,23 @@ def clear_fetch_cache() -> None:
 
 def fetch(url: str, *, timeout: float = 20.0, retries: int = 2,
           method: str = "GET", headers: Optional[dict] = None,
-          use_cache: bool = True) -> Fetch:
-    """Polite fetch with backoff. Never raises; failures come back on `Fetch.error`."""
+          data: Optional[bytes] = None, use_cache: bool = True) -> Fetch:
+    """Polite fetch with backoff. Never raises; failures come back on `Fetch.error`.
+
+    `data` sends a request body, which is what a JSON API needs - OSV answers "which
+    advisories affect this exact version" only as a POST. It goes through here rather
+    than around it so an API call gets the same throttle, the same private-address
+    refusal and the same cache as every other request this system makes; a second
+    fetcher would be a second set of rules to keep in step.
+
+    A POST with a body caches on the body too. Keying on the URL alone would have made
+    every package's advisory query return the first package's answer.
+    """
     key = f"{method}\x1f{url}"
-    if use_cache and method == "GET" and key in _BODY_CACHE:
+    if data is not None:
+        key += "\x1f" + hashlib.sha256(data).hexdigest()[:16]
+    cacheable = use_cache and (method == "GET" or data is not None)
+    if cacheable and key in _BODY_CACHE:
         hit = _BODY_CACHE[key]
         return dataclasses.replace(hit, from_cache=True)
     safety = url_safety(url)
@@ -262,7 +275,7 @@ def fetch(url: str, *, timeout: float = 20.0, retries: int = 2,
         t0 = time.monotonic()
         try:
             r = requests.request(method, url, headers=h, timeout=timeout,
-                                 allow_redirects=True)
+                                 data=data, allow_redirects=True)
         except requests.RequestException as exc:
             last = Fetch(url=url, error=type(exc).__name__,
                          elapsed_ms=int((time.monotonic() - t0) * 1000))
@@ -286,7 +299,7 @@ def fetch(url: str, *, timeout: float = 20.0, retries: int = 2,
         # Cache answers only. A transport error or a 5xx is not an answer about the
         # world, and caching one would make a blip look like a settled fact for the
         # rest of the run - the same conflation `reachable`/`ok` exists to prevent.
-        if use_cache and method == "GET" and out.status is not None \
+        if cacheable and out.status is not None \
                 and out.status not in (500, 502, 503, 504):
             if len(_BODY_CACHE) >= _CACHE_MAX:
                 _BODY_CACHE.clear()

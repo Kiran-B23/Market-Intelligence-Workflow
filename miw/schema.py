@@ -305,6 +305,11 @@ class ProbeResult:
     # lands somewhere else is the product having moved, been rebranded or been acquired.
     # Those call for different work and used to be one signal.
     redirects: list[dict] = field(default_factory=list)
+    # Published advisories affecting the exact version the course pins. Shape as
+    # `miw.probe.advisories.advisories()`: `supported` is False when there is no
+    # pinned version to ask about, because the union of everything ever filed against
+    # a package is true of the package and says nothing about this curriculum.
+    advisories: dict = field(default_factory=dict)
     # Deprecation notices seen on this dependency's pages this run, as stable keys, and
     # the verbatim text of any that were not there last time. The keys are the baseline
     # `state.probe_save` stores; `new_notices` is the news.
@@ -630,6 +635,8 @@ class Finding:
     successors: list[dict] = field(default_factory=list)
     # Carried from the probe. Shape as `ProbeResult.redirects`.
     redirects: list[dict] = field(default_factory=list)
+    # Carried from the probe. Shape as `ProbeResult.advisories`.
+    advisories: dict = field(default_factory=dict)
     # The provider's own shutdown date, verbatim, when it announced one. A real date
     # beats a severity-derived deadline: severity says how bad, this says when, and
     # they routinely disagree by months.

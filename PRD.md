@@ -4237,3 +4237,115 @@ the way this one is. Worth saying rather than implying the class is closed.
 ### Gates
 
 738 tests, eval 4/4, `verify` clean with the new scope audit.
+
+---
+
+## 43. A known hole in the version the course pins
+
+Researched what had shipped since the last look, verified each claim on this machine
+rather than reporting it, and built the one that matched best without putting the output
+at risk.
+
+**Two of the headline recommendations were wrong**, which is the reason for checking.
+`--bare` came back strongly recommended as *the* production flag for scripted runs; on
+this box it returns `terminal_reason: "api_error"`, exit 1, zero tokens. And Claude's own
+computer use is not available in print mode at all, so it cannot close the
+taught-procedure gap.
+
+**What was verified as real:** `--json-schema` on the installed CLI (2.1.280) returns a
+schema-validated `structured_output` field; replacing Claude Code's agentic system prompt
+with a task one cuts a judgement call from **$0.0534 to $0.0317** (22,123 → 13,486 cache
+tokens, 15.2s → 7.7s); Playwright's accessibility tree is *"not pixel-based input… no
+vision models needed"*, which would make procedure-checking a better `text_hash` rather
+than a vision problem; and OSV answers for free, without a key, about the exact versions
+this curriculum pins.
+
+OSV was the best match: it closes §39's gap #4 outright, needs no model, no key and no
+new judgement, and it is the same shape as the probe stage that already exists.
+
+### Three traps, each of which produces a number that is not a measurement
+
+**The row count is nearly double the issue count.** GHSA and PyPA both publish most
+CVEs, so OSV returns each one twice:
+
+```
+transformers 4.46.3   44 rows -> 26 distinct issues
+gradio       4.44.0   43 rows -> 23
+pypdf        6.6.0    69 rows -> 35
+langchain    0.3.7     4 rows ->  2
+```
+
+Reporting rows would have overstated every finding by roughly 40% — the same mistake as
+reporting one n8n rule once per node it names. Grouping on the CVE alias fixes it, and
+preferring the GHSA row within a group does a second job: **unrated advisories fell from
+26 to 8**, because PYSEC is the copy that carries no rated band.
+
+**Asking about the package answers a question nobody asked.** The union of every advisory
+ever filed against `transformers` is a fact about transformers. What a curriculum owner
+needs is whether the version their students install has a hole in it, so the query is
+keyed on `taught_version` and **no pinned version means `supported=False`** — the same
+structural refusal the deck and catalogue readers make. 26 packages refuse on that
+ground today.
+
+**Never score a CVSS vector ourselves.** 26 of those 44 rows carry a vector and no rated
+band. Deriving a severity from it would present our arithmetic as the database's
+judgement, so rated advisories are counted by band and the rest are counted as unrated
+and *said* to be unrated.
+
+### Severity is about the course, not the CVE
+
+The worst **rated** band sets the ceiling — never the count, because 26 moderate issues
+are not worse than one critical one. Then the same question the n8n reference-table cap
+asks: does the course actually *run* this? Verified on the live inventory:
+
+```
+pypdf         install_command present        HIGH stays high
+transformers  install_command + import       HIGH stays high
+crewai-tools  sheet_pin + question_tag only  HIGH capped to medium
+Flask         sheet rows only                LOW  capped to info
+```
+
+A version number in a spreadsheet is a spreadsheet edit.
+
+### What it found on the first run
+
+12 packages carry advisories against the exact pinned version, and the recommendation
+names the release that clears them and says when that crosses a major boundary:
+
+> **transformers** — 26 published advisories affect 4.46.3, the version this course pins:
+> 6 high, 11 moderate, 1 low; 8 carry no rated severity. *Upgrade from the pinned 4.46.3 —
+> 5.10.0 clears all 26 of them, but that is a major version ahead of what the course
+> teaches, so the taught code needs re-running against it.*
+
+`ragas` and `accelerate` have advisories with no fixed release at all, and the wording
+says so rather than inventing an upgrade.
+
+### Cost and plumbing
+
+One request per pinned package, ~1.6s each, ≈135s added to a full probe — no model, no
+key. `net.fetch` gained a request body so the API call gets the same throttle,
+private-address refusal and cache as every other request this system makes; the cache key
+includes a hash of the body, without which every package would have returned the first
+package's answer.
+
+### Gates
+
+19 new tests and **six new mutations**, all caught: reporting rows instead of distinct
+CVEs, counting a withdrawn advisory, asking about the package instead of the version,
+offering a release candidate as the upgrade, ignoring whether the course runs the
+package, and OSV being unreachable reading as a clean bill of health.
+
+855 tests, eval 4/4, mutations 61/61, `verify` clean, pipeline run end to end.
+
+### Not taken, and why
+
+Batch API (50% off) needs a key. Vision screenshot diffing is exactly the shape this
+system refuses — a model judges and nothing can check the judgement. Subagent fan-out
+would trade deterministic Python with 61 mutation-tested gates for prompts nothing can
+audit. MCP as a client buys nothing a direct library call does not.
+
+**Still open and worth its own decision:** `--json-schema` and the system-prompt
+replacement are measured wins on correctness and cost, but both change how the model is
+asked, so they need before/after evidence on real judgements before they ship. Playwright
+is a 150MB browser binary and a genuine architectural commitment; it should be prototyped
+against the 8 bot-walled dependencies first.

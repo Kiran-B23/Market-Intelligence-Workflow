@@ -77,6 +77,11 @@ SIGNALS = {
     # key page is wrong while nothing is broken.
     "S15": ("Sign-up or authentication changed", "regression", "high"),
     "S16": ("Taught API version being retired", "regression", "high"),
+    # Base only. `advisory_severity` sets the real one from the worst RATED band and
+    # from whether the course actually runs the package - a HIGH in something students
+    # `pip install` and execute is not the same finding as the same HIGH in a package
+    # a workbook merely lists.
+    "S17": ("Known vulnerability in the pinned version", "regression", "medium"),
 }
 
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
@@ -110,6 +115,36 @@ def retirement_severity(signal: str, dep: Dependency, radius: int,
     if graded:
         return "high"              # nothing breaks, but graded answers are now wrong
     return _bump(severity_for(signal, dep, radius), -1)
+
+
+# OSV's rated bands, in the order a reviewer would work through them.
+ADVISORY_BASE = {"CRITICAL": "critical", "HIGH": "high", "MODERATE": "medium",
+                 "LOW": "low"}
+
+
+def advisory_severity(dep: Dependency, adv: dict) -> str:
+    """How bad is a known hole in the version this course pins?
+
+    Two inputs, and the second is the one a CVE count cannot supply. The worst RATED
+    band sets the ceiling - never the raw count, because 26 moderate issues are not
+    worse than one critical one, and never an unrated advisory, because scoring a CVSS
+    vector ourselves would present our arithmetic as the database's judgement.
+
+    Then: does the course RUN this package? `pip install` in a taught step and an
+    import in a solution are a student executing the vulnerable code. A package a
+    workbook merely lists is a version number in a spreadsheet, and the work is to
+    update the spreadsheet. The same argument caps an n8n node the curriculum only
+    names in a reference table, and for the same reason - the severity a reviewer
+    triages on has to mean something about their students.
+    """
+    base = ADVISORY_BASE.get((adv.get("worst") or "").upper())
+    if base is None:
+        # Nothing rated. Real, worth showing, not worth a deadline: `low` is what
+        # "somebody should read these" is worth, and the finding says they are unrated.
+        return "low"
+    if not any(dep._executes(l) for l in dep.locations):
+        return _bump(base, -1)
+    return base
 
 
 def severity_for(signal: str, dep: Dependency, radius: int) -> str:
@@ -151,6 +186,7 @@ PROBE_TO_SIGNAL = {
     # the session relies on moved".
     "model_price_changed": "S3",
     "model_rate_limit_changed": "S3",
+    "advisory_affects_pinned_version": "S17",
     "auth_method_changed": "S15",
     "taught_field_deprecated": "S13",
     "taught_api_version_sunset": "S16",
@@ -244,6 +280,10 @@ EVIDENCE_REACH: dict[str, Optional[tuple]] = {
     "pricing_page_changed": _LINK,
     # A registry event is about a package: it reaches where the package is installed,
     # imported, pinned or declared - not every paragraph that names it.
+    # A hole in a version reaches where that version is installed, imported, pinned or
+    # declared - the same places a registry event reaches, and for the same reason: it
+    # is about the package, not about every paragraph that names it.
+    "advisory_affects_pinned_version": _REGISTRY_USE,
     "registry_missing": _REGISTRY_USE, "registry_deprecated": _REGISTRY_USE,
     "no_release_in_2y": _REGISTRY_USE,
     "new_release": _REGISTRY_USE, "major_behind_taught_pin": _REGISTRY_USE,
@@ -317,6 +357,7 @@ SIGNAL_EVIDENCE: dict[str, Optional[tuple[str, ...]]] = {
     "S13": (),
     "S14": None,     # a promise: one location, the line that declares it (outcomes.py)
     "S15": _LINK + ("solution_import", "install_command", "test_case_enum"),
+    "S17": _REGISTRY_USE,
     "S16": (),
 }
 MAX_LOCATIONS = 12
@@ -753,6 +794,11 @@ def _probe_severity(sig: str, signal: str, f: Finding, dep: Dependency,
         # run time (`Dependency._executes`), so only that case is a live outage.
         f.severity = retirement_severity(
             signal, dep, radius, f.questions_executing, f.graded_locations)
+    if sig == "advisory_affects_pinned_version":
+        # Set, not bumped: the worst RATED band is the ceiling and the course's own use
+        # of the package decides the rest. Blast radius must not raise it - a widely
+        # taught package with one moderate issue is not a critical finding.
+        f.severity = advisory_severity(dep, f.advisories or {})
     if sig == "free_tier_language_lost":
         # The strongest S3 evidence there is: wording the vendor advertised
         # while it was true has gone.
@@ -882,6 +928,7 @@ def _from_probe(dep: Dependency, probe: ProbeResult, radius: int,
             f.affected_urls = list(probe.affected_urls)
             f.successors = list(probe.successors)
             f.redirects = list(probe.redirects)
+            f.advisories = dict(probe.advisories or {})
             f.deprecated_fields = list(probe.deprecated_fields)
             f.api_version_sunset = list(probe.api_version_sunset)
             f.auth_change = dict(probe.auth_change or {})
@@ -1208,6 +1255,30 @@ def _api_version_summary(dep: Dependency, probe: ProbeResult) -> str:
             f"being retired.{where}{more}")
 
 
+
+def _advisory_summary(dep: Dependency, probe: ProbeResult) -> str:
+    adv = probe.advisories or {}
+    n = adv.get("count", 0)
+    bands = adv.get("by_severity") or {}
+    rated = ", ".join(f"{bands[b]} {b.lower()}" for b in ("CRITICAL", "HIGH", "MODERATE",
+                                                          "LOW") if bands.get(b))
+    unrated = adv.get("unrated") or 0
+    # `count` is distinct CVEs, `rows` is what OSV returned. GHSA and PyPA both publish
+    # most issues, so the two differ by nearly half and the raw number would overstate
+    # every one of these findings. Said out loud where they differ.
+    dedup = (f" (OSV returned {adv['rows']} rows for these; GHSA and PyPA publish most "
+             f"issues twice)" if adv.get("rows", 0) > n else "")
+    one = n == 1
+    return (f"{n} published advisor{'y' if one else 'ies'} "
+            f"{'affects' if one else 'affect'} "
+            f"{dep.canonical_name} {adv.get('version')}, the version this course pins"
+            + (f": {rated}" if rated else "")
+            + (f"{'; ' if rated else ': '}{unrated} "
+               f"{'carries' if unrated == 1 else 'carry'} no rated severity"
+               if unrated else "")
+            + f".{dedup}")
+
+
 def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
     """A summary specific to this signal, not the probe's single detail string."""
     urls = probe.affected_urls or ([probe.evidence_url] if probe.evidence_url else [])
@@ -1228,6 +1299,7 @@ def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
         "pricing_page_changed": probe.detail,
         "page_text_changed": f"The prose on {first} changed substantially since the "
                              f"last run.",
+        "advisory_affects_pinned_version": _advisory_summary(dep, probe),
         "registry_missing": f"{dep.registry or 'the registry'} no longer lists "
                             f"'{dep.registry_id or dep.canonical_name}'.",
         "registry_deprecated": f"The current release of {dep.canonical_name} is marked "
@@ -1473,6 +1545,24 @@ def recommend(dep: Dependency, f: Finding) -> str:
         s15 = (f"Re-check how a student signs in to {dep.canonical_name}; its own "
                f"pages describe a different mechanism than when we last looked.")
 
+    adv = f.advisories or {}
+    clears = adv.get("clears_all") or ""
+    same_major = (clears and dep.taught_version
+                  and clears.split(".")[0] == dep.taught_version.split(".")[0])
+    s17 = (f"Upgrade {dep.canonical_name} from the pinned {dep.taught_version} — "
+           + (f"{clears} clears "
+              + ("it" if adv.get("count") == 1
+                 else f"all {adv.get('count', 0)} of them")
+              + ("" if same_major else
+                 f", but that is a major version ahead of what the course teaches, so "
+                 f"the taught code needs re-running against it")
+              if clears else
+              "no advisory names a fixed release yet, so there is nothing to upgrade to")
+           + ". Check what "
+           + ("it affects" if adv.get("count") == 1 else "each one actually affects")
+           + " before acting — an advisory in a code path the course never uses is not "
+             "a reason to rewrite a session.")
+
     reach = s5_reach(f.redirects)
     moved = next((r for r in (f.redirects or []) if r.get("off_site")), None)
     if reach == "links":
@@ -1562,6 +1652,7 @@ def recommend(dep: Dependency, f: Finding) -> str:
         # missing topics; it never reaches this map.
         "S15": s15,
         "S16": s16,
+        "S17": s17,
     }[f.signal]
     # Assessment fallout: the reading material is only half the edit.
     q = ""
