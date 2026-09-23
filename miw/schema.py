@@ -107,10 +107,6 @@ class Dependency:
     # can retire a field without retiring anything else the system watches, so without
     # this there is no way to ask the question at all.
     taught_params: list[str] = field(default_factory=list)
-    # `{field: [content_id, ...]}` — the records that actually write each field. The
-    # scope of a field finding, which `evidence_source` cannot express: it says how the
-    # DEPENDENCY was found in a record, not what the record contains.
-    taught_param_at: dict = field(default_factory=dict)
     review_status: str = "registry"   # registry | proposed | approved | rejected
     first_seen: str = field(default_factory=utcnow)
     notes: str = ""
@@ -199,7 +195,13 @@ class Dependency:
     # two buckets need different work, so they are counted separately rather than
     # summed into one alarming number.
     RUNTIME_EVIDENCE_SOURCES = ("solution_import", "test_case_enum", "n8n_workflow",
-                                "install_command")
+                                "install_command",
+                                # A key the course writes into a request body. See
+                                # `analyse/score.PAYLOAD_KEY`: a graded item that sends
+                                # a deprecated field is executing the dependency, not
+                                # mentioning it, and `questions_that_execute_it` is what
+                                # decides retirement severity.
+                                "payload_key")
 
     def _executes(self, loc: Location) -> bool:
         """Does this graded item actually run the dependency?

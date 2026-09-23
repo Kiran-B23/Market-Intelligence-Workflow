@@ -114,6 +114,41 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "        if successor.lower() in _NOT_A_FIELD:"),
      "fields"),
 
+    # --- A: the check must reach every kind, and every record ----------------
+    ("A1 the field check goes back inside the URL branch of the kind switch",
+     "miw/probe/runner.py",
+     ("    _taught_field_pass(dep, res, seen_obs)", "    pass"),
+     "pytest:tests/test_watch.py tests/test_location_scoping.py"),
+    ("A2 field sites are filtered to records where the dependency was NAMED",
+     "miw/analyse/score.py",
+     ("        for site in PARAM_SITES.get(row.get(\"field\") or \"\", []):",
+      "        for site in [s for s in PARAM_SITES.get(row.get(\"field\") or \"\", [])\n"
+      "                     if any(l.content_id == s.get(\"content_id\")\n"
+      "                            for l in dep.locations)]:"),
+     "pytest:tests/test_location_scoping.py"),
+    ("A3 a field site is not runtime evidence, so graded items stop executing it",
+     "miw/schema.py",
+     ('                                "payload_key")', '                                )'),
+     "pytest:tests/test_location_scoping.py"),
+
+    ("tier analyse honours the research tier, dropping 209 reference-only deps",
+     "main.py",
+     ("    return dataclasses.replace(scope, tiers=set())",
+      "    return scope"),
+     "pytest:tests/test_location_scoping.py"),
+
+    # --- the UI vocabulary, which nothing enumerated until a signal shipped
+    # rendering as the literal string "S13" in five places.
+    ("UI a drift code ships with no plain word, rendering as raw jargon",
+     "miw/api/static/index.html",
+     ("           S13: 'a field we send is deprecated'},", "           },"),
+     "pytest:tests/test_ui_contract.py"),
+    ("UI a probe outcome that becomes a finding has no plain word",
+     "miw/api/static/index.html",
+     ("            taught_field_deprecated: 'a field we send is deprecated'},",
+      "            },"),
+     "pytest:tests/test_ui_contract.py"),
+
     # --- M1: the only place generated text reaches a human ------------------
     ("M1 only invented URLs are rejected; versions, dates and prices pass",
      "miw/analyse/notes.py",
@@ -152,6 +187,10 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
      ("        if not [c for c in (a.get(\"claims\") or []) if _claim_substantiates(c)]:",
       '        if not [c for c in (a.get("claims") or []) if c.get("substantiating")]:'),
      "trust"),
+    ("trust widening to a serving provider drops the registry remit",
+     "miw/trust.py",
+     ("        registry_domains=subject.registry_domains,\n", ""),
+     "trust"),
     ("trust a package's borrowed registry is treated as its own site",
      "miw/schema.py",
      ("            registry_domains=((reg[0],) if reg else ()),",
@@ -161,9 +200,20 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
 
 
 def run(gate: str, tree: pathlib.Path) -> bool:
-    """True when the gate FAILED, which is what a mutation should cause."""
-    r = subprocess.run([sys.executable, "eval/run_eval.py", "--suite", gate],
-                       cwd=tree, capture_output=True, text=True, timeout=600)
+    """True when the gate FAILED, which is what a mutation should cause.
+
+    A gate is normally an `eval/run_eval.py` suite. Some guarantees are pinned by the
+    pytest suite instead — the UI vocabulary is one, because it compares a JavaScript
+    map against the scorer and has no evidence fixtures to score. Those are named
+    `pytest:<path-or-expr>` so the harness covers the whole gate surface rather than
+    only the half that happens to live in the eval.
+    """
+    if gate.startswith("pytest:"):
+        cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+               *gate.split(":", 1)[1].split()]
+    else:
+        cmd = [sys.executable, "eval/run_eval.py", "--suite", gate]
+    r = subprocess.run(cmd, cwd=tree, capture_output=True, text=True, timeout=600)
     return r.returncode != 0
 
 

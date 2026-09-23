@@ -108,52 +108,68 @@ def taught_params(records: Iterable[ContentRecord],
             for dep_id, b in counts.items()}
 
 
-# How many writing records to remember per field. The finding needs to NAME places,
-# and `MAX_LOCATIONS` caps what a finding displays at 12 anyway.
-MAX_SITES_PER_FIELD = 12
+def _site(r: ContentRecord) -> dict:
+    """Enough of a record to become a `Location` later, and nothing more."""
+    return {"content_id": r.content_id, "course": r.course,
+            "topic_name": r.topic_name, "unit_id": r.unit_id,
+            "unit_name": r.unit_name, "field_path": r.field_path,
+            "object_type": r.object_type, "session_no": r.session_no}
 
 
-def attach(records: Iterable[ContentRecord], deps: Iterable[Dependency]) -> int:
-    """Record each dependency's taught fields, and where each one is written.
+def attach(records: Iterable[ContentRecord],
+           deps: Iterable[Dependency]) -> tuple[int, dict]:
+    """Record each dependency's taught fields, and return where each field is written.
 
-    The `where` half is not decoration. A finding about a field has to scope to the
-    records that WRITE it, and `evidence_source` cannot answer that: it records how the
-    DEPENDENCY was found in a record, not what the record contains. Measured on Murf,
-    the four records writing `multiNativeLocale` carry `link:a_href`, `link:markdown`
-    and `prose_name` — the code block sits in a reading material that also links to
-    murf.ai — so any reach rule phrased in evidence kinds scopes this finding to
-    nothing at all.
+    The `where` half is not decoration, and it is deliberately NOT filtered by where the
+    dependency was found. Two different questions were once answered with one lookup:
+
+    * *Whose field is this?* — settled by the vendor's own reference page, at probe time.
+    * *Where must we edit?* — **every record that writes the field**, named or not.
+
+    Filtering sites by the dependency's own locations answered the second with the first
+    and under-reported badly. Measured on Murf: `multiNativeLocale` is written in ten
+    records across sessions 18, 19 and 20, eight of them graded — and the finding could
+    see three, because session 20's module quiz writes the key seven times without ever
+    saying the word "Murf" or linking `murf.ai`.
+
+    That is structural rather than a Murf quirk. Every evidence kind the inventory can
+    emit is a NAME or a LINK, so a dependency used without being named produces no
+    location at all. Payload keys are simply the first place the system looks inside the
+    request and the gap becomes visible.
+
+    Uncapped on purpose: a display cap belongs in the reporter (`MAX_LOCATIONS`), not
+    here, or `affects_total` silently understates the work.
+
+    Returns `(fields attached, {field: [site, ...]})`. The site map is shared rather
+    than copied onto every dependency - see the note at the return.
     """
     records = list(records)
     deps = list(deps)
     found = taught_params(records, deps)
-    at: dict[str, set[str]] = {}
-    for d in deps:
-        at[d.dep_id] = {l.content_id for l in d.locations if l.content_id}
 
-    sites: dict[str, dict[str, list[str]]] = {}
+    # field -> every record in the curriculum that writes it, whoever is named there.
+    by_field: dict[str, list[dict]] = {}
     for r in records:
-        keys = payload_keys(r.body_text)
-        if not keys or not r.content_id:
+        if not r.content_id:
             continue
-        for dep_id, mine in at.items():
-            if r.content_id not in mine:
-                continue
-            bucket = sites.setdefault(dep_id, {})
-            for k in keys & set(found.get(dep_id) or {}):
-                ids = bucket.setdefault(k, [])
-                if r.content_id not in ids and len(ids) < MAX_SITES_PER_FIELD:
-                    ids.append(r.content_id)
+        for k in payload_keys(r.body_text):
+            rows = by_field.setdefault(k, [])
+            if not any(x["content_id"] == r.content_id for x in rows):
+                rows.append(_site(r))
 
     n = 0
     for d in deps:
         keys = [k for k, c in (found.get(d.dep_id) or {}).items()
                 if c >= MIN_OCCURRENCES]
         d.taught_params = keys
-        d.taught_param_at = {k: v for k, v in (sites.get(d.dep_id) or {}).items()
-                             if k in set(keys)}
         n += len(keys)
-    return n
+    # The site map is returned, not hung on each dependency. A record writing
+    # `promptType` is the same record for every dependency that lists it as a
+    # candidate, and storing it per dependency took the inventory from 6 MB to 65 MB
+    # for no new information. It rides in the artifact beside `unit_images`, which is
+    # the same shape of shared census.
+    return n, {k: v for k, v in by_field.items()
+               if any(k in (found.get(d.dep_id) or {}) for d in deps)}
 
 
 def where_written(records: Iterable[ContentRecord], dep: Dependency,

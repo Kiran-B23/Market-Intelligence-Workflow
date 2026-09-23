@@ -19,6 +19,7 @@ or audited without the others:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import re
 import sys
@@ -208,7 +209,7 @@ def cmd_extract(args) -> int:
     # own reference page and discards anything the vendor does not document, which is
     # what keeps a key written near two tools from being attributed to the wrong one.
     from miw.extract.params import attach as attach_params
-    n_params = attach_params(records, deps)
+    n_params, param_sites = attach_params(records, deps)
     with_params = sum(1 for d in deps if d.taught_params)
     print(f"  taught API fields: {n_params} candidate(s) across {with_params} "
           f"dependency(ies) — checked against each vendor's own reference at probe time")
@@ -241,6 +242,10 @@ def cmd_extract(args) -> int:
         "generated_at": _today(),
         "stats": to_jsonable(st),
         "unit_images": b.image_census(),
+        # Where each taught API field is written, shared across dependencies. See
+        # `extract/params.attach`: per-dependency copies took this artifact from 6 MB
+        # to 65 MB and said nothing new.
+        "param_sites": param_sites,
         "dependencies": [to_jsonable(d) for d in deps],
     })
     reg.save()
@@ -305,6 +310,11 @@ def _load_inventory():
         sys.exit(2)
     raw = json.load(open(path))
     _INVENTORY_EXTRAS["unit_images"] = raw.get("unit_images") or {}
+    _INVENTORY_EXTRAS["param_sites"] = raw.get("param_sites") or {}
+    # The scorer needs it and does not read artifacts itself, the same arrangement
+    # `unit_images` has with `screenshots_at_risk`.
+    from miw.analyse.score import set_param_sites
+    set_param_sites(_INVENTORY_EXTRAS["param_sites"])
     deps = []
     for d in raw["dependencies"]:
         locs = [Location(**l) for l in d.pop("locations", [])]
@@ -535,6 +545,16 @@ def _opinion_violations(f: dict) -> list[str]:
     return out
 
 
+def _scoring_scope(scope):
+    """The scope `analyse` scores with: everything the caller asked for, minus the tier.
+
+    A function rather than an inline `dataclasses.replace` so the gate can exercise the
+    real transform. See the comment at the call site for why the tier is lifted and why
+    course, session, kind and dep-id are not.
+    """
+    return dataclasses.replace(scope, tiers=set())
+
+
 def _claim_substantiates(c: dict) -> bool:
     """Does this serialised claim carry enough authority for its own kind?
 
@@ -590,8 +610,22 @@ def cmd_analyse(args) -> int:
 
     scope = _scope_from(args, default_tiers=())
     if not scope.is_everything:
-        deps = scope.select(deps)
-        print(f"  scope: {scope.describe()} -> {len(deps)} dependencies")
+        # The tier rations RESEARCH budget, not scoring. `probe` widened past it for
+        # exactly that reason (`probe/runner.py`, "the tier no longer gates the probe")
+        # and `analyse` did not, so on every run the UI and `run-weekly` start — both
+        # send `--tiers critical,standard` — the 209 `mention-only` dependencies were
+        # probed and then dropped before they could become findings. That is 48% of the
+        # inventory observed and discarded, and it is the half the curriculum names for
+        # student awareness, where the only question is whether the thing still works.
+        #
+        # Course, session, kind and dep-id still bind: scoring a course must not quietly
+        # score another one.
+        scored = _scoring_scope(scope)
+        deps = scored.select(deps)
+        widened = len(deps) - len(scope.select(deps))
+        print(f"  scope: {scope.describe()} -> {len(deps)} dependencies"
+              + (f" (+{widened} below the tier filter: scoring is free, and a tool the "
+                 f"course only names can still be dead)" if widened else ""))
     raised, still_open, suppressed, by_reviewer, seen_ids = [], [], 0, [], set()
     by_dep = {d.dep_id: d for d in deps}
 

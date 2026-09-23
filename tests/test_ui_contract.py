@@ -606,3 +606,47 @@ def test_every_evidence_source_has_a_plain_word():
     assert not (emitted - keys), sorted(emitted - keys)
     # the raw name stays reachable, the same rule the drift codes follow
     assert 'title="${esc(w.evidence_source || \'\')}"' in PAGE
+
+
+def test_every_drift_code_the_scorer_can_emit_has_a_plain_word():
+    """The loop `test_the_drift_codes_carry_their_meaning` left open.
+
+    That test asserts `word('signal', ` exists and spot-checks S11. It does not
+    enumerate, so S13 shipped with no entry and `word()`'s fallback rendered the chip as
+    the literal string "S13" in five places — the exact jargon the WORDS map exists to
+    keep off the page. Nothing failed, because nothing was comparing the map to the
+    scorer.
+
+    Modelled on `test_every_evidence_source_has_a_plain_word` below, which closes the
+    same loop for evidence kinds against the live inventory.
+    """
+    import re
+
+    from miw.analyse.score import SIGNALS
+
+    block = PAGE[PAGE.index("  signal: {"):PAGE.index("  /* How the tool was found")]
+    have = set(re.findall(r"(?:^|[{,\s])'?(S\d+)'?\s*:", block))
+    missing = set(SIGNALS) - have
+    assert not missing, f"no plain word for {sorted(missing)}"
+
+
+def test_every_probe_outcome_that_becomes_a_finding_has_a_plain_word():
+    """Same loop for the observation vocabulary.
+
+    `WORDS.outcome` drives the one-line "→ what came back" beside the evidence URL, and
+    the Response row of a probe-only detail panel. A probe signal that routes to a
+    finding but has no word renders as a bare URL with nothing next to it — which is how
+    `taught_field_deprecated` shipped.
+
+    Only signals that can actually reach a reader are required: `PROBE_TO_SIGNAL` is the
+    set that becomes a finding. Diagnostic flags (`model_provider_unknown`,
+    `n8n_rule_unparsed:*`) never surface and need no prose.
+    """
+    import re
+
+    from miw.analyse.score import PROBE_TO_SIGNAL
+
+    block = PAGE[PAGE.index("  outcome: {"):PAGE.index("  // How a finding moved")]
+    have = set(re.findall(r"(?:^|[{,\s])'?([a-z0-9_]+)'?\s*:\s*'", block))
+    missing = set(PROBE_TO_SIGNAL) - have
+    assert not missing, f"no plain word for {sorted(missing)}"

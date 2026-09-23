@@ -439,7 +439,12 @@ class InventoryBuilder:
 # authoring time - stronger than a passing mention, and the only source for pins at
 # all: they cannot be recovered from the JSON export.
 RUNTIME_EVIDENCE = {"solution_import", "n8n_workflow", "test_case_enum",
-                    "install_command", "sheet_pin"}
+                    "install_command", "sheet_pin",
+                    # Minted by `analyse/score._field_locations` once a vendor confirms
+                    # a field is theirs. The course writes this key into a request body,
+                    # which is a runtime dependency in the most literal sense the system
+                    # has - so a graded item that writes it must count as executing it.
+                    "payload_key"}
 # A student opens these to follow the material.
 VISITED_EVIDENCE = {"link:a_href", "link:iframe", "model_id"}
 # Weak signals: the name appears, but nothing is shown to depend on it.

@@ -123,9 +123,12 @@ def suite_trust(verbose: bool) -> Suite:
             # registry's authority. Constructing the Subject by hand instead would put
             # `pypi.org` in `official_domains` as if it were the package's own site,
             # and the remit exists precisely to tell those two apart.
-            subj = Dependency(kind="package", canonical_name=spec["name"],
-                              registry=spec["registry"],
-                              registry_id=spec.get("registry_id", "")).subject()
+            dep = Dependency(kind=("model" if spec.get("provider_domains")
+                                   else "package"),
+                             canonical_name=spec["name"], registry=spec["registry"],
+                             registry_id=spec.get("registry_id", ""))
+            subj = (dep.subject_with_provider(spec["provider_domains"])
+                    if spec.get("provider_domains") else dep.subject())
         else:
             subj = Subject(name=spec["name"], homepage=spec.get("homepage", ""),
                            docs_url=spec.get("docs_url", "")).with_domains_from_urls()

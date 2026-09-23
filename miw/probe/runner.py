@@ -48,6 +48,12 @@ def _days_since(iso: str) -> Optional[int]:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if dt.tzinfo is None:
+        # A registry that returns a bare date - `2026-09-01` - used to raise
+        # "can't subtract offset-naive and offset-aware datetimes" right here, and
+        # nothing wraps this call, so one such row would take down the probe for that
+        # dependency. Read as UTC: the caller only wants a day count.
+        dt = dt.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - dt).days
 
 
@@ -137,8 +143,80 @@ def _targets(dep: Dependency) -> list[str]:
     return (docs + rest)[:cap]
 
 
+def _subject_terms(dep: Dependency) -> tuple:
+    return tuple({dep.canonical_name, dep.canonical_name.rsplit(".", 1)[-1],
+                  *dep.aliases} - {""})
+
+
+def _match_taught_fields(dep: Dependency, obs: list, res: ProbeResult) -> None:
+    """Fields the course writes that this vendor's own reference marks deprecated.
+
+    The one check that looks INSIDE the request. Everything else asks whether the
+    dependency is still there; a vendor can retire a field without retiring anything
+    else the system watches. Murf is the live proof — `murf.ai` answers 200, its pricing
+    is up, its docs are up, and its reference says `multiNativeLocale` is superseded by
+    `locale` while the curriculum writes the old key in ten records across three
+    sessions, eight of them graded.
+
+    The vendor's page is also what BINDS the field. `extract/params.py` offers every key
+    written in a record where the dependency appears, because a lesson names a dozen
+    tools at once and picking one is a guess; a page that documents the field is the
+    proof it is that vendor's, and it arrives as a verbatim quote rather than an
+    inference.
+    """
+    taught = {k.lower(): k for k in (dep.taught_params or [])}
+    if not taught:
+        return
+    for o in obs:
+        for f in o.deprecated_fields:
+            hit = taught.get((f.get("field") or "").lower())
+            if not hit or any(d.get("field") == hit for d in res.deprecated_fields):
+                continue
+            res.flag("taught_field_deprecated")
+            res.deprecated_fields.append(
+                {"field": hit, "successor": f.get("successor", ""),
+                 "quote": f.get("quote", ""), "evidence_url": o.url})
+            if o.url not in res.affected_urls:
+                res.affected_urls.append(o.url)
+
+
+def _taught_field_pass(dep: Dependency, res: ProbeResult,
+                       obs: Optional[list] = None) -> None:
+    """Run the field check for ANY dependency, whatever its kind.
+
+    It used to live inside `res_from_urls`, which only the `else` arm of the kind switch
+    below calls — so packages, models and n8n nodes could never produce a field finding.
+    Measured on the live inventory: of 170 dependencies carrying candidate fields, 70
+    could be checked and 100 could not, and the 100 were the most-taught things in the
+    curriculum — `langchain` at 215 locations, `gemini-2.5-flash` at 213, `google-genai`
+    at 108. An SDK's request fields and a model's request fields are exactly this class
+    of problem, and neither was reachable.
+
+    `mention-only` is skipped deliberately. A tool the course names so students are
+    aware it exists has no payload we write, so any key it picked up from a co-located
+    record would be a false attribution. For those the question is only whether they
+    still work, which the rest of the probe already answers.
+
+    `obs` is passed in when the URL branch has already fetched these pages, so a
+    service costs no extra requests; the other kinds fetch here because nothing else
+    does it for them.
+    """
+    if not dep.taught_params or dep.watch_tier == "mention-only":
+        return
+    if not dep.subject().official_domains:
+        return                      # nothing authoritative to check the field against
+    if obs is None:
+        terms = _subject_terms(dep)
+        obs = [observe(u, terms) for u in _targets(dep)]
+        obs += _reference_pages(dep, obs, terms)
+    _match_taught_fields(dep, obs, res)
+
+
 def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
     res = ProbeResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name)
+    # Set only by the URL branch, which has already fetched the vendor's pages; the
+    # other kinds leave it None and `_taught_field_pass` fetches for itself.
+    seen_obs: Optional[list] = None
     prev = state.probe_prev(dep.dep_id)
     prev_hash = (prev["text_hash"] if prev else "") or ""
     prev_version = (prev["latest_version"] if prev else "") or ""
@@ -192,10 +270,10 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
     # --- URL-backed kinds ---------------------------------------------------
     else:
         _probe_pricing(dep, res, state)
-        terms = tuple({dep.canonical_name, dep.canonical_name.rsplit(".", 1)[-1],
-                       *dep.aliases} - {""})
+        terms = _subject_terms(dep)
         obs = [observe(u, terms) for u in _targets(dep)]
         obs += _reference_pages(dep, obs, terms)
+        seen_obs = obs
         if not obs:
             res.status = "inconclusive"
             res.detail = "no URL known for this dependency"
@@ -215,6 +293,12 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             # dead URL, all on domains the dependency already owns.
             if "url_gone" in res.signals or "domain_parked" in res.signals:
                 res.successors = _successors_for(dep, res, obs)
+
+    # --- what the course puts INSIDE the request ----------------------------
+    # Outside the kind switch on purpose. See `_taught_field_pass`: living inside the
+    # `else` arm above meant 100 of the 170 dependencies carrying candidate fields —
+    # every package, model and n8n node — could never produce a field finding.
+    _taught_field_pass(dep, res, seen_obs)
 
     # --- flap protection ----------------------------------------------------
     # Two-run confirmation exists to stop a transient network failure reading as a dead
@@ -478,35 +562,6 @@ def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str,
     if fresh and seen_notices is not None:
         res.flag("deprecation_notice_added")
         res.new_notices = fresh[:3]
-
-    # A field the course writes that this vendor's own reference now marks deprecated.
-    #
-    # This is the one check that looks INSIDE the request. Everything else here asks
-    # whether the dependency is still there; a vendor can retire a field without
-    # retiring anything else the system watches, and Murf is the live proof —
-    # `murf.ai` answers 200, its pricing is up, its docs are up, and its reference says
-    # `multiNativeLocale` is superseded by `locale` while the curriculum sends the old
-    # key in three sessions, eight of those places graded.
-    #
-    # The vendor's page is also what BINDS the field. `extract/params.py` offers every
-    # key written near a dependency, because a lesson record names a dozen tools at once
-    # and picking one is a guess; a page that documents the field is the proof it is
-    # that vendor's, and it arrives as a verbatim quote rather than an inference.
-    taught = {k.lower(): k for k in (dep.taught_params if dep else [])}
-    if taught:
-        for o in obs:
-            for f in o.deprecated_fields:
-                hit = taught.get((f.get("field") or "").lower())
-                if not hit:
-                    continue
-                if any(d.get("field") == hit for d in res.deprecated_fields):
-                    continue
-                res.flag("taught_field_deprecated")
-                res.deprecated_fields.append(
-                    {"field": hit, "successor": f.get("successor", ""),
-                     "quote": f.get("quote", ""), "evidence_url": o.url})
-                if o.url not in res.affected_urls:
-                    res.affected_urls.append(o.url)
 
     for o in obs:
         if o.sunset_near_subject:

@@ -359,3 +359,156 @@ def test_a_projection_recounts_for_its_own_course():
     local = project_finding(f, dep, COURSE)
     assert local.affects_total == 3
     assert local.affects_counts == {"OBJECTIVE_QUESTIONS": 3}
+
+
+def test_scoring_is_not_rationed_by_the_research_budget_either():
+    """`probe` widened past the tier filter; `analyse` did not, and that gap was the
+    whole of the reference-only requirement.
+
+    The tier rations RESEARCH — searches, model calls, the many fetches
+    `official.gather` makes. Scoring costs nothing. The UI (`app.py` `RunIn.tiers`) and
+    `run-weekly` both send `--tiers critical,standard`, so on every run the team
+    actually starts, the 209 `mention-only` dependencies were probed and then dropped
+    before they could become findings — 48% of the inventory observed and discarded,
+    and precisely the half the curriculum names so students are aware a tool exists,
+    where the only question is whether it still works.
+
+    Course, session, kind and dep-id must still bind: scoring one course must never
+    quietly score another.
+    """
+    import main as cli
+    from miw.scope import Scope
+
+    # Through the real transform, not a local copy of it: a gate that reimplements the
+    # thing it guards passes while the call site rots.
+    sc = Scope(courses={"Intro to Gen AI"}, tiers={"critical", "standard"},
+               kinds={"tool"}, sessions={4})
+    scored = cli._scoring_scope(sc)
+    assert not scored.tiers, "the tier must be lifted for scoring"
+    assert scored.courses == {"Intro to Gen AI"}, "the course must still bind"
+    assert scored.sessions == {4}, "the session must still bind"
+    assert scored.kinds == {"tool"}, "the kind must still bind"
+
+    def loc(course):
+        return Location(course=course, topic_name="t", unit_id="u", unit_name="un",
+                        content_id="c", field_path="f", evidence_source="prose_name",
+                        object_type="LEARNING_RESOURCE", session_no=4)
+
+    mention = Dependency(kind="tool", canonical_name="Julius AI",
+                         watch_tier="mention-only",
+                         locations=[loc("Intro to Gen AI")])
+    other = Dependency(kind="tool", canonical_name="Elsewhere",
+                       watch_tier="mention-only", locations=[loc("AI for Finance")])
+    assert mention in scored.select([mention, other])   # reference-only, now scored
+    assert other not in scored.select([mention, other])  # another course, still out
+    assert mention not in sc.select([mention, other])    # and the old rule dropped it
+
+
+def test_a_field_finding_reaches_every_record_that_writes_it():
+    """The scope of a field finding is the content, not the places the tool was named.
+
+    Measured on the live Murf case before this was fixed: `multiNativeLocale` is written
+    in ten records across sessions 18, 19 and 20, eight of them graded — and the finding
+    named three, because session 20's module quiz writes the key seven times without
+    ever saying the word "Murf" or linking `murf.ai`, so Murf had no `Location` there.
+    A reviewer was told "1 quiz question"; the work was eight.
+
+    Structural rather than a Murf quirk: every evidence kind the inventory emits is a
+    NAME or a LINK, so a dependency used without being named produces no location at
+    all. Payload keys are the first place the system looks inside the request.
+    """
+    from miw.analyse import score
+    from miw.schema import Finding
+
+    dep = Dependency(kind="service", canonical_name="Acme",
+                     homepage="https://acme.test", official_domains=["acme.test"],
+                     watch_tier="critical",
+                     # Named in ONE record. The other four write the field and never
+                     # name the vendor — the shape that was invisible.
+                     locations=[Location(
+                         course="C1", topic_name="t", unit_id="u1", unit_name="U1",
+                         content_id="r1", field_path="body",
+                         evidence_source="link:a_href",
+                         object_type="LEARNING_RESOURCE", session_no=18)])
+    sites = [{"content_id": f"r{i}", "course": "C1", "topic_name": "t",
+              "unit_id": f"u{i}", "unit_name": f"U{i}", "field_path": "body",
+              "object_type": "OBJECTIVE_QUESTIONS" if i > 1 else "LEARNING_RESOURCE",
+              "session_no": 18 + (i % 3)} for i in range(1, 6)]
+    score.set_param_sites({"legacyLocale": sites})
+    try:
+        f = Finding(dep_id=dep.dep_id, canonical_name="Acme", signal="S13",
+                    signal_label="Taught API field deprecated",
+                    kind_of_signal="regression", severity="high",
+                    probe_signals=["taught_field_deprecated"],
+                    deprecated_fields=[{"field": "legacyLocale", "successor": "locale",
+                                        "quote": "legacyLocale string Optional "
+                                                 "deprecated use locale instead",
+                                        "evidence_url": "https://acme.test/ref"}])
+        score.scope_locations(dep, f)
+        score._recount_from_locations(dep, f)
+    finally:
+        score.set_param_sites({})
+
+    assert f.affects_total == 5, "every writing record, not only the one that names it"
+    assert {l.content_id for l in f.locations} == {f"r{i}" for i in range(1, 6)}
+    assert all(l.evidence_source == score.PAYLOAD_KEY for l in f.locations)
+    # The counts follow the finding: four graded records write the field, and a payload
+    # key is runtime evidence, so they EXECUTE it rather than mention it.
+    assert f.graded_locations == 4
+    assert f.questions_executing == 4
+    assert f.courses == ["C1"]
+    assert sorted({l.session_no for l in f.locations}) == [18, 19, 20]
+
+
+def test_the_field_check_runs_for_every_kind_not_only_url_backed_ones(monkeypatch):
+    """It lived inside the `else` arm of `probe_dependency`'s switch on kind.
+
+    Measured on the live inventory: of 170 dependencies carrying candidate fields, 70
+    could reach the check and 100 could not — every package, every model, every n8n
+    node. The 100 were the most-taught things in the curriculum: `langchain` at 215
+    locations, `gemini-2.5-flash` at 213, `google-genai` at 108. An SDK's request fields
+    and a model's request fields are exactly this class of problem.
+    """
+    import miw.probe.registries as reg
+    import miw.probe.runner as runner
+    from miw.probe.http_probe import UrlObservation
+    from miw.state import State
+
+    def fake_observe(url, terms=()):
+        o = UrlObservation(url=url)
+        o.reachable = True
+        o.deprecated_fields = [{"field": "legacyLocale", "successor": "locale",
+                                "quote": "legacyLocale string Optional deprecated "
+                                         "use locale instead"}]
+        return o
+
+    monkeypatch.setattr(runner, "observe", fake_observe)
+    monkeypatch.setattr(runner, "_reference_pages", lambda *a, **k: [])
+    # The pricing probe fetches on its own account and is not what this test is about.
+    monkeypatch.setattr(runner, "_probe_pricing", lambda *a, **k: None)
+    monkeypatch.setattr(reg, "pypi", lambda *a, **k: {
+        "found": True, "reachable": True, "latest_version": "2.0.0",
+        "released_at": "2026-09-01", "evidence_url": "https://pypi.org/project/x/"})
+
+    st = State(":memory:")
+    try:
+        for kind, extra in (("package", {"registry": "pypi", "registry_id": "x"}),
+                            ("service", {})):
+            dep = Dependency(kind=kind, canonical_name="Acme",
+                             homepage="https://acme.test",
+                             docs_url="https://acme.test/docs",
+                             official_domains=["acme.test"], watch_tier="critical",
+                             taught_params=["legacyLocale"], **extra)
+            res = runner.probe_dependency(dep, st)
+            assert "taught_field_deprecated" in res.signals, (
+                f"a {kind} never reached the field check")
+            assert res.deprecated_fields[0]["successor"] == "locale"
+
+        # ...and a tool named only so students are aware it exists is NOT deep-checked.
+        aware = Dependency(kind="service", canonical_name="Acme",
+                           homepage="https://acme.test",
+                           official_domains=["acme.test"], watch_tier="mention-only",
+                           taught_params=["legacyLocale"])
+        assert "taught_field_deprecated" not in runner.probe_dependency(aware, st).signals
+    finally:
+        st.close()

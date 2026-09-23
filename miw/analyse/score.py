@@ -15,13 +15,15 @@ Three rules shape this module:
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import re
 from typing import Optional
 
 from config.constants import ARTIFACT_ORDER, artifact_word
 from miw.analyse import notes
-from miw.schema import (Alternative, Claim, Dependency, Finding, ProbeResult,
+from miw.schema import (Alternative, Claim, Dependency, Finding, Location,
+                        ProbeResult,
                         ResearchResult, UncitedClaim, utcnow)
 from miw.trust import ClaimKind, domain as _domain
 
@@ -35,6 +37,9 @@ EVIDENCE_WEIGHT = {
     # name exists. Recording it as `n8n_workflow` gave nine glossary rows the weight of
     # a wired node and put two of them in the digest at `high`.
     "question_tag": 0.5, "title": 0.5, "prose_name": 0.2, "n8n_mention": 0.2,
+    # The course writes this key into a request body. That is a runtime dependency in
+    # the most literal sense available - it is the payload the student's code sends.
+    "payload_key": 5.0,
 }
 GRADED_MULTIPLIER = 2.0
 
@@ -228,7 +233,7 @@ EVIDENCE_REACH: dict[str, Optional[tuple]] = {
     "deprecation_notice_added": None,
     # A retired field reaches the records that WRITE it, and that is not expressible
     # here: `evidence_source` records how the DEPENDENCY was found, not what the record
-    # contains. `scope_locations` special-cases S13 onto `Dependency.taught_param_at`,
+    # contains. `scope_locations` special-cases S13 onto `score.PARAM_SITES`,
     # which the extractor measured. `None` keeps `verify`'s over-reach check from
     # second-guessing a scope that is already narrower than any rule it could apply.
     "taught_field_deprecated": None,
@@ -379,6 +384,68 @@ def reaching_locations(signal: str, affected_urls, locations,
     return reached, [l for l in locations if id(l) not in keep]
 
 
+# How a field site is recorded once the vendor has confirmed the field is theirs.
+# Distinct from every other evidence kind because it is the only one that is not a name
+# or a link: the course WRITES this key into a payload. Weighted as runtime evidence -
+# a request body is something a student's code actually sends.
+PAYLOAD_KEY = "payload_key"
+
+
+# `{field: [site, ...]}` for the whole curriculum, set once per run by the caller that
+# loaded the inventory. Shared rather than copied onto each dependency - see
+# `extract/params.attach`.
+PARAM_SITES: dict = {}
+
+
+def set_param_sites(sites: dict) -> None:
+    PARAM_SITES.clear()
+    PARAM_SITES.update(sites or {})
+
+
+def _recount_from_locations(dep: Dependency, f: Finding) -> None:
+    """Re-derive the impact numbers from the places this finding actually reaches.
+
+    Only called where the finding's scope is built rather than filtered — see the note
+    at the call site. Everywhere else the dependency's own totals are the honest ones,
+    because the finding is about the dependency.
+    """
+    locs = f.locations or []
+    f.courses = sorted({l.course for l in locs if l.course})
+    f.blast_radius = blast_radius(dataclasses.replace(dep, locations=locs))
+    f.graded_locations = sum(
+        1 for l in locs
+        if l.is_graded and l.evidence_source not in ("prose_name", "question_tag"))
+    executing = [l for l in locs if l.is_graded and dep._executes(l)]
+    f.questions_executing = len({l.content_id for l in executing})
+    f.questions_mentioning = len({l.content_id for l in locs if l.is_graded}) \
+        - f.questions_executing
+    f.question_ids = list(dict.fromkeys(l.content_id for l in locs if l.is_graded))[:6]
+
+
+def _field_locations(dep: Dependency, f: Finding) -> list:
+    """Every place the course writes a field this vendor has deprecated.
+
+    The `Location`s are minted here rather than in the extractor on purpose: until the
+    vendor's own page confirms the field is theirs, a key written near a dependency is a
+    candidate and nothing more. Confirmation is what turns it into a place on the map.
+    """
+    out, seen = [], set()
+    for row in f.deprecated_fields or []:
+        for site in PARAM_SITES.get(row.get("field") or "", []):
+            key = (site.get("content_id"), site.get("field_path"))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(Location(
+                course=site.get("course", ""), topic_name=site.get("topic_name", ""),
+                unit_id=site.get("unit_id", ""), unit_name=site.get("unit_name", ""),
+                content_id=site.get("content_id", ""),
+                field_path=site.get("field_path", ""),
+                evidence_source=PAYLOAD_KEY, object_type=site.get("object_type", ""),
+                session_no=site.get("session_no")))
+    return out
+
+
 def scope_locations(dep: Dependency, f: Finding) -> None:
     """Split `dep.locations` into the places this finding reaches and the rest.
 
@@ -392,15 +459,18 @@ def scope_locations(dep: Dependency, f: Finding) -> None:
     evidence kind.
     """
     if f.signal == "S13":
-        # Scoped by the records that WRITE the field, which is a fact the extractor
-        # measured rather than a rule about evidence kinds. See
-        # `Dependency.taught_param_at`: the locations that carry a deprecated field are
-        # ordinary reading materials that happen to contain a code block, so every
-        # evidence-kind rule scopes this finding to zero.
-        wanted = {cid for fld in (x.get("field") for x in f.deprecated_fields or [])
-                  for cid in (dep.taught_param_at or {}).get(fld or "", [])}
-        reached = [l for l in dep.locations if l.content_id in wanted]
-        rest = [l for l in dep.locations if l.content_id not in wanted]
+        # Built from the records that WRITE the field, not filtered from the ones where
+        # the dependency was NAMED. `evidence_source` cannot express this question: it
+        # records how the dependency was found in a record, not what the record
+        # contains. Murf's ten `multiNativeLocale` records carry `link:a_href`,
+        # `link:markdown` and `prose_name` where they carry anything at all — session
+        # 20's module quiz writes the key seven times and never says "Murf" — so
+        # intersecting with `dep.locations` reported three places out of ten and called
+        # eight graded items one.
+        reached = _field_locations(dep, f)
+        seen = {(l.content_id, l.field_path) for l in reached}
+        rest = [l for l in dep.locations
+                if (l.content_id, l.field_path) not in seen]
     else:
         reached, rest = reaching_locations(f.signal, f.affected_urls, dep.locations,
                                            f.redirects, f.probe_signals)
@@ -524,6 +594,35 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f.successors = list(probe.successors)
             f.redirects = list(probe.redirects)
             f.deprecated_fields = list(probe.deprecated_fields)
+            # A retired field is a vendor DECLARATION, so it goes through the trust
+            # layer like every other one — the same construction the n8n and model
+            # paths use below. Without this the finding shipped `claims: []`, its
+            # evidence URL was never tier-checked, and the one thing a reviewer needs
+            # to see (the vendor's own sentence) reached no evidence panel.
+            for row in probe.deprecated_fields:
+                url, quote = row.get("evidence_url", ""), row.get("quote", "")
+                if not url or len(quote) < 12:
+                    continue
+                try:
+                    c = Claim.build(
+                        kind=ClaimKind.IMPLEMENTATION,
+                        statement=(f"{dep.canonical_name} marks the "
+                                   f"`{row.get('field')}` field deprecated"),
+                        source_url=url, quote=quote, subject=dep.subject())
+                except UncitedClaim:
+                    c = None
+                # Same discipline as the declared-change path below: a claim that
+                # cannot substantiate its own kind must not be attached, and the
+                # refusal is counted rather than swallowed. Only the vendor can retire
+                # the vendor's own field, so a page we happened to reach that does not
+                # speak for this subject is not evidence of its API contract.
+                if c is not None and c.substantiating:
+                    if not any(x.source_url == c.source_url and x.quote == c.quote
+                               for x in f.claims):
+                        f.claims.append(c)
+                elif c is not None:
+                    f.probe_signals = list(f.probe_signals) + [
+                        f"field_evidence_unciteable:{_domain(url)}"]
             f.latest_version = probe.latest_version or ""
             if not f.summary:
                 f.summary = _probe_summary(sig, dep, probe)
@@ -796,6 +895,15 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                          f"is an example address students generate for themselves, "
                          f"published as a live link.")
         scope_locations(dep, f)
+        if f.signal == "S13":
+            # The counts have to follow the finding, not the dependency. An S13 is
+            # scoped to the records that WRITE one field, which is routinely narrower
+            # than everywhere the vendor is taught: Murf is named across three courses,
+            # and `multiNativeLocale` is written in one. Leaving the dependency's
+            # numbers on it said "Scope: 3 course(s)" over ten records that are all in
+            # Building LLM Applications, and "0 graded items execute this" over eight
+            # quiz questions that send the field.
+            _recount_from_locations(dep, f)
         f.recommendation = recommend(dep, f)
         _assert_claim_fits(f)
         notes.compose(dep, f)          # deterministic triad; refine() may replace it

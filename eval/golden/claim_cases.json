@@ -190,5 +190,25 @@
    "serialised_verdict_absent": true,
    "through_verify": true
   }
+ },
+ {
+  "name": "widening a model's authority to its serving provider keeps the registry remit",
+  "kind": "pricing",
+  "statement": "llama-3.3-70b-versatile is free",
+  "source_url": "https://pypi.org/project/x/",
+  "quote": "x 1.2.0 is the latest release published on PyPI.",
+  "subject": {
+   "name": "llama-3.3-70b-versatile",
+   "registry": "pypi",
+   "registry_id": "x",
+   "provider_domains": [
+    "groq.com"
+   ]
+  },
+  "expect": {
+   "built": true,
+   "tier": "CORROBORATING",
+   "substantiates": false
+  }
  }
 ]

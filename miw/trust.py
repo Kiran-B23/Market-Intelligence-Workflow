@@ -205,6 +205,11 @@ def with_provider(subject: Subject, provider_domains: Iterable[str]) -> Subject:
         docs_url=subject.docs_url, homepage=subject.homepage,
         changelog_url=subject.changelog_url, pricing_url=subject.pricing_url,
         status_url=subject.status_url,
+        # Carried, not dropped. Rebuilding the Subject without this re-opened the hole
+        # the remit exists to close: for any model whose authority was widened by its
+        # serving provider, `pypi.org` went back to being an own-domain and settled a
+        # PRICING claim. Measured CORROBORATING -> AUTHORITATIVE across this call.
+        registry_domains=subject.registry_domains,
     )
 
 

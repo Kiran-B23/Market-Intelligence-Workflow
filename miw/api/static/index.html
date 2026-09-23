@@ -1612,8 +1612,13 @@ const WORDS = {
             model_deprecation_declared: 'deprecation declared',
             model_tier_restricted: 'moved to a quote-only tier',
             node_removed_upstream: 'removed from n8n',
+            n8n_new_release: 'n8n released a new version',
+            node_named_in_release_notes: 'named in n8n release notes',
+            sunset_language_about_subject: 'the page says it is ending',
             breaking_change_declared: 'breaking change declared',
-            breaking_change_possible: 'breaking change, needs a check'},
+            breaking_change_possible: 'breaking change, needs a check',
+            deprecation_notice_added: 'new deprecation notice',
+            taught_field_deprecated: 'a field we send is deprecated'},
   // How a finding moved since the last check. "worsened" and "improved" describe the
   // severity, which is not what a reader assumes the word refers to.
   diff: {new: 'new', worsened: 'got worse', improved: 'got better',
@@ -1634,7 +1639,8 @@ const WORDS = {
            S5: 'the taught steps changed', S6: 'version moved past what we teach',
            S7: 'model retired', S8: 'docs rewritten', S9: 'n8n node changed',
            S10: 'a better option exists', S11: "topic we don't teach yet",
-           S12: 'a newer option exists'},
+           S12: 'a newer option exists',
+           S13: 'a field we send is deprecated'},
   /* How the tool was found at this location. The chip used to print the raw
      `evidence_source`, which is fine for `prose_name` and useless for the one
      distinction that now matters most: `n8n_workflow` means a workflow BUILDS with the
@@ -1647,6 +1653,7 @@ const WORDS = {
     prose_name: 'named in the text', question_tag: 'question tag',
     sheet_declared: 'declared in the workbook', sheet_pin: 'version pinned in the workbook',
     title: 'in the title',
+    payload_key: 'sent in the request',
     'link:a_href': 'linked', 'link:iframe': 'embedded', 'link:bare': 'linked',
     'link:markdown': 'linked'},
   // Pipeline stages, in the order they run.
@@ -2453,13 +2460,30 @@ function renderDetail(d) {
             answered for this path${sc.tried ? ` (${sc.tried} tried)` : ''}. The page
             has to be found by hand, or the link removed.</div></div>`)).join('');
 
+  /* The rename itself, which is the edit. A reviewer opening an S13 finding needs the
+     old name, the new name and the vendor's own sentence — not a paragraph telling them
+     a field is deprecated. The quote also appears under "What proves it" with its trust
+     tier; this is the same fact in the shape the work takes. */
+  const fields = (f.deprecated_fields || []).map(x => `<div class="move">
+      <div class="mono"><s>${esc(x.field)}</s>${x.successor
+        ? ` <span class="arr">&rarr;</span> <b>${esc(x.successor)}</b>` : ''}</div>
+      <div class="note">${x.successor
+        ? `${esc(dep.canonical_name || 'The vendor')} names <span class="mono">${
+            esc(x.successor)}</span> as the replacement.`
+        : `${esc(dep.canonical_name || 'The vendor')} names no replacement — check the
+           reference before editing.`}${x.evidence_url
+        ? ` <a href="${esc(x.evidence_url)}" target="_blank" rel="noopener">reference</a>`
+        : ''}</div></div>`).join('');
+
   const change = `<h3>What needs to change</h3>
-    ${moves}
+    ${moves}${fields}
     <div class="kv">
       <div class="lab">action</div><div>${esc(ch.what_to_act || ch.recommendation || '—')}</div>
       <div class="lab">why</div><div>${esc(ch.why_to_act || '—')}</div>
       <div class="lab">when</div><div>${esc(ch.when_to_act || '—')}${
         ch.due_by ? ` <span class="chip n">by ${esc(ch.due_by)}</span>` : ''}</div>
+      ${f.shutdown_date ? `<div class="lab">vendor's date</div>
+        <div class="mono">${esc(f.shutdown_date)}</div>` : ''}
       ${versions}
     </div>${candBlock}`;
 
