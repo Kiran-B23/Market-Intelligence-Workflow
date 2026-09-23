@@ -55,6 +55,7 @@ def test_reaching_everywhere_is_rare_and_every_case_is_named():
                           "model_price_changed", "model_rate_limit_changed",
                           "pricing_restriction_language",
                           "sunset_language_about_subject",
+                          "taught_api_version_sunset",
                           "taught_field_deprecated"], everywhere
     # The argument for the two newest: what a model COSTS and how much of it a student
     # may use are facts about the model, not about one page that mentions it. A price
@@ -76,6 +77,14 @@ def test_reaching_everywhere_is_rare_and_every_case_is_named():
     # `sunset_language_about_subject` beside it - so every place the course teaches it
     # is affected, prose included. A reader who is told the tool is being retired needs
     # the paragraph that recommends it changed, not just the link.
+    #
+    # `taught_api_version_sunset` abstains for exactly the reason `taught_field_deprecated`
+    # does, one level out. The places to edit are the records that CALL the versioned
+    # endpoint, and a record can post to `api.murf.ai/v1` without ever writing the word
+    # "Murf" — so `evidence_source`, which records how the dependency was RECOGNISED,
+    # cannot express the question. `scope_locations` narrows S16 onto `score.API_SITES`,
+    # measured by the extractor, which is strictly narrower than any rule this table
+    # could apply. `None` here means "do not second-guess it", not "everywhere".
 
 
 def test_a_page_event_never_reaches_past_the_links_to_that_page():

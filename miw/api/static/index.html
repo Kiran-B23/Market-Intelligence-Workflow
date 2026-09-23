@@ -1634,7 +1634,8 @@ const WORDS = {
             taught_field_deprecated: 'a field or method we use is deprecated',
             model_price_changed: 'the price changed',
             model_rate_limit_changed: 'the usage limit changed',
-            auth_method_changed: 'signing in changed'},
+            auth_method_changed: 'signing in changed',
+            taught_api_version_sunset: 'the API version we call is closing'},
   // How a finding moved since the last check. "worsened" and "improved" describe the
   // severity, which is not what a reader assumes the word refers to.
   diff: {new: 'new', worsened: 'got worse', improved: 'got better',
@@ -1658,7 +1659,8 @@ const WORDS = {
            S12: 'a newer option exists',
            S13: 'a field or method we use is deprecated',
            S14: 'a promise nothing covers',
-           S15: 'signing in changed'},
+           S15: 'signing in changed',
+           S16: 'the API version we call is closing'},
   /* How the tool was found at this location. The chip used to print the raw
      `evidence_source`, which is fine for `prose_name` and useless for the one
      distinction that now matters most: `n8n_workflow` means a workflow BUILDS with the
@@ -1672,6 +1674,7 @@ const WORDS = {
     sheet_declared: 'declared in the workbook', sheet_pin: 'version pinned in the workbook',
     title: 'in the title',
     payload_key: 'sent in the request',
+    api_call: 'called at this endpoint',
     outcome_declared: 'promised by the course',
     'link:a_href': 'linked', 'link:iframe': 'embedded', 'link:bare': 'linked',
     'link:markdown': 'linked'},
@@ -2494,8 +2497,20 @@ function renderDetail(d) {
         ? ` <a href="${esc(x.evidence_url)}" target="_blank" rel="noopener">reference</a>`
         : ''}</div></div>`).join('');
 
+  /* The endpoint edit. A version retirement is a find-and-replace on a base URL, so
+     the base URL is what a reviewer needs in front of them — not a sentence saying an
+     API version is deprecated. Same shape as the rename block above. */
+  const apiv = (f.api_version_sunset || []).map(x => `<div class="move">
+      <div class="mono">${esc(x.version)} <span class="arr">&rarr;</span> <b>check the
+        vendor's migration notes</b></div>
+      <div class="note">${esc(dep.canonical_name || 'The vendor')} says this API version
+        is being retired. The course calls ${(x.bases || []).map(b =>
+          `<span class="mono">${esc(b)}</span>`).join(', ') || 'it'}.${x.evidence_url
+        ? ` <a href="${esc(x.evidence_url)}" target="_blank" rel="noopener">notice</a>`
+        : ''}</div></div>`).join('');
+
   const change = `<h3>What needs to change</h3>
-    ${moves}${fields}
+    ${moves}${fields}${apiv}
     <div class="kv">
       <div class="lab">action</div><div>${esc(ch.what_to_act || ch.recommendation || '—')}</div>
       <div class="lab">why</div><div>${esc(ch.why_to_act || '—')}</div>

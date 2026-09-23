@@ -40,6 +40,9 @@ EVIDENCE_WEIGHT = {
     # The course writes this key into a request body. That is a runtime dependency in
     # the most literal sense available - it is the payload the student's code sends.
     "payload_key": 5.0,
+    # The course sends a request to this versioned endpoint. Worth what a payload key
+    # is worth and for the same reason: it is what the student's code actually does.
+    "api_call": 5.0,
 }
 GRADED_MULTIPLIER = 2.0
 
@@ -73,6 +76,7 @@ SIGNALS = {
     # authenticates differently, so every taught setup step and every screenshot of its
     # key page is wrong while nothing is broken.
     "S15": ("Sign-up or authentication changed", "regression", "high"),
+    "S16": ("Taught API version being retired", "regression", "high"),
 }
 
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
@@ -149,6 +153,7 @@ PROBE_TO_SIGNAL = {
     "model_rate_limit_changed": "S3",
     "auth_method_changed": "S15",
     "taught_field_deprecated": "S13",
+    "taught_api_version_sunset": "S16",
 }
 
 # n8n states a severity on each of its own breaking-change rules. Honour it rather
@@ -252,6 +257,10 @@ EVIDENCE_REACH: dict[str, Optional[tuple]] = {
     # which the extractor measured. `None` keeps `verify`'s over-reach check from
     # second-guessing a scope that is already narrower than any rule it could apply.
     "taught_field_deprecated": None,
+    # A retiring API version reaches the records that CALL it, which is the same
+    # inexpressible question as a retired field and is special-cased onto
+    # `score.API_SITES` in `scope_locations`.
+    "taught_api_version_sunset": None,
     # Money and quota reach everywhere the model is taught, for the reason
     # `free_tier_language_lost` does: a price change alters the instruction itself, not
     # one page that mentions it.
@@ -429,6 +438,18 @@ def set_param_sites(sites: dict) -> None:
     PARAM_SITES.update(sites or {})
 
 
+API_CALL = "api_call"
+
+# `{base: [site, ...]}` — every record that calls each versioned endpoint. Shared for
+# the reason `PARAM_SITES` is: the same record is the same record for every dependency.
+API_SITES: dict = {}
+
+
+def set_api_sites(sites: dict) -> None:
+    API_SITES.clear()
+    API_SITES.update(sites or {})
+
+
 def _recount_from_locations(dep: Dependency, f: Finding) -> None:
     """Re-derive the impact numbers from the places this finding actually reaches.
 
@@ -473,6 +494,33 @@ def _field_locations(dep: Dependency, f: Finding) -> list:
     return out
 
 
+def _api_locations(dep: Dependency, f: Finding) -> list:
+    """Every place the course calls a versioned endpoint this vendor is retiring.
+
+    Built from the records that CALL the endpoint rather than filtered from the ones
+    where the dependency was named, for the reason `_field_locations` gives: a record
+    can post to `api.murf.ai/v1` without ever writing the word "Murf".
+    """
+    out, seen = [], set()
+    for row in f.api_version_sunset or []:
+        for base in (row.get("bases") or []):
+            for site in API_SITES.get(base, []):
+                key = (site.get("content_id"), site.get("field_path"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(Location(
+                    course=site.get("course", ""),
+                    topic_name=site.get("topic_name", ""),
+                    unit_id=site.get("unit_id", ""),
+                    unit_name=site.get("unit_name", ""),
+                    content_id=site.get("content_id", ""),
+                    field_path=site.get("field_path", ""),
+                    evidence_source=API_CALL, object_type=site.get("object_type", ""),
+                    session_no=site.get("session_no")))
+    return out
+
+
 def scope_locations(dep: Dependency, f: Finding) -> None:
     """Split `dep.locations` into the places this finding reaches and the rest.
 
@@ -495,6 +543,15 @@ def scope_locations(dep: Dependency, f: Finding) -> None:
         # intersecting with `dep.locations` reported three places out of ten and called
         # eight graded items one.
         reached = _field_locations(dep, f)
+        seen = {(l.content_id, l.field_path) for l in reached}
+        rest = [l for l in dep.locations
+                if (l.content_id, l.field_path) not in seen]
+    elif f.signal == "S16":
+        # Same argument, one level out. A record can post to `api.murf.ai/v1` without
+        # ever naming Murf, so the places to edit are the records that CALL the
+        # endpoint — which is what `API_SITES` measured — and not the subset where the
+        # dependency happened to be recognisable.
+        reached = _api_locations(dep, f)
         seen = {(l.content_id, l.field_path) for l in reached}
         rest = [l for l in dep.locations
                 if (l.content_id, l.field_path) not in seen]
@@ -621,6 +678,7 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f.successors = list(probe.successors)
             f.redirects = list(probe.redirects)
             f.deprecated_fields = list(probe.deprecated_fields)
+            f.api_version_sunset = list(probe.api_version_sunset)
             f.auth_change = dict(probe.auth_change or {})
             # An auth change is only ever reported on the vendor's OWN say-so.
             #
@@ -681,6 +739,30 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                 elif c is not None:
                     f.probe_signals = list(f.probe_signals) + [
                         f"field_evidence_unciteable:{_domain(url)}"]
+            # A version retirement is a DEPRECATION in the trust layer's own terms,
+            # and `ClaimKind.DEPRECATION` is inside `STRICT_KINDS` — so AUTHORITATIVE
+            # is enforced by policy here rather than at the call site, which is the
+            # opposite of S15's situation and the reason no special case is needed.
+            # Only the vendor can retire the vendor's own endpoint.
+            for row in probe.api_version_sunset:
+                url, quote = row.get("evidence_url", ""), row.get("quote", "")
+                if not url or len(quote) < 12:
+                    continue
+                try:
+                    c = Claim.build(
+                        kind=ClaimKind.DEPRECATION,
+                        statement=(f"{dep.canonical_name} says its "
+                                   f"`{row.get('version')}` API is being retired"),
+                        source_url=url, quote=quote, subject=dep.subject())
+                except UncitedClaim:
+                    c = None
+                if c is not None and c.substantiating:
+                    if not any(x.source_url == c.source_url and x.quote == c.quote
+                               for x in f.claims):
+                        f.claims.append(c)
+                elif c is not None:
+                    f.probe_signals = list(f.probe_signals) + [
+                        f"api_version_evidence_unciteable:{_domain(url)}"]
             f.latest_version = probe.latest_version or ""
             if not f.summary:
                 f.summary = _probe_summary(sig, dep, probe)
@@ -953,14 +1035,15 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                          f"is an example address students generate for themselves, "
                          f"published as a live link.")
         scope_locations(dep, f)
-        if f.signal == "S13":
+        if f.signal in ("S13", "S16"):
             # The counts have to follow the finding, not the dependency. An S13 is
             # scoped to the records that WRITE one field, which is routinely narrower
             # than everywhere the vendor is taught: Murf is named across three courses,
             # and `multiNativeLocale` is written in one. Leaving the dependency's
             # numbers on it said "Scope: 3 course(s)" over ten records that are all in
             # Building LLM Applications, and "0 graded items execute this" over eight
-            # quiz questions that send the field.
+            # quiz questions that send the field. S16 is scoped the same way and for
+            # the same reason — to the records that CALL one versioned endpoint.
             _recount_from_locations(dep, f)
         f.recommendation = recommend(dep, f)
         _assert_claim_fits(f)
@@ -1008,6 +1091,21 @@ def _field_summary(dep: Dependency, probe: ProbeResult) -> str:
             f"`{first['field']}` deprecated{to}. The course {verb} it{more}.")
 
 
+def _api_version_summary(dep: Dependency, probe: ProbeResult) -> str:
+    """What the vendor said about the version the course calls, in the vendor's terms."""
+    rows = probe.api_version_sunset or []
+    if not rows:
+        return f"{dep.canonical_name} says an API version the course calls is ending."
+    first = rows[0]
+    bases = first.get("bases") or []
+    where = f" The course calls `{bases[0]}`" + (
+        f" and {len(bases) - 1} other base URL(s)." if len(bases) > 1 else ".")
+    more = (f" {len(rows) - 1} other taught version(s) are named too."
+            if len(rows) > 1 else "")
+    return (f"{dep.canonical_name}'s own page says its `{first.get('version')}` API is "
+            f"being retired.{where}{more}")
+
+
 def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
     """A summary specific to this signal, not the probe's single detail string."""
     urls = probe.affected_urls or ([probe.evidence_url] if probe.evidence_url else [])
@@ -1045,6 +1143,7 @@ def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
         "n8n_upstream_unreachable": probe.detail,
         "sunset_language_about_subject": probe.detail,
         "taught_field_deprecated": _field_summary(dep, probe),
+        "taught_api_version_sunset": _api_version_summary(dep, probe),
         "deprecation_notice_added": (
             f"{dep.canonical_name}'s own pages carry a deprecation notice that was not "
             f"there at the last check: \u201c{(probe.new_notices or [''])[0][:200]}\u201d"),
@@ -1237,6 +1336,23 @@ def recommend(dep: Dependency, f: Finding) -> str:
         s13 = (f"A field the course sends to {dep.canonical_name} is marked deprecated "
                f"on its own API reference; check the payloads in the session.")
 
+    # The endpoint edit, named exactly. A version retirement is a find-and-replace on a
+    # base URL, and the base URL is the one thing the reviewer needs in front of them.
+    vrows = f.api_version_sunset or []
+    if vrows:
+        v0 = vrows[0]
+        bases = v0.get("bases") or []
+        named = ", ".join(f"`{b}`" for b in bases[:3])
+        tail = f" (and {len(bases) - 3} more)" if len(bases) > 3 else ""
+        s16 = (f"{dep.canonical_name} says its `{v0.get('version')}` API is being "
+               f"retired, and the course still calls it at {named}{tail}. Check the "
+               f"vendor's migration notes for the current version and repoint every "
+               f"request before the endpoint stops answering.")
+    else:
+        s16 = (f"An API version the course calls is being retired by "
+               f"{dep.canonical_name}; check its migration notes and repoint the "
+               f"requests in the session.")
+
     # The setup step, named. "Check Acme's auth" sends a reviewer to read a page that
     # looks fine; "the key page now offers OAuth where it offered an API key" tells
     # them which screenshot and which snippet to redo.
@@ -1343,6 +1459,7 @@ def recommend(dep: Dependency, f: Finding) -> str:
         # S14 is composed by `analyse/outcomes.py`, which has the promise and the
         # missing topics; it never reaches this map.
         "S15": s15,
+        "S16": s16,
     }[f.signal]
     # Assessment fallout: the reading material is only half the edit.
     q = ""

@@ -119,6 +119,10 @@ class UrlObservation:
     # Fields this page labels deprecated, with the successor it names. See
     # `deprecated_fields` for why a reference page needs its own reader.
     deprecated_fields: list[dict] = field(default_factory=list)
+    # API versions this page says are ending, read generically because an observation
+    # never keeps raw text. The runner intersects these with the versions the course
+    # actually calls. See `api_version_notices`.
+    api_version_notices: list[dict] = field(default_factory=list)
     paid_phrases: list[str] = field(default_factory=list)
     parked: bool = False
     title: str = ""
@@ -275,6 +279,91 @@ def deprecated_fields(text: str, limit: int = 30) -> list[dict]:
     return out
 
 
+# --- an API VERSION as a vendor announces its end ---------------------------
+#
+# The same sentence-level machinery `_sunset_sentences` uses, with one rule added and
+# one loosened. `_sunset_sentences` matches its subject terms as substrings, which is
+# right for a tool's name and catastrophic for a version: `v1` occurs inside `v10`,
+# `rev1` and `Nov1`, so a substring match would report a vendor announcing its TENTH
+# version as retiring the first. `research/news.py` learned the same lesson about tool
+# names occurring inside ordinary words. The boundary lives in `_VERSION_TOKEN` below,
+# which reads versions OFF the page rather than looking given ones up in it.
+
+# A third rule, and it is restraint rather than precision. A sunset phrase plus a
+# bounded `v1` still matches "Whisper v1 will be removed" on a page that also serves an
+# API - a model's version, not the endpoint's. The sentence must therefore name the
+# interface itself. The cost of being wrong here is a reviewer told their endpoint is
+# closing, so a sentence that merely says "version v1 will be removed" is deliberately
+# left alone, and this comment is where that choice is recorded rather than discovered.
+_ABOUT_THE_API = re.compile(r"\bapi\b|\bendpoint|\bbase url\b", re.I)
+
+# `SUNSET_PHRASES_STRONG` is tuned for a different sentence: "the TOOL is finished". It
+# is past-tense and absolute - `has been deprecated`, `is retired` - because a tool that
+# is going away says so about itself. A vendor retiring one API version announces it in
+# the future tense and on a date: "the v1 API will be retired on 1 June", "we are
+# sunsetting /v1/". None of those match, and adding them to the shared list would fire
+# S4 and S8 on every reference page that says a field "will be removed".
+#
+# They are safe HERE for a reason that does not hold there: this set only ever runs
+# against a sentence that already names a version the course calls, as a bounded token,
+# in a sentence about the API. The three rules together are the precision; the phrase
+# list on its own is not asked to carry it.
+_VERSION_SUNSET_PHRASES = SUNSET_PHRASES_STRONG + (
+    "will be removed", "will be retired", "will be deprecated", "will be discontinued",
+    "will be shut off", "will stop working", "will no longer be supported",
+    "sunsetting", "scheduled for removal", "end of life", "end-of-life",
+)
+
+
+# A version token as a page writes it, bounded so `v1` cannot be lifted out of `v10`.
+_VERSION_TOKEN = re.compile(
+    r"(?<![A-Za-z0-9])(v\d+(?:[a-z]+\d*)?|\d{4}-\d{2}-\d{2})(?![A-Za-z0-9])", re.I)
+
+
+def api_version_notices(text: str, limit: int = 20) -> list[dict]:
+    """Every sentence where this page says an API VERSION is ending.
+
+    Generic on purpose. `UrlObservation` records derived facts and never raw page text,
+    so the page is read once here without knowing which versions the curriculum calls,
+    and the runner intersects the result with the ones it teaches. Keeping the raw text
+    around to filter later would put a megabyte of HTML per URL into memory for a
+    question answerable in one pass.
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    for raw in _SENT_SPLIT.split(text or ""):
+        sent = raw.strip()
+        if not (12 < len(sent) < 400):
+            continue
+        low = sent.lower()
+        if not any(ph in low for ph in _VERSION_SUNSET_PHRASES):
+            continue
+        if not _ABOUT_THE_API.search(sent):
+            continue
+        for m in _VERSION_TOKEN.finditer(sent):
+            v = m.group(1).lower()
+            if v in seen:
+                continue
+            seen.add(v)
+            out.append({"version": v, "quote": re.sub(r"\s+", " ", sent)[:280]})
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def api_version_sunset(text: str, versions: tuple[str, ...],
+                       limit: int = 10) -> list[dict]:
+    """Those notices that concern a version the course actually CALLS.
+
+    A vendor retiring a version we never taught is not our problem, and reporting it
+    would put every long-lived API in the digest for ever.
+    """
+    want = {(v or "").lower() for v in versions} - {""}
+    if not want:
+        return []
+    return [n for n in api_version_notices(text) if n["version"] in want][:limit]
+
+
 def notice_key(sentence: str) -> str:
     """A stable key for one notice: case and whitespace folded, nothing else.
 
@@ -310,6 +399,7 @@ def observe(url: str, subject_terms: tuple[str, ...] = ()) -> UrlObservation:
         o.sunset_near_subject = _hits_near(text, SUNSET_PHRASES_STRONG, subject_terms)
         o.sunset_sentences = _sunset_sentences(text, subject_terms)
         o.deprecated_fields = deprecated_fields(text)
+        o.api_version_notices = api_version_notices(text)
         o.paid_phrases = _hits(text, PAID_PHRASES)
         o.parked = bool(_hits(text, PARKED_PHRASES))
         m = _TITLE.search(f.body)

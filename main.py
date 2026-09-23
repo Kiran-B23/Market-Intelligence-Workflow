@@ -214,6 +214,15 @@ def cmd_extract(args) -> int:
     print(f"  taught API fields: {n_params} candidate(s) across {with_params} "
           f"dependency(ies) — checked against each vendor's own reference at probe time")
 
+    # One level out: which API VERSION the course calls. Bound by DOMAIN rather than by
+    # co-location, so unlike the fields above these are not candidates - the host is a
+    # matter of record. What the probe adds is the vendor's own sentence retiring it.
+    from miw.extract.apiversion import attach as attach_api
+    n_api, api_sites = attach_api(records, deps)
+    with_api = sum(1 for d in deps if d.taught_api)
+    print(f"  taught API versions: {n_api} endpoint(s) across {with_api} "
+          f"dependency(ies) — checked against each vendor's own pages at probe time")
+
     # Names the curriculum teaches that nothing can check. A dependency with no official
     # domain produces no deprecation, pricing or version finding — and for the 153
     # workbook-declared names in that position, not even the cheap "is it still alive"
@@ -258,6 +267,8 @@ def cmd_extract(args) -> int:
         # `extract/params.attach`: per-dependency copies took this artifact from 6 MB
         # to 65 MB and said nothing new.
         "param_sites": param_sites,
+        # Where each versioned endpoint is called, shared for the same reason.
+        "api_sites": api_sites,
         "dependencies": [to_jsonable(d) for d in deps],
     })
     reg.save()
@@ -323,10 +334,12 @@ def _load_inventory():
     raw = json.load(open(path))
     _INVENTORY_EXTRAS["unit_images"] = raw.get("unit_images") or {}
     _INVENTORY_EXTRAS["param_sites"] = raw.get("param_sites") or {}
+    _INVENTORY_EXTRAS["api_sites"] = raw.get("api_sites") or {}
     # The scorer needs it and does not read artifacts itself, the same arrangement
     # `unit_images` has with `screenshots_at_risk`.
-    from miw.analyse.score import set_param_sites
+    from miw.analyse.score import set_api_sites, set_param_sites
     set_param_sites(_INVENTORY_EXTRAS["param_sites"])
+    set_api_sites(_INVENTORY_EXTRAS["api_sites"])
     deps = []
     for d in raw["dependencies"]:
         locs = [Location(**l) for l in d.pop("locations", [])]

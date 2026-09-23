@@ -874,9 +874,10 @@ JSON + xlsx in `/home/nxtwave/Market Intelligence Workflow/`.
 | S13 | Taught API member deprecated | `multiNativeLocale` superseded by `locale`, or a method renamed, while the course still uses it | the vendor's own API reference |
 | S14 | Promised outcome not covered | a stated course outcome rests on an area with corroborated topics no session teaches | `registry/outcomes.yaml` + the gap run |
 | S15 | Sign-up or authentication changed | a tool GAINED or LOST an auth mechanism between two runs — the taught setup step is wrong while nothing is broken | the vendor's own page, AUTHORITATIVE only |
+| S16 | Taught API version being retired | the course posts to `api.murf.ai/v1` and the vendor says that version is closing | the vendor's own page, `ClaimKind.DEPRECATION` |
 
-S1–S9, S13 and S15 are **regression** signals (what we teach is now wrong). S10–S12 and
-S14 are **opportunity** signals (still right, no longer best, or promised and unmet).
+S1–S9, S13, S15 and S16 are **regression** signals (what we teach is now wrong). S10–S12
+and S14 are **opportunity** signals (still right, no longer best, or promised and unmet).
 They are scored and reported in separate sections — mixing them buries the urgent under
 the interesting.
 
@@ -895,6 +896,56 @@ already exists in `research/official.py`; measured over the whole inventory its 
 (`renamed`, `replaced`, `removed the`) produced three claims, none substantiating, two
 of them Wikipedia prose about OpenAI removing a chief executive. A phrase list finds
 sentences containing a word, which is why the taught-symbol route was taken instead.
+
+**S16 asks the same question one level out**: not what is inside the request, but which
+version of the API the request addresses at all. A vendor can retire a whole API version
+while every other signal stays green — the tool is live, the pricing page is up, the
+fields are current, and every code sample posts to an endpoint with a shutdown date.
+
+It carries three refusals, each measured rather than assumed:
+
+* **A version is only pinned where the course CALLS the URL.** The curriculum writes
+  `developers.google.com/youtube/v3/docs/search/list` beside
+  `www.googleapis.com/youtube/v3/search`. Both carry `v3`; only the second is an
+  endpoint. The test is whether the URL addresses an API surface and not a manual.
+* **A version is a bounded token.** `v1` occurs inside `v10`, `rev1` and `Nov1`, and a
+  substring match reports a vendor announcing its tenth version as retiring its first.
+* **The sentence must name the interface.** A sunset phrase plus a bounded `v1` still
+  matches "Whisper v1 will be removed" — a model's version, not the endpoint's.
+
+Unlike S13, **binding is by DOMAIN**, which makes it stricter rather than looser: a
+payload key is a candidate until the vendor's page adjudicates it, because one lesson
+names a dozen tools, whereas `api.murf.ai` falls under Murf's authority set as a matter
+of record. A host no tracked dependency can speak for produces nothing — today
+`www.googleapis.com` and `api.freepik.com`, which is the registry gap above, not a fault
+in the rule. For the same reason S16 does NOT skip `mention-only` where S13 does: a key
+inherited from a co-located record could be a false attribution, but an endpoint the
+course calls is called whatever the watch tier says.
+
+Because a version retirement is a `ClaimKind.DEPRECATION`, and that kind is inside
+`STRICT_KINDS`, AUTHORITATIVE is enforced by policy rather than at the call site — the
+opposite of S15's situation, and the reason S16 needed no special case.
+
+Measured on the live curriculum: 9 versioned endpoints across 8 dependencies —
+`global.api.murf.ai/v1` called in 10 records, `backend.composio.dev/v3` in 7,
+`api.groq.com/openai/v1` in 4.
+
+**S16 carries the same stated limit as S13's method half, and it is the same cause.**
+The check runs: 29 of 29 pages read across four vendors on a live run, and zero version
+retirements announced on any of them, for any version. Its restraint is proven on real
+pages that were held out — GitHub's `api-versions` page carries five sentences of
+retirement vocabulary and names no version, and Microsoft's `api-version-deprecation`
+page says "api-version is no longer a required parameter with the v1 GA API", which
+clears the bounded-token rule and the interface rule and is stopped only by the phrase
+list. Both are silent, correctly.
+
+What has not been demonstrated is a live positive, and the reason is structural rather
+than a gap in the rule: **vendors publish version lifecycles as TABLES, not sentences**
+— version, status, retirement date — and on the pages sampled those tables are rendered
+client-side, so the served HTML does not contain them. `probe/catalogue.py` is the
+machinery for reading exactly that shape of table and was tried against Microsoft's
+page; it found one table, `Variable | Value`. Extending S16 to tables is worth doing
+only once there is a page whose table the fetcher can actually see.
 
 The method half carries a stated limit. Its no-false-positive behaviour is proven on
 real pages — the eight held-out `fields` fixtures and a live LangChain API index that

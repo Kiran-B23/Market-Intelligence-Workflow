@@ -107,6 +107,11 @@ class Dependency:
     # can retire a field without retiring anything else the system watches, so without
     # this there is no way to ask the question at all.
     taught_params: list[str] = field(default_factory=list)
+    # API versions the curriculum CALLS, bound by `miw/extract/apiversion.py`. Each row
+    # is `{"base": "https://api.murf.ai/v1", "version": "v1"}`. Bound by DOMAIN rather
+    # than by co-location, because a host is a matter of record where a payload key
+    # written beside a dozen tool names is a guess.
+    taught_api: list[dict] = field(default_factory=list)
     review_status: str = "registry"   # registry | proposed | approved | rejected
     first_seen: str = field(default_factory=utcnow)
     notes: str = ""
@@ -311,6 +316,9 @@ class ProbeResult:
     # Fields the course writes that the vendor's own reference marks deprecated, each
     # with the successor the vendor names and the verbatim row that says so.
     deprecated_fields: list[dict] = field(default_factory=list)
+    # API versions the course calls that the vendor's own page says are ending, each
+    # with the verbatim sentence that says so.
+    api_version_sunset: list[dict] = field(default_factory=list)
     # How the vendor's authentication moved: what was named last time, what is named
     # now, and which mechanisms were gained or lost.
     auth_change: dict = field(default_factory=dict)
@@ -630,6 +638,8 @@ class Finding:
     # Fields the course writes that the vendor's own reference marks deprecated, each
     # with the successor the vendor names and the verbatim row that says so.
     deprecated_fields: list[dict] = field(default_factory=list)
+    # API versions the course calls that the vendor's own page says are ending.
+    api_version_sunset: list[dict] = field(default_factory=list)
     # How the vendor's authentication moved: what was named last time, what is
     # named now, and which mechanisms were gained or lost.
     auth_change: dict = field(default_factory=dict)

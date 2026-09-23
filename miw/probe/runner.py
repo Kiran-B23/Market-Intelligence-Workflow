@@ -187,6 +187,61 @@ def _match_taught_fields(dep: Dependency, obs: list, res: ProbeResult) -> None:
                 res.affected_urls.append(o.url)
 
 
+def _match_taught_api(dep: Dependency, obs: list, res: ProbeResult) -> None:
+    """API versions the course calls that this vendor's own page says are ending.
+
+    The version is bound to the dependency by DOMAIN at extract time — `api.murf.ai`
+    falls under Murf's authority set — so unlike a payload key there is nothing here for
+    the page to adjudicate. What the page supplies is the only thing that matters: the
+    vendor's own sentence saying this version is going away, verbatim, so the finding
+    quotes rather than infers.
+
+    Only a version the course ACTUALLY CALLS is looked for. A vendor retiring a version
+    we never taught is not our problem, and reporting it would put every long-lived API
+    in the digest for ever.
+    """
+    want = tuple({(r.get("version") or "").lower() for r in (dep.taught_api or [])} - {""})
+    if not want:
+        return
+    for o in obs:
+        for hit in [n for n in (o.api_version_notices or [])
+                    if n.get("version") in want]:
+            if any(x.get("version") == hit["version"] for x in res.api_version_sunset):
+                continue
+            bases = sorted({r["base"] for r in dep.taught_api
+                            if (r.get("version") or "").lower() == hit["version"]})
+            res.flag("taught_api_version_sunset")
+            res.api_version_sunset.append(
+                {"version": hit["version"], "quote": hit["quote"],
+                 "evidence_url": o.url, "bases": bases})
+            if o.url not in res.affected_urls:
+                res.affected_urls.append(o.url)
+
+
+def _taught_api_pass(dep: Dependency, res: ProbeResult,
+                     obs: Optional[list] = None) -> None:
+    """Run the API-version check for ANY dependency, whatever its kind.
+
+    Deliberately written as its own pass outside the kind switch, which is the shape
+    `_taught_field_pass` had to be rewritten into after living in one arm of it made the
+    field check unreachable for every package, model and n8n node.
+
+    `mention-only` is NOT skipped here, and that is the difference from the field pass.
+    A tool named only so students are aware of it has no payload we write, so a key it
+    inherits from a co-located record is a false attribution — but a versioned endpoint
+    is bound by domain, so if the course calls `api.example/v1` it calls it whatever the
+    watch tier says. The tier governs how loudly it is reported, not whether the fact is
+    true.
+    """
+    if not dep.taught_api or not dep.subject().official_domains:
+        return
+    if obs is None:
+        terms = _subject_terms(dep)
+        obs = [observe(u, terms) for u in _targets(dep)]
+        obs += _reference_pages(dep, obs, terms)
+    _match_taught_api(dep, obs, res)
+
+
 def _taught_field_pass(dep: Dependency, res: ProbeResult,
                        obs: Optional[list] = None) -> None:
     """Run the field check for ANY dependency, whatever its kind.
@@ -307,6 +362,7 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
     # `else` arm above meant 100 of the 170 dependencies carrying candidate fields —
     # every package, model and n8n node — could never produce a field finding.
     _taught_field_pass(dep, res, seen_obs)
+    _taught_api_pass(dep, res, seen_obs)
 
     # --- flap protection ----------------------------------------------------
     # Two-run confirmation exists to stop a transient network failure reading as a dead

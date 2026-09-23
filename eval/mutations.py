@@ -278,6 +278,37 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
      ("outcome: {url_gone: '404 / 410 Gone', ", "outcome: {"),
      "pytest:tests/test_ui_contract.py"),
 
+    # --- S16: the API VERSION the course calls, one level out from S13 ------
+    # Each of these restores a refusal that was measured on the live curriculum.
+    ("S16 a documentation link counts as a taught API version",
+     "miw/extract/apiversion.py",
+     ("    if _DOCS_PATH.search(path):\n        return False\n", "    "),
+     "pytest:tests/test_api_version.py"),
+    ("S16 a version is matched unbounded, so v1 is lifted out of v10",
+     "miw/probe/http_probe.py",
+     (r'    r"(?<![A-Za-z0-9])(v\d+(?:[a-z]+\d*)?|\d{4}-\d{2}-\d{2})(?![A-Za-z0-9])", re.I)',
+      r'    r"(v\d+(?:[a-z]+\d*)?|\d{4}-\d{2}-\d{2})", re.I)'),
+     "pytest:tests/test_api_version.py"),
+    ("S16 the sunset sentence need not be about the API, so a model version fires",
+     "miw/probe/http_probe.py",
+     ("        if not _ABOUT_THE_API.search(sent):\n            continue\n", "        "),
+     "pytest:tests/test_api_version.py"),
+    ("S16 a version the course never calls is reported anyway",
+     "miw/probe/http_probe.py",
+     ('    return [n for n in api_version_notices(text) if n["version"] in want][:limit]',
+      "    return api_version_notices(text)[:limit]"),
+     "pytest:tests/test_api_version.py"),
+    ("S16 the scope falls back to where the dependency was NAMED",
+     "miw/analyse/score.py",
+     ('    elif f.signal == "S16":', '    elif False:'),
+     "pytest:tests/test_api_version.py"),
+    ("S16 a reference-only tool is skipped, though the endpoint is bound by domain",
+     "miw/probe/runner.py",
+     ("    if not dep.taught_api or not dep.subject().official_domains:",
+      '    if (not dep.taught_api or not dep.subject().official_domains\n'
+      '            or dep.watch_tier == "mention-only"):'),
+     "pytest:tests/test_api_version.py"),
+
     # --- M1: the only place generated text reaches a human ------------------
     ("M1 only invented URLs are rejected; versions, dates and prices pass",
      "miw/analyse/notes.py",
