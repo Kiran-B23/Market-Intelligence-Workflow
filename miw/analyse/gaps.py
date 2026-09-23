@@ -398,10 +398,22 @@ def area_coverage(areas: Iterable[Area], index: CurriculumIndex) -> dict:
     outside = [f"{d.course} s{d.session_no} — {d.session_name}"
                for d in sorted(index.docs, key=lambda x: (x.course, x.session_no))
                if (d.course, d.session_no) not in inside]
+    # Broken out per course as well as in total, because an outcome belongs to one
+    # course: "six sessions touch retrieval" says nothing about whether the course that
+    # PROMISED a retrieval pipeline is one of them. `analyse/outcomes.py` reads this.
+    areas = list(areas)
+    by_course: dict = {}
+    for (course, _session), ids in inside.items():
+        bucket = by_course.setdefault(course, {a.area_id: 0 for a in areas})
+        for area_id in ids:
+            bucket[area_id] = bucket.get(area_id, 0) + 1
+    for course in {d.course for d in index.docs}:
+        by_course.setdefault(course, {a.area_id: 0 for a in areas})
     return {"sessions": len(index.docs), "in_an_area": len(inside),
             "not_in_any_area": outside,
             "areas": {a.area_id: sum(1 for v in inside.values() if a.area_id in v)
-                      for a in areas}}
+                      for a in areas},
+            "by_course": by_course}
 
 
 @dataclass

@@ -1063,6 +1063,36 @@ def cmd_gaps(args, only=None) -> int:
         owned = ({"S11"} if do_gaps else set()) | ({"S12"} if do_changes else set())
         examined |= {f.get("dep_id") for f in (on_file.get("findings") or [])
                      if f.get("signal") in owned and f.get("dep_id")}
+    # What the course PROMISED, against the holes a gap run just found. A third
+    # input for a third question: the inventory says what is USED, `topics.yaml`
+    # says what EXISTS, and neither records a promise made to a student. Reports
+    # nothing until a human writes one down, and seeds the file with each course's
+    # observed areas so writing one is arithmetic they already have.
+    from miw.analyse.outcomes import (OUTCOMES_PATH, OutcomesUnreadable,
+                                      check_outcomes, load_outcomes,
+                                      starting_point)
+    if not OUTCOMES_PATH.exists():
+        OUTCOMES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUTCOMES_PATH.write_text(starting_point(cov))
+        print(f"  outcomes: none declared yet -> wrote a starting point to "
+              f"{OUTCOMES_PATH}, seeded with each course's observed areas")
+    try:
+        declared = load_outcomes()
+    except OutcomesUnreadable as exc:
+        declared = []
+        print(f"  outcome PROBLEM: {exc} - no outcome is checked this run", file=sys.stderr)
+    if declared:
+        orep = check_outcomes(declared, areas, rep.findings, rep.rows)
+        rep.findings += orep.findings
+        rep.rows += orep.rows
+        rep.considered |= orep.considered
+        for pr in orep.stats.unknown_areas:
+            print(f"  outcome PROBLEM: {pr}", file=sys.stderr)
+        print(f"  outcomes: {orep.stats.declared} promise(s) across "
+              f"{len(orep.stats.courses)} course(s); {orep.stats.served} fully "
+              f"served, {orep.stats.findings} resting on an area with documented "
+              f"gaps in that course")
+
     raised, held = [], []
     for f in rep.findings:
         fp = fingerprint_of(f)

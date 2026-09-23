@@ -64,6 +64,10 @@ SIGNALS = {
     # request still exists. High rather than critical by default: the vendor still
     # serves the field today, and `severity_for` lifts it where the course executes it.
     "S13": ("Taught API field deprecated", "regression", "high"),
+    # A promise the course makes, resting on an area no session in that course covers.
+    # Opportunity rather than regression: nothing is broken, and whether the promise
+    # still stands is a curriculum decision, not a defect.
+    "S14": ("Promised outcome not covered", "opportunity", "medium"),
 }
 
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]

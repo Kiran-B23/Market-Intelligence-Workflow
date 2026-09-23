@@ -137,6 +137,24 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    # --- E: a promise, checked against the holes a gap run found -------------
+    ("E an outcome fires for gaps that land in a different course",
+     "miw/analyse/outcomes.py",
+     ("            missing = sorted(set((holes.get(area_id) or {}).get(o.course) or []))",
+      "            missing = sorted({t for c in (holes.get(area_id) or {}).values()\n"
+      "                              for t in c})"),
+     "pytest:tests/test_outcomes.py"),
+    ("E an outcome finding ships without the citations that document the area",
+     "miw/analyse/outcomes.py",
+     ("                courses=[o.course], locations=[loc], claims=claims,",
+      "                courses=[o.course], locations=[loc],"),
+     "pytest:tests/test_outcomes.py"),
+    ("E a malformed outcomes file crashes the stage instead of reporting",
+     "miw/analyse/outcomes.py",
+     ("        raise OutcomesUnreadable(f\"{p}: {exc}\") from None",
+      "        raise"),
+     "pytest:tests/test_outcomes.py"),
+
     # --- D: news as a lead. The must-not cases are the whole design. ---------
     ("D a news feed matches a name that is also an ordinary English word",
      "miw/research/news.py",
@@ -174,7 +192,7 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
     # rendering as the literal string "S13" in five places.
     ("UI a drift code ships with no plain word, rendering as raw jargon",
      "miw/api/static/index.html",
-     ("           S13: 'a field we send is deprecated'},", "           },"),
+     ("           S14: 'a promise nothing covers'},", "           },"),
      "pytest:tests/test_ui_contract.py"),
     ("UI a probe outcome that becomes a finding has no plain word",
      "miw/api/static/index.html",
