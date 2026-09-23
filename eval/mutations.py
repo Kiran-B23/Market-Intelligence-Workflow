@@ -175,10 +175,12 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
      "pytest:tests/test_location_scoping.py"),
 
     # --- F: how a vendor lets you in ----------------------------------------
+    # The bar moved into `_attach_claim` when `findings_for` was split; the defect is
+    # the same one, restored where the policy now lives.
     ("F an auth change ships on a third party's say-so, not the vendor's",
      "miw/analyse/score.py",
-     ("                if c is not None and c.tier is Tier.AUTHORITATIVE:",
-      "                if c is not None and c.substantiating:"),
+     ("    ok = (c.tier is Tier.AUTHORITATIVE) if authoritative_only else c.substantiating",
+      "    ok = c.substantiating"),
      "pytest:tests/test_auth_change.py"),
     ("F the first look at a dependency reports every mechanism as gained",
      "miw/probe/runner.py",

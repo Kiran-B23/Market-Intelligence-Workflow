@@ -637,11 +637,76 @@ def _assert_claim_fits(f: Finding) -> None:
                 f"{len(f.locations)}")
 
 
+def _attach_claim(f: Finding, c, url: str, refusal: str, *,
+                  authoritative_only: bool = False, dedupe: bool = True) -> None:
+    """Attach a vendor declaration to a finding, or record why it could not be.
+
+    The same three lines were written out three times inside `_from_probe` - for an
+    auth change, a retired field and a sunset API version - and the discipline they
+    encode is the one this system rests on, so it is worth having once:
+
+      * a claim that cannot substantiate its own kind is NOT attached. `Claim.build`
+        only refuses an EXCLUDED source, so a strict kind resting on a merely
+        CORROBORATING one still came back built - and a finding carrying it LOOKS
+        cited while resting on nothing. That is what `verify` caught on
+        `@n8n/n8n-nodes-langchain.chatTrigger`: an `implementation` claim citing
+        npm, which is canonical for versions and existence and not for how a vendor's
+        chat protocol changed.
+      * the refusal is COUNTED, never swallowed. Silence is what made that one
+        invisible until `verify` shouted.
+
+    `authoritative_only` raises the bar past `substantiating` for the one kind that
+    needs it: `ClaimKind.AVAILABILITY` sits outside `STRICT_KINDS`, so a merely
+    corroborating source could otherwise settle "this tool now requires OAuth" - an
+    independent blog seeing a login screen is not the vendor changing its contract,
+    and a session's setup steps get rewritten off that.
+    """
+    if c is None:
+        return
+    ok = (c.tier is Tier.AUTHORITATIVE) if authoritative_only else c.substantiating
+    if ok:
+        if dedupe and any(x.source_url == c.source_url and x.quote == c.quote
+                          for x in f.claims):
+            return
+        f.claims.append(c)
+    else:
+        f.probe_signals = list(f.probe_signals) + [f"{refusal}:{_domain(url)}"]
+
+
 def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                  research: Optional[ResearchResult]) -> list[Finding]:
+    """Everything this run can say about one dependency, as ranked findings.
+
+    Four phases, in order, each able only to add to or narrow what the one before it
+    established:
+
+      1. observations   what our own probe saw, first-hand
+      2. research       what a source we fetched says, and only where it substantiates
+      3. reconcile      the same event reported twice, collapsed to once
+      4. finalise       drop the unsubstantiated, cap what the course's use does not
+                        earn, scope to the places the evidence reaches, then word it
+
+    This was one 423-line function with fifty branches, and naming the phases is worth
+    doing for a specific reason: every defect of the "claimed more than the evidence"
+    family lived in here, and they kept recurring because a special case added to one
+    phase could not see the special cases in the others. The split changes no behaviour
+    - it is proved output-identical against the live artifact - it makes the phases
+    separable enough to reason about one at a time.
+    """
     radius = blast_radius(dep)
     out: dict[str, Finding] = {}
+    ensure = _ensure(dep, radius, out)
 
+    if probe:
+        _from_probe(dep, probe, radius, out, ensure)
+    if research:
+        _from_research(dep, probe, research, out, ensure)
+    _reconcile(dep, probe, radius, out)
+    return _finalise(dep, out)
+
+
+def _ensure(dep: Dependency, radius: int, out: dict):
+    """The one Finding per signal, created on first use. Closes over `out` as before."""
     def ensure(signal: str) -> Finding:
         if signal not in out:
             label, kind, _ = SIGNALS[signal]
@@ -663,7 +728,137 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                                            dep.questions_that_mention_it)))[:6],
                 raised_at=utcnow())
         return out[signal]
+    return ensure
 
+
+def _probe_severity(sig: str, signal: str, f: Finding, dep: Dependency,
+                    radius: int) -> None:
+    """What one observation does to a finding's severity.
+
+    Four adjustments, and three of them are ABSOLUTE rather than relative - which is
+    why they are worth collecting in one place. A relative step down from a base
+    that blast radius has already raised still lands on `high` for a widely-used
+    dependency, so a severity meaning "someone should look" has to be set, not
+    nudged."""
+    # A vendor-declared change comes with the vendor's own severity, doc URL
+    # and wording. Cite it rather than paraphrase it.
+    if sig == "node_removed_upstream":
+        f.severity = "critical"
+    if sig in ("model_shutdown_passed", "model_tier_restricted"):
+        # The announced date has passed - but "already broken" depends on what
+        # the curriculum DOES with the id, not just that it is retired. Setting
+        # `critical` unconditionally ranked 5 broken coding questions and one
+        # line of reading material identically, and told a reviewer to fix both
+        # this sprint. A model id inside a coding question is passed to an API at
+        # run time (`Dependency._executes`), so only that case is a live outage.
+        f.severity = retirement_severity(
+            signal, dep, radius, f.questions_executing, f.graded_locations)
+    if sig == "free_tier_language_lost":
+        # The strongest S3 evidence there is: wording the vendor advertised
+        # while it was true has gone.
+        f.severity = _bump(f.severity, 1)
+    if sig == "pricing_page_changed" and len(f.probe_signals) == 1:
+        # A pricing rewrite on its own routes to research; it is not yet a
+        # finding about money. Set absolutely, not relatively: blast radius has
+        # already bumped the base severity by this point, so a relative step
+        # down still landed on medium for a widely-used tool.
+        f.severity = "low"
+
+
+def _from_declared_changes(dep: Dependency, probe: ProbeResult, f: Finding,
+                           sig: str) -> None:
+    """A change the VENDOR published, cited from the vendor's own page.
+
+    n8n's breaking-change rules, a model's shutdown date, a provider's replacement
+    listing. It is the one part of the probe phase where we are not the observer,
+    so it is the one part that must build a Claim and let the trust layer judge it."""
+    for change in probe.declared_changes:
+        if change.get("shutdown_date") and not f.shutdown_date:
+            f.shutdown_date = str(change["shutdown_date"])
+        vend = VENDOR_SEVERITY.get(str(change.get("severity", "")).lower())
+        if vend and SEVERITY_ORDER.index(vend) > SEVERITY_ORDER.index(f.severity):
+            f.severity = vend
+        if sig == "breaking_change_possible":
+            # Absolute, not relative. This branch fires on a rule that names no
+            # node types at all - n8n matched it by prose - and its own detail
+            # line says "whether the course is affected needs a human check".
+            # A relative step down still landed on `high` for a widely-used
+            # node, which is a confident severity on an admittedly unconfirmed
+            # claim. `low` is what "someone should look" is worth.
+            f.severity = "low"
+        url = change.get("doc_url") or ""
+        quote = " ".join(x for x in (change.get("title"),
+                                     change.get("description")) if x)
+        # The rule's identity, carried onto the finding so `merge.py` can put
+        # one rule's blast back together. n8n's `wait-node-subworkflow` names
+        # 16 node types; the curriculum teaches 4 of them, and a reviewer was
+        # handed the same paragraph four times.
+        if change.get("rule_id"):
+            tag = f"n8n_rule:{change['rule_id']}"
+            if tag not in f.probe_signals:
+                f.probe_signals = list(f.probe_signals) + [tag]
+        if change.get("version_checked") and change.get("taught_version"):
+            f.probe_signals = list(f.probe_signals) + [
+                f"n8n_version_checked:{change['taught_version']}"
+                f"{change.get('version_bound', '')}"]
+        if not url or len(quote) < 12:
+            continue
+        # A model's serving provider is authoritative about it even when the
+        # family owner differs — Groq can retire a Meta model. Widening is
+        # earned: the probe only sets `provider_domains` when that provider's
+        # own catalogue named the exact id.
+        subject = (dep.subject_with_provider(probe.provider_domains)
+                   if probe.provider_domains else dep.subject())
+        is_model = dep.kind == "model"
+        try:
+            c = Claim.build(
+                kind=(ClaimKind.DEPRECATION if is_model
+                      else ClaimKind.IMPLEMENTATION),
+                statement=(change.get("title") if is_model else
+                           f"n8n declares: {change.get('title')} "
+                           f"(n8n {change.get('n8n_version')})"),
+                source_url=url, quote=quote, subject=subject)
+        except UncitedClaim:
+            c = None
+        # A claim that cannot substantiate its own kind must not be attached.
+        # `Claim.build` only refuses an EXCLUDED source, so a strict kind on a
+        # merely CORROBORATING one was still appended - and a finding carrying
+        # it LOOKS cited while resting on nothing, which is what `main.py
+        # verify` flagged for `@n8n/n8n-nodes-langchain.chatTrigger`: an
+        # `implementation` claim citing `npmjs.com/package/@n8n/chat`. npm is a
+        # canonical registry for versions and existence, not for how a vendor's
+        # embedded chat protocol changed. Dropped, and counted, because silence
+        # here is what made it invisible until `verify` shouted.
+        if c is not None and c.substantiating:
+            f.claims.append(c)
+        elif c is not None:
+            f.probe_signals = list(f.probe_signals) + [
+                f"declared_change_unciteable:{_domain(url)}"]
+
+        # Cite the SECOND sighting too, when the vendor contradicts itself. The
+        # live listing is the half a reviewer would otherwise use to disprove
+        # us - "you said it was shut down and here it is on the models page" -
+        # so it belongs in the evidence, quoted from the same vendor, rather
+        # than left out for the digest to look tidier.
+        listed_url = change.get("listed_url") or ""
+        listed_quote = change.get("listed_quote") or ""
+        if change.get("still_listed") and listed_url and len(listed_quote) >= 12:
+            try:
+                f.claims.append(Claim.build(
+                    kind=ClaimKind.PRICING,
+                    statement=(f"{dep.canonical_name} is still listed by "
+                               f"{probe.provider or 'the provider'} at "
+                               f"{change.get('listed_price') or 'quote-only'} "
+                               f"pricing"),
+                    source_url=listed_url, quote=listed_quote, subject=subject))
+            except UncitedClaim:
+                pass
+
+
+def _from_probe(dep: Dependency, probe: ProbeResult, radius: int,
+                out: dict, ensure) -> None:
+    """Phase 1: what our own probe saw. First-hand, so it needs no citation -
+    but anything a VENDOR declared inside it still goes through `Claim.build`."""
     # --- from the probe: first-hand observations ----------------------------
     if probe:
         # A registry bump on its own is not curriculum news. 71 taught packages
@@ -713,13 +908,10 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                         source_url=url, quote=quote, subject=dep.subject())
                 except UncitedClaim:
                     c = None
-                if c is not None and c.tier is Tier.AUTHORITATIVE:
-                    f.claims.append(c)
-                else:
-                    # Recorded, not swallowed: an auth change we cannot pin on the
-                    # vendor is a thing we saw and may not report.
-                    f.probe_signals = list(f.probe_signals) + [
-                        f"auth_change_unciteable:{_domain(url)}"]
+                # Recorded, not swallowed: an auth change we cannot pin on the
+                # vendor is a thing we saw and may not report.
+                _attach_claim(f, c, url, "auth_change_unciteable",
+                              authoritative_only=True, dedupe=False)
             # A retired field is a vendor DECLARATION, so it goes through the trust
             # layer like every other one — the same construction the n8n and model
             # paths use below. Without this the finding shipped `claims: []`, its
@@ -737,18 +929,10 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                         source_url=url, quote=quote, subject=dep.subject())
                 except UncitedClaim:
                     c = None
-                # Same discipline as the declared-change path below: a claim that
-                # cannot substantiate its own kind must not be attached, and the
-                # refusal is counted rather than swallowed. Only the vendor can retire
-                # the vendor's own field, so a page we happened to reach that does not
-                # speak for this subject is not evidence of its API contract.
-                if c is not None and c.substantiating:
-                    if not any(x.source_url == c.source_url and x.quote == c.quote
-                               for x in f.claims):
-                        f.claims.append(c)
-                elif c is not None:
-                    f.probe_signals = list(f.probe_signals) + [
-                        f"field_evidence_unciteable:{_domain(url)}"]
+                # Only the vendor can retire the vendor's own field, so a page we
+                # happened to reach that does not speak for this subject is not
+                # evidence about its API contract.
+                _attach_claim(f, c, url, "field_evidence_unciteable")
             # A version retirement is a DEPRECATION in the trust layer's own terms,
             # and `ClaimKind.DEPRECATION` is inside `STRICT_KINDS` — so AUTHORITATIVE
             # is enforced by policy here rather than at the call site, which is the
@@ -766,121 +950,13 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
                         source_url=url, quote=quote, subject=dep.subject())
                 except UncitedClaim:
                     c = None
-                if c is not None and c.substantiating:
-                    if not any(x.source_url == c.source_url and x.quote == c.quote
-                               for x in f.claims):
-                        f.claims.append(c)
-                elif c is not None:
-                    f.probe_signals = list(f.probe_signals) + [
-                        f"api_version_evidence_unciteable:{_domain(url)}"]
+                _attach_claim(f, c, url, "api_version_evidence_unciteable")
             f.latest_version = probe.latest_version or ""
             if not f.summary:
                 f.summary = _probe_summary(sig, dep, probe)
 
-            # A vendor-declared change comes with the vendor's own severity, doc URL
-            # and wording. Cite it rather than paraphrase it.
-            if sig == "node_removed_upstream":
-                f.severity = "critical"
-            if sig in ("model_shutdown_passed", "model_tier_restricted"):
-                # The announced date has passed - but "already broken" depends on what
-                # the curriculum DOES with the id, not just that it is retired. Setting
-                # `critical` unconditionally ranked 5 broken coding questions and one
-                # line of reading material identically, and told a reviewer to fix both
-                # this sprint. A model id inside a coding question is passed to an API at
-                # run time (`Dependency._executes`), so only that case is a live outage.
-                f.severity = retirement_severity(
-                    signal, dep, radius, f.questions_executing, f.graded_locations)
-            if sig == "free_tier_language_lost":
-                # The strongest S3 evidence there is: wording the vendor advertised
-                # while it was true has gone.
-                f.severity = _bump(f.severity, 1)
-            if sig == "pricing_page_changed" and len(f.probe_signals) == 1:
-                # A pricing rewrite on its own routes to research; it is not yet a
-                # finding about money. Set absolutely, not relatively: blast radius has
-                # already bumped the base severity by this point, so a relative step
-                # down still landed on medium for a widely-used tool.
-                f.severity = "low"
-            for change in probe.declared_changes:
-                if change.get("shutdown_date") and not f.shutdown_date:
-                    f.shutdown_date = str(change["shutdown_date"])
-                vend = VENDOR_SEVERITY.get(str(change.get("severity", "")).lower())
-                if vend and SEVERITY_ORDER.index(vend) > SEVERITY_ORDER.index(f.severity):
-                    f.severity = vend
-                if sig == "breaking_change_possible":
-                    # Absolute, not relative. This branch fires on a rule that names no
-                    # node types at all - n8n matched it by prose - and its own detail
-                    # line says "whether the course is affected needs a human check".
-                    # A relative step down still landed on `high` for a widely-used
-                    # node, which is a confident severity on an admittedly unconfirmed
-                    # claim. `low` is what "someone should look" is worth.
-                    f.severity = "low"
-                url = change.get("doc_url") or ""
-                quote = " ".join(x for x in (change.get("title"),
-                                             change.get("description")) if x)
-                # The rule's identity, carried onto the finding so `merge.py` can put
-                # one rule's blast back together. n8n's `wait-node-subworkflow` names
-                # 16 node types; the curriculum teaches 4 of them, and a reviewer was
-                # handed the same paragraph four times.
-                if change.get("rule_id"):
-                    tag = f"n8n_rule:{change['rule_id']}"
-                    if tag not in f.probe_signals:
-                        f.probe_signals = list(f.probe_signals) + [tag]
-                if change.get("version_checked") and change.get("taught_version"):
-                    f.probe_signals = list(f.probe_signals) + [
-                        f"n8n_version_checked:{change['taught_version']}"
-                        f"{change.get('version_bound', '')}"]
-                if not url or len(quote) < 12:
-                    continue
-                # A model's serving provider is authoritative about it even when the
-                # family owner differs — Groq can retire a Meta model. Widening is
-                # earned: the probe only sets `provider_domains` when that provider's
-                # own catalogue named the exact id.
-                subject = (dep.subject_with_provider(probe.provider_domains)
-                           if probe.provider_domains else dep.subject())
-                is_model = dep.kind == "model"
-                try:
-                    c = Claim.build(
-                        kind=(ClaimKind.DEPRECATION if is_model
-                              else ClaimKind.IMPLEMENTATION),
-                        statement=(change.get("title") if is_model else
-                                   f"n8n declares: {change.get('title')} "
-                                   f"(n8n {change.get('n8n_version')})"),
-                        source_url=url, quote=quote, subject=subject)
-                except UncitedClaim:
-                    c = None
-                # A claim that cannot substantiate its own kind must not be attached.
-                # `Claim.build` only refuses an EXCLUDED source, so a strict kind on a
-                # merely CORROBORATING one was still appended - and a finding carrying
-                # it LOOKS cited while resting on nothing, which is what `main.py
-                # verify` flagged for `@n8n/n8n-nodes-langchain.chatTrigger`: an
-                # `implementation` claim citing `npmjs.com/package/@n8n/chat`. npm is a
-                # canonical registry for versions and existence, not for how a vendor's
-                # embedded chat protocol changed. Dropped, and counted, because silence
-                # here is what made it invisible until `verify` shouted.
-                if c is not None and c.substantiating:
-                    f.claims.append(c)
-                elif c is not None:
-                    f.probe_signals = list(f.probe_signals) + [
-                        f"declared_change_unciteable:{_domain(url)}"]
-
-                # Cite the SECOND sighting too, when the vendor contradicts itself. The
-                # live listing is the half a reviewer would otherwise use to disprove
-                # us - "you said it was shut down and here it is on the models page" -
-                # so it belongs in the evidence, quoted from the same vendor, rather
-                # than left out for the digest to look tidier.
-                listed_url = change.get("listed_url") or ""
-                listed_quote = change.get("listed_quote") or ""
-                if change.get("still_listed") and listed_url and len(listed_quote) >= 12:
-                    try:
-                        f.claims.append(Claim.build(
-                            kind=ClaimKind.PRICING,
-                            statement=(f"{dep.canonical_name} is still listed by "
-                                       f"{probe.provider or 'the provider'} at "
-                                       f"{change.get('listed_price') or 'quote-only'} "
-                                       f"pricing"),
-                            source_url=listed_url, quote=listed_quote, subject=subject))
-                    except UncitedClaim:
-                        pass
+            _probe_severity(sig, signal, f, dep, radius)
+            _from_declared_changes(dep, probe, f, sig)
         # Only fall back to "dead URL" when nothing more specific fired. A model its
         # provider has retired is S7; reporting it as S1 as well double-counts one event
         # and pads the digest.
@@ -889,6 +965,11 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f.probe_signals.append(probe.status)
             f.summary = probe.detail
 
+
+
+def _from_research(dep: Dependency, probe: Optional[ProbeResult],
+                   research: ResearchResult, out: dict, ensure) -> None:
+    """Phase 2: what a fetched source says, and only where it substantiates."""
     # --- from research: only substantiated claims ---------------------------
     if research:
         for claim in research.claims:
@@ -968,6 +1049,12 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             # the note on. The refutation accounting in the research artifact is where
             # "we looked and found only the competitors' own marketing" is recorded.
 
+
+def _reconcile(dep: Dependency, probe: Optional[ProbeResult], radius: int,
+               out: dict) -> None:
+    """Phase 3: one event, one finding. A model deprecation is S7 and not S4; a
+    vendor-named successor belongs on it; a dead URL supersedes "the docs moved"."""
+
     # Model-kind dependencies with a deprecation finding are S7, not S4.
     if dep.kind == "model" and "S4" in out:
         f = out.pop("S4")
@@ -1006,6 +1093,11 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
     if ("S1" in out) and ("S5" in out) and \
             set(out["S5"].probe_signals) <= {"redirected_off_path", "page_text_changed"}:
         del out["S5"]
+
+
+def _finalise(dep: Dependency, out: dict) -> list[Finding]:
+    """Phase 4: drop what is unsubstantiated, cap what the course's use does not
+    earn, scope to the places the evidence reaches, then word it."""
 
     final = []
     for f in out.values():
