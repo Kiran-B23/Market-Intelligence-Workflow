@@ -1,0 +1,992 @@
+# Taught names with no official domain, so nothing can check them -
+# not even whether they still work. Add the domain to
+# `registry/tools.yaml` and the next run picks it up; leave concepts,
+# techniques and datasets alone - they are not vendors and will never
+# have one.
+#
+# 161 name(s), most-taught first. Written by `extract`.
+needs_domain:
+- name: RSS Feed
+  kind: tool
+  locations: 68
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: QLoRA
+  kind: tool
+  locations: 50
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Julius AI
+  kind: tool
+  locations: 39
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Claude Skills
+  kind: tool
+  locations: 37
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Stable Diffusion 3.5
+  kind: tool
+  locations: 22
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Cifer Fraud Detection Dataset
+  kind: tool
+  locations: 20
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: PaySim
+  kind: tool
+  locations: 20
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Google AI Studio
+  kind: tool
+  locations: 13
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: GST Ready Reckoner
+  kind: tool
+  locations: 12
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: SEBI Financial Education Booklet
+  kind: tool
+  locations: 12
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Gemini CLI
+  kind: tool
+  locations: 11
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Replicate
+  kind: tool
+  locations: 11
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Stable Diffusion v1.5
+  kind: tool
+  locations: 11
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Claude Artifacts
+  kind: tool
+  locations: 10
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: OpenAI Whisper
+  kind: tool
+  locations: 10
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Intro to Gen AI
+- name: Beautiful.ai
+  kind: tool
+  locations: 9
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Google Chrome
+  kind: tool
+  locations: 9
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: InMemorySaver
+  kind: tool
+  locations: 8
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Llama 4
+  kind: tool
+  locations: 8
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Stable Diffusion XL
+  kind: tool
+  locations: 8
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Anthropic Claude Opus 4.8
+  kind: tool
+  locations: 7
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Claude Haiku 4.5
+  kind: tool
+  locations: 7
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Gemini 3
+  kind: tool
+  locations: 7
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Gemini 3.5 Flash
+  kind: tool
+  locations: 7
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Comet Browser
+  kind: tool
+  locations: 6
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Gemini 2.5
+  kind: tool
+  locations: 6
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: Haystack
+  kind: tool
+  locations: 6
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: LlamaIndex
+  kind: tool
+  locations: 6
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Quizlet
+  kind: tool
+  locations: 6
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: CivitAI
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Claude Opus 4.8
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Cohere
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: DreamStudio
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Gemma 4
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: HuggingFace Hub
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: mistral-cloud
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: MyLens AI
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: NeMo Guardrails
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: NightCafe
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Quadratic
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Tensor.Art
+  kind: tool
+  locations: 5
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Alpha Vantage
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Cerebras
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: FAISS
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: GitHub Models
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: GPT Image 2
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Meta Llama
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Miro AI
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Mistral Large 3
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: NVIDIA NIM
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: OpenWeather API
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Polygon.io
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Sendsteps.ai
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: StudyFetch
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Together AI
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Whimsical
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Yahoo Finance
+  kind: tool
+  locations: 4
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: BandLab
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Claude Opus 4.8 Vision
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Claude Sonnet 4.6
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Cloudflare Workers AI
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: ComfyUI
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Deepgram
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: FLUX.2
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Gemini 3 Pro Image
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Gemini 3 Pro Vision
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Gemini 3.1 Pro
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Google Vertex
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: HumanInTheLoopMiddleware
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Imagen 4 Ultra
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: InternVL3
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Lambda Labs
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: LoRA
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: mcp-client
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Midjourney v8.1
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Molmo
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: MusicGen
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Paperspace
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: PIIMiddleware
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Semantic Kernel
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Soundful
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Speechify
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Stable Diffusion 4
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Vast AI
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: webhook
+  kind: tool
+  locations: 3
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Astra DB
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Bloomberg
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Canvas
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+  - Intro to Gen AI
+- name: Chart.js
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Chirp
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Codex CLI
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Copilot CLI
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: deepseek-ai
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: EmbedChain
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: F5-TTS
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: FastSpeech2
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Fooocus
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Gemini-TTS
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Google Gemini 3.1 Pro
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Grok
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Hugging Face Diffusers
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: HuggingFaceEmbeddings
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Interactive Brokers
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Marketaux
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Meta Llama 3
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Milvus
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: ModelScope
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: NewsAPI
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Robinhood
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: RunPod
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Scholar AI
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: SFTTrainer
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+  - Building LLM Applications
+- name: SpeechT5
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Tacotron 2
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Voyage AI
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: WaveNet
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Weaviate
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Webull
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Zerodha
+  kind: tool
+  locations: 2
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: AIVA
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Anki
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Bark
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: BLEU
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Bolt
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: claude-sonnet-4-5
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: DALL-E
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: DeepSeek-V4 Flash
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Email
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Excel
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Fathom
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Fireflies AI
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Flowise AI
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Gemini Nano Banana
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Google Speech-to-Text
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: GPT
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: GPT-5.4 mini
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: GPT-5.5 Vision
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: JSON
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Kokoro-82M
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Local Storage
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: meta-llama/Llama-3.2-1B-Instruct
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Mid Journey
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: NTTS
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: OpenAI GPT-5.5
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Opus 4
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: protectai/deberta-v3-base-prompt-injection-v2
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Qwen
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Qwen-Image
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: R1
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: RAGatouille
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Relevance AI
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Reuters
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - AI for Finance
+- name: Rev
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: Sonnet 4.5
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Suno
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: tl;dv
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: TOON
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: Udio
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
+- name: V3
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Building LLM Applications
+- name: VALL-E 2
+  kind: tool
+  locations: 1
+  watch_tier: mention-only
+  courses:
+  - Intro to Gen AI
