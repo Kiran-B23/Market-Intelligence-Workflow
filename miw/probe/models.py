@@ -60,8 +60,50 @@ def _declared(adapter, entry, provider: str) -> dict:
     }
 
 
+_TERMS_SIGNALS = frozenset({"model_price_changed", "model_rate_limit_changed"})
+
+
+def _terms_drift(dep: Dependency, adapter, entry, res: ProbeResult, state) -> None:
+    """Did what this model COSTS, or how much of it you may use, change since last week?
+
+    Both cells have been parsed since `probe/catalogue.py` was written and nothing ever
+    compared them to the last run — they fed `quoted_only` and the agent path and were
+    otherwise discarded. So a halved free quota was a fact the system fetched, parsed
+    and threw away, every week, on the one signal class a student notices first.
+
+    Quoted verbatim in both directions. `$0.04 per hour` -> `$0.08 per hour` is the
+    evidence; a parsed number would be our arithmetic standing in for the vendor's page.
+    """
+    if state is None:
+        return
+    price = (entry.listed_price or entry.price or "").strip()
+    rate = (entry.rate_limit or "").strip()
+    if not (price or rate):
+        return
+    key = f"catalogue:{adapter.key}"
+    prev = state.terms_prev(key, entry.entry_id)
+    state.terms_save(source_key=key, entry_id=entry.entry_id, price=price,
+                     rate_limit=rate, now=utcnow())
+    if prev is None:
+        return                 # first sight is a baseline, the rule every diff here uses
+    was_price = (prev["price"] or "").strip()
+    was_rate = (prev["rate_limit"] or "").strip()
+    moved = []
+    if price and was_price and price != was_price:
+        res.flag("model_price_changed")
+        moved.append(f"price {was_price!r} -> {price!r}")
+    if rate and was_rate and rate != was_rate:
+        res.flag("model_rate_limit_changed")
+        moved.append(f"rate limit {was_rate!r} -> {rate!r}")
+    if moved:
+        if res.status == "ok":
+            res.status = "changed"
+        res.detail = (f"{res.provider or adapter.key} changed the terms on "
+                      f"{entry.entry_id}: " + "; ".join(moved))
+
+
 def probe_model_dependency(dep: Dependency, *, today: Optional[date] = None,
-                           adapters=None) -> ProbeResult:
+                           adapters=None, state=None) -> ProbeResult:
     """One deterministic observation of a taught model id."""
     today = today or date.today()
     res = ProbeResult(dep_id=dep.dep_id, canonical_name=dep.canonical_name)
@@ -93,6 +135,9 @@ def probe_model_dependency(dep: Dependency, *, today: Optional[date] = None,
         res.checked_at = utcnow()
 
         when = parse_shutdown(entry.shutdown_date)
+        # Terms drift is orthogonal to retirement: a model can be perfectly alive and
+        # twice the price, and the early return below would have skipped the check.
+        _terms_drift(dep, adapter, entry, res, state)
 
         if not entry.retired:
             # Still listed - but a vendor can announce a shutdown date for a model it
@@ -111,7 +156,10 @@ def probe_model_dependency(dep: Dependency, *, today: Optional[date] = None,
                 if entry.replacement_ids:
                     res.flag("vendor_named_replacement")
                 return res
-            res.status = "ok"
+            # `_terms_drift` above may already have set `changed`, and a model that is
+            # still listed but twice the price is not `ok`. The flag is the finding;
+            # this only stops the status contradicting it.
+            res.status = "changed" if _TERMS_SIGNALS & set(res.signals) else "ok"
             res.flag("model_listed_available")
             return res
 

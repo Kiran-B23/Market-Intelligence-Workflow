@@ -256,7 +256,7 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
 
     elif dep.kind == "model":
         from miw.probe.models import probe_model_dependency, verified_replacements
-        got = probe_model_dependency(dep)
+        got = probe_model_dependency(dep, state=state)
         # Carry the discovered provider and its declared change through unchanged; the
         # scoring stage builds the cited claim from `declared_changes`.
         for fld in ("status", "detail", "evidence_url", "provider", "provider_domains",

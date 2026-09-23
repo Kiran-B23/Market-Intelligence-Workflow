@@ -101,6 +101,24 @@ CREATE TABLE IF NOT EXISTS catalogue_snapshot (
     observed_at TEXT,
     first_seen  TEXT
 );
+-- What a vendor's catalogue said this model COSTS and how much of it you may use.
+--
+-- `probe/catalogue.py` has parsed both cells since it was written and nothing ever
+-- compared them to last week: `price` and `rate_limit` fed `quoted_only` and the agent
+-- path and were otherwise inert. So "Groq halved the free quota on Whisper" was a fact
+-- the system fetched, parsed, stored in memory and discarded, every run.
+--
+-- Verbatim, not normalised. The finding has to quote what the page said, and a parsed
+-- number cannot be quoted - `$0.04 per hour` and `400K ASH 400 RPM` are the evidence.
+CREATE TABLE IF NOT EXISTS catalogue_terms (
+    source_key  TEXT,
+    entry_id    TEXT,
+    price       TEXT,
+    rate_limit  TEXT,
+    observed_at TEXT,
+    first_seen  TEXT,
+    PRIMARY KEY (source_key, entry_id)
+);
 CREATE TABLE IF NOT EXISTS watch_signal (
     signal_id    TEXT PRIMARY KEY,
     vendor_key   TEXT,
@@ -225,6 +243,23 @@ class State:
             (dep_id, canonical_name, status, checked_at, text_hash, latest_version,
              http_status, None if repo_archived is None else int(repo_archived),
              consecutive_failures, first_seen, json.dumps(keys)))
+        self.conn.commit()
+
+    def terms_prev(self, source_key: str, entry_id: str) -> Optional[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM catalogue_terms WHERE source_key=? AND entry_id=?",
+            (source_key, entry_id)).fetchone()
+
+    def terms_save(self, *, source_key: str, entry_id: str, price: str,
+                   rate_limit: str, now: str) -> None:
+        prev = self.terms_prev(source_key, entry_id)
+        first = prev["first_seen"] if prev else now
+        self.conn.execute(
+            "INSERT INTO catalogue_terms (source_key, entry_id, price, rate_limit,"
+            " observed_at, first_seen) VALUES (?,?,?,?,?,?)"
+            " ON CONFLICT(source_key, entry_id) DO UPDATE SET price=excluded.price,"
+            " rate_limit=excluded.rate_limit, observed_at=excluded.observed_at",
+            (source_key, entry_id, price, rate_limit, now, first))
         self.conn.commit()
 
     def notice_keys(self, dep_id: str) -> list:

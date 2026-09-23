@@ -289,3 +289,103 @@ def test_a_restructured_page_is_inconclusive_not_ok():
                                  adapters=[adapter_for(served)])
     assert res.status == "ok"
     assert "model_provider_unknown" in res.signals
+
+
+def test_a_change_in_what_a_model_costs_or_allows_is_news():
+    """Both cells were parsed and never compared to last week.
+
+    `probe/catalogue.py` has read `price` and `rate_limit` since it was written; they fed
+    `quoted_only` and the agent path and were otherwise discarded. So "Groq halved the
+    free quota on Whisper" was a fact the system fetched, parsed and threw away every
+    run — on the signal class a student notices first.
+    """
+    from datetime import date
+
+    from miw.probe.catalogue import CatalogueEntry
+    from miw.probe.models import probe_model_dependency
+    from miw.schema import Dependency
+    from miw.state import State
+
+    def cat_with(price, rate):
+        entry = CatalogueEntry(entry_id="whisper-large-v3", status="available",
+                               price=price, rate_limit=rate,
+                               quote="whisper-large-v3 | available")
+
+        class Cat:
+            ok = supported = True
+            error = ""
+
+            def get(self, i):
+                return entry if i == "whisper-large-v3" else None
+
+        class Adapter:
+            key, vendor, official_domains = "groq", "Groq", ("groq.com",)
+
+            def catalogue(self, refresh=False):
+                return Cat()
+        return Adapter()
+
+    dep = Dependency(kind="model", canonical_name="whisper-large-v3")
+    st = State(":memory:")
+    try:
+        # First sight is a baseline and raises nothing — the rule every diff here uses.
+        first = probe_model_dependency(dep, today=date(2026, 9, 23), state=st,
+                                       adapters=[cat_with("$0.04 per hour",
+                                                          "400K ASH 400 RPM")])
+        assert "model_price_changed" not in first.signals
+        assert "model_rate_limit_changed" not in first.signals
+
+        # Unchanged terms stay quiet.
+        same = probe_model_dependency(dep, today=date(2026, 9, 23), state=st,
+                                      adapters=[cat_with("$0.04 per hour",
+                                                         "400K ASH 400 RPM")])
+        assert "model_price_changed" not in same.signals
+
+        # A price rise and a quota cut are both news, and both quote the page.
+        moved = probe_model_dependency(dep, today=date(2026, 9, 23), state=st,
+                                       adapters=[cat_with("$0.08 per hour",
+                                                          "200K ASH 400 RPM")])
+        assert moved.status == "changed"
+        assert "model_price_changed" in moved.signals
+        assert "model_rate_limit_changed" in moved.signals
+        assert "$0.04 per hour" in moved.detail and "$0.08 per hour" in moved.detail
+        assert "400K ASH" in moved.detail and "200K ASH" in moved.detail
+    finally:
+        st.close()
+
+
+def test_terms_drift_is_checked_even_while_the_model_is_perfectly_alive():
+    """The retirement branch returns early, and a model can be alive and twice the
+    price."""
+    from datetime import date
+
+    from miw.probe.catalogue import CatalogueEntry
+    from miw.probe.models import probe_model_dependency
+    from miw.schema import Dependency
+    from miw.state import State
+
+    def adapter(price):
+        entry = CatalogueEntry(entry_id="m", status="available", price=price,
+                               quote="m | available")
+
+        class Cat:
+            ok = supported = True
+            error = ""
+
+            def get(self, i):
+                return entry
+        return type("A", (), {"key": "groq", "vendor": "Groq",
+                              "official_domains": ("groq.com",),
+                              "catalogue": lambda self, refresh=False: Cat()})()
+
+    dep = Dependency(kind="model", canonical_name="m")
+    st = State(":memory:")
+    try:
+        probe_model_dependency(dep, today=date(2026, 9, 23), state=st,
+                               adapters=[adapter("$1")])
+        res = probe_model_dependency(dep, today=date(2026, 9, 23), state=st,
+                                     adapters=[adapter("$2")])
+        assert "model_listed_available" in res.signals   # still alive
+        assert "model_price_changed" in res.signals      # ...and dearer
+    finally:
+        st.close()

@@ -137,6 +137,22 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    # --- F: commercial terms, parsed since day one and never compared --------
+    ("F the terms diff is skipped for a model that is still listed",
+     "miw/probe/models.py",
+     ("        _terms_drift(dep, adapter, entry, res, state)", "        pass"),
+     "pytest:tests/test_models.py"),
+    ("F first sight of a price raises a change instead of a baseline",
+     "miw/probe/models.py",
+     ("    if prev is None:\n        return                 # first sight is a baseline",
+      "    if False:\n        return                 # first sight is a baseline"),
+     "pytest:tests/test_models.py"),
+    ("F a model that is still listed is `ok` however its price moved",
+     "miw/probe/models.py",
+     ('            res.status = "changed" if _TERMS_SIGNALS & set(res.signals) else "ok"',
+      '            res.status = "ok"'),
+     "pytest:tests/test_models.py"),
+
     # --- E: a promise, checked against the holes a gap run found -------------
     ("E an outcome fires for gaps that land in a different course",
      "miw/analyse/outcomes.py",

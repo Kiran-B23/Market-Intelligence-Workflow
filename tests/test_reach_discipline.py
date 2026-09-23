@@ -52,9 +52,15 @@ def test_reaching_everywhere_is_rare_and_every_case_is_named():
     argued for one observation at a time rather than inherited."""
     everywhere = sorted(k for k, v in EVIDENCE_REACH.items() if v is None)
     assert everywhere == ["deprecation_notice_added", "free_tier_language_lost",
+                          "model_price_changed", "model_rate_limit_changed",
                           "pricing_restriction_language",
                           "sunset_language_about_subject",
                           "taught_field_deprecated"], everywhere
+    # The argument for the two newest: what a model COSTS and how much of it a student
+    # may use are facts about the model, not about one page that mentions it. A price
+    # that doubles or a quota that halves changes the instruction wherever the session
+    # tells a student to call it — which is the same reason `free_tier_language_lost`
+    # sits here, and it has sat here since before either of these existed.
     # `taught_field_deprecated` is the one entry here that is not a widening. It abstains,
     # because the question this table asks — which EVIDENCE KINDS does an observation
     # reach — is the wrong question for a field. `evidence_source` says how the

@@ -137,6 +137,11 @@ PROBE_TO_SIGNAL = {
     # rather than duplicating into S3, which is how 8 findings appeared where there
     # were 4 in Phase 2.
     "model_tier_restricted": "S7",
+    # What it costs and how much you may use are the same question to a student on a
+    # free key, and both are S3 - the signal that already means "the commercial terms
+    # the session relies on moved".
+    "model_price_changed": "S3",
+    "model_rate_limit_changed": "S3",
     "taught_field_deprecated": "S13",
 }
 
@@ -241,6 +246,11 @@ EVIDENCE_REACH: dict[str, Optional[tuple]] = {
     # which the extractor measured. `None` keeps `verify`'s over-reach check from
     # second-guessing a scope that is already narrower than any rule it could apply.
     "taught_field_deprecated": None,
+    # Money and quota reach everywhere the model is taught, for the reason
+    # `free_tier_language_lost` does: a price change alters the instruction itself, not
+    # one page that mentions it.
+    "model_price_changed": None,
+    "model_rate_limit_changed": None,
     "free_tier_language_lost": None, "pricing_restriction_language": None,
     # A model id is passed to an API; the workbook row names it too.
     "model_shutdown_passed": ("model_id", "sheet_declared", "sheet_pin"),
@@ -957,6 +967,8 @@ def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
         "model_shutdown_passed": probe.detail,
         "model_deprecation_declared": probe.detail,
         "model_catalogue_unreadable": probe.detail,
+        "model_price_changed": probe.detail,
+        "model_rate_limit_changed": probe.detail,
         "breaking_change_declared": probe.detail,
         "breaking_change_possible": probe.detail,
         "n8n_upstream_unreachable": probe.detail,
