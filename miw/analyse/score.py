@@ -1082,10 +1082,14 @@ def recommend(dep: Dependency, f: Finding) -> str:
         # "Candidate replacement" is a recommendation, and it may only be used when one
         # was actually made. `verified` means the candidate EXISTS and publishes
         # checkable pricing - the anti-hallucination test - and nothing about whether it
-        # does the job the course teaches. `does_taught_job` is that judgement, and in
-        # the weekly pipeline nothing sets it: `research/fit.py` runs only on the agent
-        # path. So the default wording is a lead, not a replacement, and the sentence
-        # says which rung of the ladder the thing actually reached.
+        # does the job the course teaches. `does_taught_job` is that judgement, and it is
+        # set by `research/fit.py` — which runs in the weekly pipeline too, on by default
+        # via `main.py`'s `judge_fit=not args.no_fit`, not only on the agent path as this
+        # comment used to say. It still needs a model provider and it still leaves the
+        # factor `None` when the quotes do not say, so most candidates arrive without
+        # it. The wording below branches on `recommendable` and is correct either way:
+        # a lead is not a replacement, and the sentence says which rung of the ladder
+        # the thing actually reached.
         if a.recommendable:
             alt_txt = (f" Candidate replacement: {a.name}{where_alt} - {free}"
                        f"{'; signup required' if a.signup_required else ''}.")

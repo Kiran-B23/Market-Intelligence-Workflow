@@ -277,7 +277,12 @@ class JobRunner:
 
     def submit(self, *, scope: dict, stages: list[str], refine: bool = False,
                label: str = "", llm: Optional[dict] = None) -> str:
-        stages = [s for s in stages if s in STAGES] or ["probe", "analyse", "report"]
+        # Sorted into PIPELINE order, not the order they arrived in. The filter alone
+        # kept the caller's sequence, so a payload naming `report,probe` would have
+        # written the digest from yesterday's findings and then probed. Every stage
+        # reads what the one before it wrote; the order is the pipeline's to decide.
+        wanted = {s for s in stages if s in STAGES}
+        stages = [s for s in STAGES if s in wanted] or ["probe", "analyse", "report"]
         run_id = uuid.uuid4().hex[:12]
         self._exec(
             "INSERT INTO jobs (run_id, scope, stages, refine, status, created_at, "

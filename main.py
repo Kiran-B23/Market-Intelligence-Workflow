@@ -1202,7 +1202,16 @@ def cmd_decks(args) -> int:
           f"{counts['restricted']} not published to us, {counts['gone']} gone, "
           f"{counts['unreachable']} unreachable")
     out = OUT / f"decks_{_today()}.json"
-    dump(out, {"generated_at": utcnow(), "counts": counts, "decks": rows})
+    # Merged, not replaced. This was the last scoped stage still writing its own slice
+    # over the whole day's artifact - the exact failure `miw/artifacts.py` was written
+    # to eliminate after a 91-dependency probe slice was presented as the week's
+    # 229-dependency state. `gaps` reads this file and degrades quietly without a
+    # course's decks, so a `decks --course X` run used to cost every other course its
+    # outlines until the next unscoped run.
+    from miw.artifacts import merge_by_dep
+    merge_by_dep(out, new_rows=rows, examined={r["url"] for r in rows},
+                 meta={"generated_at": utcnow(), "counts": counts},
+                 rows_key="decks", key="url")
     print(f"  -> {out}")
     return 0
 
@@ -1917,7 +1926,15 @@ def build_parser() -> argparse.ArgumentParser:
     dk.add_argument("--verbose", action="store_true",
                     help="show every deck, not only the ones we could not read")
     gp = sub.add_parser("gaps", help="topics the curriculum does not teach yet (S11)")
-    _add_scope_args(gp)
+    # `--course` only, like `report`, and for the same reason. These two stages work on
+    # TOPICS and vendor catalogues rather than on the dependency inventory, so a tier, a
+    # kind or a dep-id has nothing to filter - `cmd_gaps` reads `scope.courses` and
+    # nothing else. Declaring the rest made them parse and then silently do nothing,
+    # which `miw/api/jobs.py` had to work around with a `COURSE_ONLY` list. A flag that
+    # accepts a value and ignores it is worse than one that refuses it.
+    gp.add_argument("--course", action="append", default=[],
+                    help="course slug or title; repeatable. Default: every course.")
+
     gp.add_argument("--topics", default="registry/topics.yaml",
                     help="curriculum-topic registry to read")
     gp.add_argument("--dry-run", action="store_true",
@@ -1934,7 +1951,10 @@ def build_parser() -> argparse.ArgumentParser:
     ch = sub.add_parser("changes",
                         help="what a vendor we already use has added, and what the "
                              "launch feeds nominate (S12)")
-    _add_scope_args(ch)
+    # `--course` only; see the note on `gaps` above.
+    ch.add_argument("--course", action="append", default=[],
+                    help="course slug or title; repeatable. Default: every course.")
+
     ch.add_argument("--reconcile", action="store_true",
                     help="ignore the stored baseline and ask each catalogue what it "
                          "lists TODAY. Run once: the baseline was seeded from the live "

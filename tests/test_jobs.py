@@ -311,3 +311,74 @@ def test_findings_are_recorded_only_for_the_run_that_examined_them(tmp_path, mon
         r._record_findings(a)
         assert len(r.findings_for(a)) == 1
         assert r.findings_for(b) == [], "a second run inherits nothing"
+
+
+def test_stages_run_in_pipeline_order_however_they_arrive(monkeypatch):
+    """`submit` filtered the stage list and kept the caller's sequence.
+
+    Every stage reads what the one before it wrote, so a payload naming
+    `report,probe` would have written the digest from yesterday's findings and then
+    gone looking for today's. The order is the pipeline's to decide, not the caller's.
+    """
+    import json
+    import tempfile
+    from pathlib import Path
+
+    import miw.api.jobs as J
+
+    with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setattr(J, "DB", Path(tmp) / "j.db")
+        monkeypatch.setattr(J.JobRunner, "_loop", lambda self: None, raising=True)
+        r = J.JobRunner()
+        try:
+            rid = r.submit(scope={"courses": []},
+                           stages=["report", "probe", "gaps", "extract"])
+            got = json.loads(r.get(rid)["stages"])
+        finally:
+            r.conn.close()
+    assert got == ["extract", "probe", "gaps", "report"]
+    assert got == [s for s in J.STAGES if s in set(got)]
+
+
+def test_gaps_and_changes_refuse_the_flags_they_cannot_honour():
+    """They work on topics and vendor catalogues, not on the dependency inventory.
+
+    `cmd_gaps` reads `scope.courses` and nothing else, so `--tiers`, `--kinds`,
+    `--session`, `--dep-id` and `--limit` parsed and then silently did nothing —
+    `miw/api/jobs.py` carries a `COURSE_ONLY` list purely to work around it. A flag that
+    accepts a value and ignores it is worse than one that refuses it: the first lies
+    about the scope of the run.
+    """
+    import pytest
+
+    import main
+
+    p = main.build_parser()
+    for stage in ("gaps", "changes"):
+        assert p.parse_args([stage, "--course", "AI for Finance"]).course == \
+            ["AI for Finance"]
+        for flag, val in (("--tiers", "critical"), ("--kinds", "model"),
+                          ("--session", "4"), ("--dep-id", "abc"), ("--limit", "3")):
+            with pytest.raises(SystemExit):
+                p.parse_args([stage, flag, val])
+
+
+def test_the_ui_can_start_a_run_that_answers_all_three_questions():
+    """A course run never included `gaps` or `changes` unless somebody ticked the boxes.
+
+    The three job buttons each answer one question, which is right for a reviewer who
+    knows what they want. "Does this course have anything wrong with it" is the question
+    a curriculum owner actually arrives with, and nothing answered it — so "identifying
+    new tools that match the curriculum" was not part of any default course run.
+    """
+    import pathlib
+
+    from miw.api.jobs import STAGES
+
+    page = (pathlib.Path(__file__).resolve().parents[1]
+            / "miw" / "api" / "static" / "index.html").read_text()
+    assert 'data-stages="decks,probe,research,analyse,gaps,changes,report"' in page
+    assert '<input type="checkbox" value="decks">' in page, "decks was unreachable"
+    # every stage the button names must be one the runner will actually run
+    named = "decks,probe,research,analyse,gaps,changes,report".split(",")
+    assert not set(named) - set(STAGES)

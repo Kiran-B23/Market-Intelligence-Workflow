@@ -336,9 +336,11 @@ to edit; a wire value is not.
 * **No claim without a source.** A finding that cannot be evidenced is dropped and the
   refusal is recorded, because "we looked and could not cite it" is a result and silence
   is indistinguishable from never having looked.
-* **No temporal staleness signal (S12).** "This page has not changed in 18 months" is as
+* **No temporal staleness signal (S0).** "This page has not changed in 18 months" is as
   often a sign of stability as of abandonment; it was designed and deliberately not built
-  (§15).
+  (§15). It was allocated S12 originally and that number was later reused for a signal
+  that WAS built — "a newer option from a vendor we already use" (§B.4) — so the unbuilt
+  one is renumbered here rather than left contradicting the scorer.
 * **No bare version bumps as news.** 91 taught packages release constantly. What makes a
   release curriculum-relevant is that it moved past what the course *pins*. State is
   recorded either way; only news is reported.
@@ -705,11 +707,13 @@ is what makes a name checkable at all.
 
 ## G. What is not covered yet, stated plainly
 
-* **A newly released model or tool does not become a Change.** A new model is not a
-  topic, so `gaps` will not see it; it is not a replacement for something broken, so S10
-  will not either. The mechanism exists — `probe/catalogue.py` already reads vendor model
-  tables as enumerations, which is the same shape `probe/frontier.py` reads documentation
-  headings in — so this is the `gaps` stage pointed at a model catalogue. Not built.
+* ~~**A newly released model or tool does not become a Change.**~~ **Built** — that is
+  S12 (§B.4), `miw/analyse/newer.py`, pointed at the vendor catalogues exactly as this
+  entry predicted. One limit remains and it is not the one recorded here: the baseline
+  is seeded from the live world on first sight, so anything a vendor released BEFORE the
+  first run is marked already-known for ever. `changes --reconcile` exists to recover it,
+  and asking the catalogue directly is the only thing that can — a set difference cannot
+  recover a baseline it never had.
 * **S10 is the rarest signal, and its two paths are easy to confuse.** When a dependency
   is already broken (`discovery_reason: breakage`) its verified replacements attach to the
   existing S1 or S4 — "this is dead, here is a replacement" is one finding, not two — so
@@ -728,14 +732,29 @@ is what makes a name checkable at all.
   probes and reports; only the gap half needs the deck outlines.
 * **`inventory._links` attributes by domain only**, which overstates the n8n S4's blast
   radius. Known, reported, not fixed.
-* **Placeholder URLs are extracted as real links.** `https://abc123.ngrok.io` is an
-  example subdomain in a tutorial; it produces a live CRITICAL finding. One false
-  CRITICAL in three is the single highest-value precision fix outstanding — a digest
-  that cries wolf once is read with suspicion afterwards. The fix is a structural one in
-  `extract/links.py` (an example-host pattern is not a dependency reference), not a
-  blocklist.
+* ~~**Placeholder URLs are extracted as real links.**~~ **Half fixed.** They are still
+  extracted, but `probe/successor.is_placeholder` recognises them and the finding is
+  capped at `low` with a summary that says what it is — "an example address students
+  generate for themselves, published as a live link" — instead of a CRITICAL claiming a
+  404. The structural fix in `extract/links.py` is still the right one; the digest no
+  longer cries wolf while it waits.
 * **The 68 `Session PPT` decks are never checked** — 0 dependencies carry a
-  `docs.google.com` URL, so a dead deck link is invisible.
+  `docs.google.com` URL, so a dead deck link is invisible. `main.py decks` reads them and
+  records reachability, and it is now reachable from the UI; what is still missing is a
+  SIGNAL, so a deck that 404s is visible in `decks_<date>.json` and in nothing a reviewer
+  reads.
+
+* **161 taught names have no official domain**, so nothing can check them — not even
+  whether they still work. `RSS Feed` at 68 locations, `Julius AI` at 39. `extract`
+  writes `registry/needs_domain.yaml` ranked by how much the curriculum leans on each,
+  and the digest reports the count; filling them in is human work and several of them
+  (`QLoRA`, `PaySim`) are techniques and datasets that will never have a domain.
+
+* **A dependency used without being NAMED is invisible.** Every evidence kind the
+  inventory emits is a name or a link, so code that writes a vendor's field without
+  mentioning the vendor creates no location. S13 closes this for request payloads —
+  measured on Murf, it was the difference between 3 records and 10 — and the class is
+  larger than payloads.
 * **Two items from the approved UI plan are unbuilt**: the run-progress stage stepper
   (`stage_now` is returned and unused) and the queue-depth guard (`queue.Queue()` is
   unbounded and `queued_behind` only ever reports 0 or 1).
@@ -851,11 +870,18 @@ JSON + xlsx in `/home/nxtwave/Market Intelligence Workflow/`.
 | S9 | n8n node / version update | node renamed or version bumped (we teach `n8n@2.17.8`) | n8n releases + node docs |
 | S10 | Better alternative appeared | deepwiki vs codetotutorial | research, rotating watch |
 | S11 | Curriculum topic gap | industry-expected topic absent or outdated | research vs course outline |
+| S12 | Newer option from a vendor we use | a vendor's catalogue lists a later model than the one taught | vendor catalogue diff (§B.4) |
+| S13 | Taught API field deprecated | `multiNativeLocale` superseded by `locale` while the course still sends it | the vendor's own API reference |
 
-S1–S9 are **regression** signals (what we teach is now wrong). S10–S11 are
+S1–S9 and S13 are **regression** signals (what we teach is now wrong). S10–S12 are
 **opportunity** signals (still right, no longer best). They are scored and
 reported in separate sections — mixing them buries the urgent under the
 interesting.
+
+S13 is the only one that looks INSIDE the request. Every other regression signal asks
+whether the dependency is still there; a vendor can retire a field without retiring
+anything else, and `murf.ai` answering 200 with its pricing and docs intact is exactly
+what that looks like from outside.
 
 ---
 
@@ -1439,7 +1465,11 @@ the ~40 fetches are paid once rather than every run.
 Three golden cases pin this: a removed node fires S9 at critical, a declared change is
 cited from the vendor's own docs, and an unreachable GitHub fires nothing.
 
-## 15. Temporal staleness (S12) — deliberately not built
+## 15. Temporal staleness (S0) — deliberately not built
+
+> Numbered S12 when this was written. That number now belongs to "a newer option from a
+> vendor we already use" (§B.4), which is built and live; this one never was. The
+> measurement below is unchanged and still the reason.
 
 Dated references that are no longer valid — a 2024 tax reckoner, an FY 2023-24
 worksheet — are a real missing signal class. It is **not implemented**, and the reason

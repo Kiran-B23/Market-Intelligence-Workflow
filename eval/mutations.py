@@ -137,6 +137,18 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    # --- C11: a course run that answers all three questions -----------------
+    ("C11 the run stages keep the caller's order instead of the pipeline's",
+     "miw/api/jobs.py",
+     ("        stages = [s for s in STAGES if s in wanted] or [\"probe\", \"analyse\", \"report\"]",
+      "        stages = [s for s in stages if s in wanted] or [\"probe\", \"analyse\", \"report\"]"),
+     "pytest:tests/test_jobs.py"),
+    ("C11 gaps accepts a tier flag again and silently ignores it",
+     "main.py",
+     ('    gp.add_argument("--course", action="append", default=[],',
+      '    _add_scope_args(gp)\n    gp.add_argument("--course2", action="append", default=[],'),
+     "pytest:tests/test_jobs.py"),
+
     ("B the digest stops saying which taught names cannot be checked at all",
      "miw/reporters/markdown.py",
      ('        blind = coverage.get("no_authority") or 0', "        blind = 0"),

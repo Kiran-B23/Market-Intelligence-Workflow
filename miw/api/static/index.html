@@ -1328,6 +1328,17 @@
               <b>Find what's new</b>
               <span>What a vendor we already use has added, and newly launched tools</span>
             </button>
+            <!-- The three above answer one question each, which is right for a reviewer
+                 who knows what they are looking for. Nobody had a way to ask all three
+                 at once, so a course run never included `gaps` or `changes` unless
+                 somebody ticked the boxes by hand - and "does this course have anything
+                 wrong with it" is the question a curriculum owner actually arrives
+                 with. `decks` leads, because `gaps` reads what it writes. -->
+            <button type="button" class="job"
+                    data-stages="decks,probe,research,analyse,gaps,changes,report">
+              <b>Check everything</b>
+              <span>All three, in one pass: what's broken, what's missing, what's new</span>
+            </button>
           </div>
           <span class="flabel" style="margin-top:16px">Steps to run</span>
           <div class="checks" id="stages">
@@ -1335,6 +1346,8 @@
               <span class="cnt">ingest</span></label>
             <label><input type="checkbox" value="extract"> Rebuild the list of tools used
               <span class="cnt">extract · always all courses</span></label>
+            <label><input type="checkbox" value="decks"> Read the session slide decks
+              <span class="cnt">decks · what the material is written from</span></label>
             <label><input type="checkbox" value="probe" checked> Check every link and version
               <span class="cnt">probe · no AI, no cost</span></label>
             <label><input type="checkbox" value="research" checked> Read the official pages
