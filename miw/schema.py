@@ -420,8 +420,7 @@ class Alternative:
         were exactly that shape. It does not disqualify the candidate - it may well be
         a real alternative - but its own advertisement cannot be the evidence.
         """
-        from miw.extract.links import registrable
-        from miw.net import domain
+        from miw.net import domain, registrable
         src = registrable(domain(self.nominated_by or ""))
         home = registrable(domain(self.homepage or ""))
         return bool(src and home and src == home)

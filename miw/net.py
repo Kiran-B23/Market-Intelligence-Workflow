@@ -75,6 +75,39 @@ def robots_allows(url: str) -> bool:
         return True
 
 
+# Who OWNS a host, as opposed to what the host is. It sits here beside
+# `domain()` because it is the same kind of fact - a pure question about a
+# name, no fetching and no curriculum - and because `miw.schema` needs it:
+# `Alternative.self_promoted` asks whether the page that nominated a candidate
+# belongs to the candidate. It used to live in `extract/links.py`, which made
+# the lowest layer in the system import the third one for a string operation.
+_MULTI_SUFFIX = (
+    "co.in", "co.uk", "com.au", "co.jp", "co.nz", "com.br", "co.za", "org.uk",
+    "ac.in", "gov.in", "github.io", "gitlab.io", "readthedocs.io", "web.app",
+    "firebaseapp.com", "vercel.app", "netlify.app", "streamlit.app", "hf.space",
+    "pages.dev", "workers.dev", "herokuapp.com", "run.app", "azurewebsites.net",
+)
+
+
+def registrable(host: str) -> str:
+    """Registrable domain of a host: the unit that identifies who owns it.
+
+    `console.groq.com -> groq.com`, `foo.github.io -> foo.github.io` (each GitHub
+    Pages site is its own owner, which is why the multi-label suffix list matters).
+    """
+    host = (host or "").lower().strip(".")
+    if not host or host.replace(".", "").isdigit():
+        return host
+    for suf in _MULTI_SUFFIX:
+        if host == suf:
+            return host
+        if host.endswith("." + suf):
+            labels = host[: -(len(suf) + 1)].split(".")
+            return f"{labels[-1]}.{suf}" if labels else host
+    parts = host.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host
+
+
 def domain(url: str) -> str:
     """Registrable host of a URL, lower-cased, without a leading www."""
     net = (urlparse(url or "").netloc or "").lower()

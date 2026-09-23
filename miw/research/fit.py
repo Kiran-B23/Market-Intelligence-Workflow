@@ -79,13 +79,13 @@ def assess(dep: Dependency, alt: Alternative,
     the model is shown text we fetched ourselves and nothing else.
     """
     from miw.llm import complete, load_prompt
-    from miw.analyse.notes import _neutralise
+    from miw.llm import neutralise
     from miw.research.nominate import _taught_job
 
     quotes = [c for c in alt.claims if c.substantiating]
     if not quotes:
         return None
-    evidence = "\n".join(f"- {_neutralise(c.quote[:280])}" for c in quotes[:4])
+    evidence = "\n".join(f"- {neutralise(c.quote[:280])}" for c in quotes[:4])
     prompt = load_prompt(
         "taught_job_fit_v1",
         dependency=dep.canonical_name, candidate=alt.name,

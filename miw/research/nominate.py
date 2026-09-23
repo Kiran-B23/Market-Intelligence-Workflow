@@ -32,7 +32,7 @@ from typing import Callable, Iterable, Optional
 from miw import net
 from miw.extract.links import registrable, service_name
 from miw.net import domain
-from miw.analyse.notes import _neutralise
+from miw.llm import neutralise
 from miw.research import official
 from miw.schema import Alternative, AlternativeNomination, Dependency, utcnow
 from miw.trust import ClaimKind, Subject, Tier, classify
@@ -316,8 +316,8 @@ def model_nominations(dep: Dependency, probe_signals: Iterable[str] = (),
         title = getattr(h, "title", "") or ""
         snippet = (getattr(h, "snippet", "") or "")[:220]
         url = getattr(h, "url", "") or ""
-        lines.append(f"- {_neutralise(title)[:110]}\n  {domain(url)}\n  "
-                     f"{_neutralise(snippet)}")
+        lines.append(f"- {neutralise(title)[:110]}\n  {domain(url)}\n  "
+                     f"{neutralise(snippet)}")
     prompt = load_prompt(
         "nominate_alternatives_v1",
         dependency=dep.canonical_name, kind=dep.kind,

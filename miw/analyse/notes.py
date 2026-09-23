@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from miw.llm import complete, load_prompt
+from miw.llm import complete, load_prompt, neutralise
 from miw.schema import Dependency, Finding
 
 WHY = {
@@ -191,12 +191,9 @@ def compose(dep: Dependency, f: Finding) -> None:
 # Sequences a hostile page could use to escape the untrusted block or impersonate the
 # prompt's own structure. Neutralised rather than removed, so the quote a reviewer sees
 # in the digest still matches what the page said.
-_ESCAPE = re.compile(r"</?untrusted>|^\s*(#{1,6}|##\s*[A-Z])", re.I | re.M)
-
-
-def _neutralise(text: str) -> str:
-    return _ESCAPE.sub(lambda m: m.group(0).replace("<", "\u2039").replace(">", "\u203a")
-                       .replace("#", "\u266f"), text or "")
+# Kept as a name here because three modules and several tests import it from this
+# path; the implementation moved to `miw.llm`, beside the prompt loader it protects.
+_neutralise = neutralise
 
 
 def _fmt_evidence(f: Finding) -> str:

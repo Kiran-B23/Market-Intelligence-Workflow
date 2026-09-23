@@ -509,6 +509,27 @@ def complete(prompt: str, *, model: str = "", use_cache: bool = True) -> LLMResu
 PROMPT_DIR = Path("prompts")
 
 
+# Fetched text on its way into a prompt. Every string in a prompt that we did not
+# write ourselves - a quote lifted from a vendor's page, a search snippet, a page title
+# - is attacker-controllable in the ordinary sense: anyone who can edit a page we read
+# can put instructions in it. This blunts the two shapes that survive a template, an
+# `</untrusted>` tag that tries to close the fence around it and a leading markdown
+# heading that tries to open a new section, by swapping the characters for lookalikes
+# that read identically and parse as nothing.
+#
+# Public, and here rather than in `analyse/notes.py`, for one reason: it was `_neutralise`
+# there, a private name in a layer above two of its three callers. A defence that every
+# new prompt site has to remember to call is already fragile; one that also looks like
+# somebody else's private helper is a defence with a countdown on it.
+_ESCAPE = re.compile(r"</?untrusted>|^\s*(#{1,6}|##\s*[A-Z])", re.I | re.M)
+
+
+def neutralise(text: str) -> str:
+    """Make fetched text safe to place inside a prompt. Never changes what it says."""
+    return _ESCAPE.sub(lambda m: m.group(0).replace("<", "\u2039").replace(">", "\u203a")
+                       .replace("#", "\u266f"), text or "")
+
+
 def load_prompt(name: str, **fields) -> str:
     """Load `prompts/<name>.txt` and fill `{placeholders}` via str.format().
 

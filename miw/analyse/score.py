@@ -308,6 +308,16 @@ SIGNAL_EVIDENCE: dict[str, Optional[tuple[str, ...]]] = {
     "S10": None,
     "S11": None,
     "S12": None,
+    # S13 and S16 do not filter `dep.locations` at all: `scope_locations` BUILDS their
+    # location set from `PARAM_SITES` / `API_SITES`, because a record can write
+    # `multiNativeLocale` or post to `api.murf.ai/v1` without ever naming the vendor.
+    # They are declared here anyway, and narrowly, so that the fallback below can never
+    # be the thing that decides - an entry omitted from this table resolves to `None`,
+    # and `None` is the widest reading there is.
+    "S13": (),
+    "S14": None,     # a promise: one location, the line that declares it (outcomes.py)
+    "S15": _LINK + ("solution_import", "install_command", "test_case_enum"),
+    "S16": (),
 }
 MAX_LOCATIONS = 12
 

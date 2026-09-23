@@ -17,7 +17,7 @@ import re
 from urllib.parse import urlparse, urlunparse
 
 from config.constants import INFRA_HOSTS, INTERNAL_HOSTS
-from miw.net import domain
+from miw.net import domain, registrable
 
 A_HREF = re.compile(r"""<a\s[^>]*?href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))""", re.I)
 IFRAME = re.compile(r"""<iframe\s[^>]*?src\s*=\s*(?:"([^"]+)"|'([^']+)')""", re.I)
@@ -30,33 +30,6 @@ _TRAIL = ".,;:!?)]}'\"*_"
 # Multi-label public suffixes that appear in these courses. Not exhaustive by design:
 # a wrong guess here only ever widens or narrows an authority set by one label, and
 # every registry entry is reviewable.
-_MULTI_SUFFIX = (
-    "co.in", "co.uk", "com.au", "co.jp", "co.nz", "com.br", "co.za", "org.uk",
-    "ac.in", "gov.in", "github.io", "gitlab.io", "readthedocs.io", "web.app",
-    "firebaseapp.com", "vercel.app", "netlify.app", "streamlit.app", "hf.space",
-    "pages.dev", "workers.dev", "herokuapp.com", "run.app", "azurewebsites.net",
-)
-
-
-def registrable(host: str) -> str:
-    """Registrable domain of a host: the unit that identifies who owns it.
-
-    `console.groq.com -> groq.com`, `foo.github.io -> foo.github.io` (each GitHub
-    Pages site is its own owner, which is why the multi-label suffix list matters).
-    """
-    host = (host or "").lower().strip(".")
-    if not host or host.replace(".", "").isdigit():
-        return host
-    for suf in _MULTI_SUFFIX:
-        if host == suf:
-            return host
-        if host.endswith("." + suf):
-            labels = host[: -(len(suf) + 1)].split(".")
-            return f"{labels[-1]}.{suf}" if labels else host
-    parts = host.split(".")
-    return ".".join(parts[-2:]) if len(parts) >= 2 else host
-
-
 def normalise_url(url: str) -> str:
     """Drop fragments and trailing punctuation swept up by the bare-URL regex."""
     url = (url or "").strip().rstrip(_TRAIL)

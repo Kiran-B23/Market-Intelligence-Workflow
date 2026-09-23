@@ -109,3 +109,28 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "network: this test reaches the network and is exempt from the "
                    "offline rule in `_no_network`")
+
+
+@pytest.fixture(autouse=True)
+def _no_shared_site_index():
+    """`score.PARAM_SITES` and `score.API_SITES` are module-level dicts that `main.py`
+    fills before `analyse` runs, because the same content record is the same record for
+    every dependency and indexing it per dependency would be quadratic.
+
+    That makes them shared mutable state in the module every finding passes through. A
+    test that sets one and does not reset it changes what a later test measures, and the
+    later test is the one that looks broken. Demonstrated: setting `PARAM_SITES` in one
+    test and reading it in the next returns the first test's value.
+
+    Cleared around every test, so isolation stops depending on each author remembering
+    a `finally`.
+    """
+    from miw.analyse import score
+    before = dict(score.PARAM_SITES), dict(score.API_SITES)
+    score.PARAM_SITES.clear()
+    score.API_SITES.clear()
+    yield
+    score.PARAM_SITES.clear()
+    score.PARAM_SITES.update(before[0])
+    score.API_SITES.clear()
+    score.API_SITES.update(before[1])

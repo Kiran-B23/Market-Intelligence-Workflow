@@ -40,6 +40,26 @@ def test_every_observation_declares_what_it_reaches():
     assert not undeclared, f"probe signals with no declared reach: {undeclared}"
 
 
+def test_every_finding_signal_declares_a_reach_too():
+    """The half of the rule the first guard missed.
+
+    `evidence_reach` falls back to `SIGNAL_EVIDENCE.get(signal, None)` for a finding the
+    probe did not produce - S11 from `gaps.py`, S12 from `newer.py`, S14 from
+    `outcomes.py`. `.get(..., None)` means an OMITTED signal resolves to `None`, and
+    `None` is the widest reading there is: everywhere the dependency is taught.
+
+    Four signals had already walked through that hole. S13, S15 and S16 were reached
+    only via their probe observations, and S14 was safe purely because its synthetic
+    `dep_id` starts with `outcome:` and so never matches an inventory dependency for
+    `project_finding` to re-scope. Safety by accident of a prefix is not safety.
+    """
+    from miw.analyse.score import SIGNALS
+    undeclared = sorted(set(SIGNALS) - set(SIGNAL_EVIDENCE))
+    assert not undeclared, (
+        f"{undeclared} have no SIGNAL_EVIDENCE entry, so they silently reach "
+        f"everywhere the dependency is taught")
+
+
 def test_nothing_is_declared_that_is_never_produced():
     """A reach for an observation nothing emits is a rule nobody can check."""
     orphan = sorted(set(EVIDENCE_REACH) - set(PROBE_TO_SIGNAL))
