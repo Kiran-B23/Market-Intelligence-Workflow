@@ -212,7 +212,7 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
      "pytest:tests/test_ui_contract.py"),
     ("UI a probe outcome that becomes a finding has no plain word",
      "miw/api/static/index.html",
-     ("            taught_field_deprecated: 'a field we send is deprecated'},",
+     ("            model_rate_limit_changed: 'the usage limit changed'},",
       "            },"),
      "pytest:tests/test_ui_contract.py"),
 
