@@ -174,8 +174,15 @@ def _match_taught_fields(dep: Dependency, obs: list, res: ProbeResult) -> None:
                 continue
             res.flag("taught_field_deprecated")
             res.deprecated_fields.append(
+                # `shape` travels with the row because the sentence a reviewer reads
+                # depends on it: a field is edited inside a request payload, a method
+                # at every call site. Dropping it here silently made every method read
+                # as "a field we send", which is a wrong instruction rather than a
+                # vague one - and it was dropped, because this dict is rebuilt rather
+                # than copied.
                 {"field": hit, "successor": f.get("successor", ""),
-                 "quote": f.get("quote", ""), "evidence_url": o.url})
+                 "quote": f.get("quote", ""), "evidence_url": o.url,
+                 "shape": f.get("shape", "field")})
             if o.url not in res.affected_urls:
                 res.affected_urls.append(o.url)
 

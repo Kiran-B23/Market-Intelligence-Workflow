@@ -54,6 +54,58 @@ GENERIC_KEYS = frozenset({
     "settings", "properties", "required", "description", "title", "format", "schema",
     "object", "array", "string", "number", "integer", "boolean", "default", "example",
     "position", "parameters", "nodes", "connections", "main", "index", "json",
+    # This curriculum's own quiz and grading schema, which is authored by us and
+    # appears in more records than any vendor's payload. It is the single largest
+    # source of candidates on the live inventory - `test_case_enum` is offered to 62 of
+    # 195 dependencies - and it can never be a finding, because no vendor documents it.
+    "test_case_enum", "test_case_id", "test_case_details", "testcases",
+    "total_test_cases_count", "passed_test_cases_count", "must_contain", "fail_if",
+    "flexibility_note", "display_text", "evaluation_result", "similarity_percentage",
+    "total_score", "conversation_tip", "weight", "condition",
+})
+
+# A METHOD the curriculum calls, and the same refusal one step along: a method is only
+# a method when it is called ON something. `client.generate_content(` is an SDK surface;
+# a bare `process(` is a helper the course defined three cells earlier, and `print(` is
+# the language. Requiring the dot is what makes the difference, exactly as requiring the
+# colon is what makes `"multiNativeLocale":` a payload key rather than a word.
+#
+# This is deliberately NOT a second detector. A field is retired by a vendor the same way
+# a method is, the curriculum writes both, and the probe settles ownership for both by
+# reading the vendor's own reference page. The one thing that differs is how the page
+# declares the member - a type for a field, a signature for a method - and that lives in
+# `http_probe._SIGNATURE`, next to the rule it parallels.
+_METHOD_CALL = re.compile(r"\.([A-Za-z_][A-Za-z0-9_]{2,40})\s*\(")
+
+# Methods that say nothing about any vendor's API: the language, the standard library,
+# and the handful of names every HTTP and data snippet contains. None of them could
+# produce a finding even if kept - no vendor's reference page declares `.append` - but
+# `.append` outnumbers `.generate_content` in any notebook, and a candidate list is
+# read by people as well as by the probe.
+GENERIC_METHODS = frozenset({
+    "append", "extend", "insert", "remove", "pop", "sort", "reverse", "copy", "clear",
+    "get", "set", "keys", "values", "items", "update", "setdefault", "join", "split",
+    "strip", "lstrip", "rstrip", "replace", "format", "startswith", "endswith", "lower",
+    "upper", "title", "encode", "decode", "find", "index", "count", "read", "write",
+    "close", "open", "seek", "flush", "dumps", "loads", "dump", "load", "json", "text",
+    "print", "range", "len", "str", "int", "float", "list", "dict", "map", "filter",
+    "zip", "enumerate", "sum", "min", "max", "abs", "round", "sorted", "reversed",
+    "isinstance", "getattr", "setattr", "hasattr", "input", "type", "super", "add",
+    "push", "slice", "splice", "concat", "includes", "then", "catch", "finally",
+    "forEach", "reduce", "querySelector", "addEventListener", "log", "error", "warn",
+    "info", "debug", "exception", "raise", "assert", "run", "main", "init", "setup",
+    "show", "plot", "head", "tail", "describe", "apply", "astype", "iterrows",
+    "to_csv", "read_csv", "to_dict", "fillna", "dropna", "groupby", "merge", "sleep",
+    "now", "today", "strftime", "strptime", "randint", "choice", "shuffle", "sample",
+    "match", "search", "findall", "sub", "compile", "group", "groups", "exists",
+    "makedirs", "listdir", "walk", "getenv", "environ", "system", "exit", "argv",
+    "status_code", "raise_for_status", "iter_lines", "iter_content", "decode_content",
+    # stdlib that survived the dot rule because it IS called on a module:
+    # `os.unlink(`, `tempfile.NamedTemporaryFile(`. Harmless - neither module has an
+    # authority set, so neither could ever produce a finding - but a candidate list a
+    # human may read should not carry them.
+    "namedtemporaryfile", "temporarydirectory", "unlink", "mkdir", "rmdir", "rename",
+    "basename", "dirname", "abspath", "isfile", "isdir", "splitext", "expanduser",
 })
 
 # One sighting is enough to watch, because watching is free: the key is only ever
@@ -62,13 +114,46 @@ GENERIC_KEYS = frozenset({
 # Murf case would be lost at a threshold of two — of its ten records, only one names
 # Murf alone, and the count that survives ambiguity is one.
 MIN_OCCURRENCES = 1
-MAX_KEYS_PER_DEP = 40
+
+# Deliberately NOT capped, for the reason `attach` gives below about site counts: a
+# display cap belongs in the reporter, and a silent truncation here loses candidates
+# rather than hiding them.
+#
+# It was capped at 40, and the cap was quietly dangerous. Candidates are ordered by how
+# many records write them, and the most-written keys in this curriculum are not any
+# vendor's API - they are the quiz grading schema and the n8n workflow file format,
+# which co-occur with almost every dependency. Measured on the live inventory, 93 of 195
+# dependencies sat exactly at the cap and `multiNativeLocale` - the field the whole
+# check was built for - survived at position 30 of 40. One more grading key and the
+# motivating case would have been silently evicted, with every test still passing.
+#
+# Uncapped costs 9,779 short strings against 5,369, and buys back the eviction risk
+# entirely. Nothing downstream re-reads them per request: the probe intersects this set
+# with the fields the vendor's own reference page declares, so a longer list is a longer
+# set, not another fetch.
 
 
 def payload_keys(text: str) -> set[str]:
     """Field names set inside an object literal in this text."""
     return {k for k in _PAYLOAD_KEY.findall(text or "")
             if k.lower() not in GENERIC_KEYS}
+
+
+def method_calls(text: str) -> set[str]:
+    """Method names this text calls ON an object — candidate SDK surface."""
+    return {m for m in _METHOD_CALL.findall(text or "")
+            if m.lower() not in GENERIC_KEYS and m not in GENERIC_METHODS
+            and m.lower() not in GENERIC_METHODS}
+
+
+def taught_symbols(text: str) -> set[str]:
+    """Every API member this text writes: payload keys and called methods alike.
+
+    One set rather than two, because the question downstream is one question — does the
+    vendor's own reference page say it has retired something the course writes — and the
+    answer is settled the same way for both.
+    """
+    return payload_keys(text) | method_calls(text)
 
 
 def taught_params(records: Iterable[ContentRecord],
@@ -96,15 +181,14 @@ def taught_params(records: Iterable[ContentRecord],
         here = speakable.get(r.content_id or "")
         if not here:
             continue
-        keys = payload_keys(r.body_text)
+        keys = taught_symbols(r.body_text)
         if not keys:
             continue
         for d in here:
             bucket = counts.setdefault(d.dep_id, {})
             for k in keys:
                 bucket[k] = bucket.get(k, 0) + 1
-    return {dep_id: dict(sorted(b.items(), key=lambda kv: (-kv[1], kv[0]))
-                         [:MAX_KEYS_PER_DEP])
+    return {dep_id: dict(sorted(b.items(), key=lambda kv: (-kv[1], kv[0])))
             for dep_id, b in counts.items()}
 
 
@@ -152,7 +236,7 @@ def attach(records: Iterable[ContentRecord],
     for r in records:
         if not r.content_id:
             continue
-        for k in payload_keys(r.body_text):
+        for k in taught_symbols(r.body_text):
             rows = by_field.setdefault(k, [])
             if not any(x["content_id"] == r.content_id for x in rows):
                 rows.append(_site(r))
@@ -177,4 +261,4 @@ def where_written(records: Iterable[ContentRecord], dep: Dependency,
     """The records that write `field`, for a finding that has to name places."""
     at = {loc.content_id for loc in dep.locations if loc.content_id}
     return [r for r in records
-            if r.content_id in at and field in payload_keys(r.body_text)]
+            if r.content_id in at and field in taught_symbols(r.body_text)]

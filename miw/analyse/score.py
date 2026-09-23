@@ -982,17 +982,30 @@ def _auth_summary(dep: Dependency, probe: ProbeResult) -> str:
         f"{dep.canonical_name} changed how you authenticate.")
 
 
+def _member_noun(row: dict) -> tuple[str, str]:
+    """`(noun, verb)` for one retired member — a field is sent, a method is called.
+
+    The detector settles which by how the vendor's page DECLARES it: a type makes it a
+    field, a signature makes it a method. Carrying that through to the sentence matters
+    because the two send a reviewer to different places — a field is edited inside a
+    request payload, a method is edited at every call site — and "a field we send" over
+    a renamed SDK call is a wrong instruction, not a vague one.
+    """
+    return ("method", "calls") if row.get("shape") == "method" else ("field", "writes")
+
+
 def _field_summary(dep: Dependency, probe: ProbeResult) -> str:
     """What the vendor said, in the vendor's own terms."""
     rows = probe.deprecated_fields or []
     if not rows:
         return f"{dep.canonical_name} marks a field the course uses as deprecated."
     first = rows[0]
-    more = f" (and {len(rows) - 1} more field(s))" if len(rows) > 1 else ""
+    noun, verb = _member_noun(first)
+    more = f" (and {len(rows) - 1} more)" if len(rows) > 1 else ""
     to = (f"; {dep.canonical_name} names `{first['successor']}` as its replacement"
           if first.get("successor") else "")
-    return (f"{dep.canonical_name}'s own API reference marks `{first['field']}` "
-            f"deprecated{to}. The course writes it{more}.")
+    return (f"{dep.canonical_name}'s own API reference marks the {noun} "
+            f"`{first['field']}` deprecated{to}. The course {verb} it{more}.")
 
 
 def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
@@ -1211,12 +1224,15 @@ def recommend(dep: Dependency, f: Finding) -> str:
         first = fields[0]
         rename = (f"rename it to `{first['successor']}`" if first.get("successor")
                   else "check the reference for its replacement")
-        extra = (f" {len(fields) - 1} other taught field(s) are deprecated too: "
+        extra = (f" {len(fields) - 1} other taught member(s) are deprecated too: "
                  + ", ".join(f"`{x['field']}`" for x in fields[1:4]) + "."
                  if len(fields) > 1 else "")
+        noun, _ = _member_noun(first)
+        where = ("at every call site in the session" if noun == "method"
+                 else "in the session's request payloads")
         s13 = (f"{dep.canonical_name} still serves `{first['field']}` but its own API "
-               f"reference marks it deprecated - {rename} in the session's request "
-               f"payloads before the field is removed.{extra}")
+               f"reference marks it deprecated - {rename} {where} before the {noun} "
+               f"is removed.{extra}")
     else:
         s13 = (f"A field the course sends to {dep.canonical_name} is marked deprecated "
                f"on its own API reference; check the payloads in the session.")

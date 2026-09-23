@@ -102,11 +102,48 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
     # --- S13: a field inside a live API, and the two defects the held-out
     # fixtures caught. Both mutations restore an overfit that passed on the pages
     # the detector was written from and failed on pages it was not.
-    ("S13 a field need not declare a type, so a section heading becomes a field",
+    ("S13 a member need not declare anything, so a section heading becomes a field",
      "miw/probe/http_probe.py",
-     ('        if not _TYPE_TOKEN.search(between + " " + after[:60]):\n            continue\n',
+     ('        if not signature and not _TYPE_TOKEN.search(between + " " + after[:60]):'
+      '\n            continue\n',
       ""),
      "fields"),
+    # --- the same check one step along: a METHOD the curriculum calls -------
+    # A field declares a type, a method declares a signature. One detector, two
+    # accepted shapes of declaration - not a second detector built from a phrase
+    # list, which `official.py` already is and which produced three claims over the
+    # whole inventory, none substantiating, two of them Wikipedia prose.
+    ("S13 a signature may be preceded by a space, so prose becomes a renamed method",
+     "miw/probe/http_probe.py",
+     (r'_SIGNATURE = re.compile(r"^\([^(]*\)")',
+      r'_SIGNATURE = re.compile(r"^\s*\(")'),
+     "pytest:tests/test_taught_symbols.py"),
+    ("S13 a method need not be called on anything, so every helper is vendor surface",
+     "miw/extract/params.py",
+     (r'_METHOD_CALL = re.compile(r"\.([A-Za-z_][A-Za-z0-9_]{2,40})\s*\(")',
+      r'_METHOD_CALL = re.compile(r"([A-Za-z_][A-Za-z0-9_]{2,40})\s*\(")'),
+     "pytest:tests/test_taught_symbols.py"),
+    ("S13 candidates are truncated again, and the quiz schema evicts the real ones",
+     "miw/extract/params.py",
+     ("    return {dep_id: dict(sorted(b.items(), key=lambda kv: (-kv[1], kv[0])))",
+      "    return {dep_id: dict(sorted(b.items(), key=lambda kv: (-kv[1], kv[0]))[:40])"),
+     "pytest:tests/test_taught_symbols.py"),
+    ("S13 the shape is dropped on the hop from the page to the finding",
+     "miw/probe/runner.py",
+     ('                 "quote": f.get("quote", ""), "evidence_url": o.url,\n'
+      '                 "shape": f.get("shape", "field")})',
+      '                 "quote": f.get("quote", ""), "evidence_url": o.url})'),
+     "pytest:tests/test_taught_symbols.py"),
+    ("S13 a renamed method is described to a reviewer as a field we send",
+     "miw/analyse/score.py",
+     ('    return ("method", "calls") if row.get("shape") == "method" '
+      'else ("field", "writes")',
+      '    return ("field", "writes")'),
+     "pytest:tests/test_taught_symbols.py"),
+    ("S13 our own grading schema counts as a vendor's API surface",
+     "miw/extract/params.py",
+     ('    "test_case_enum", "test_case_id", "test_case_details", "testcases",', "    "),
+     "pytest:tests/test_taught_symbols.py"),
     ("S13 a successor need not look like an identifier, so prose becomes a field name",
      "miw/probe/http_probe.py",
      ("        if (successor.lower() in _NOT_A_FIELD\n"

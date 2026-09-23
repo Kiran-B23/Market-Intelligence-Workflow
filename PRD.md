@@ -752,9 +752,9 @@ is what makes a name checkable at all.
 
 * **A dependency used without being NAMED is invisible.** Every evidence kind the
   inventory emits is a name or a link, so code that writes a vendor's field without
-  mentioning the vendor creates no location. S13 closes this for request payloads —
-  measured on Murf, it was the difference between 3 records and 10 — and the class is
-  larger than payloads.
+  mentioning the vendor creates no location. S13 closes this for request payloads and
+  for methods called on a client — measured on Murf, it was the difference between 3
+  records and 10 — and the class is larger than either.
 * **Two items from the approved UI plan are unbuilt**: the run-progress stage stepper
   (`stage_now` is returned and unused) and the queue-depth guard (`queue.Queue()` is
   unbounded and `queued_behind` only ever reports 0 or 1).
@@ -871,17 +871,37 @@ JSON + xlsx in `/home/nxtwave/Market Intelligence Workflow/`.
 | S10 | Better alternative appeared | deepwiki vs codetotutorial | research, rotating watch |
 | S11 | Curriculum topic gap | industry-expected topic absent or outdated | research vs course outline |
 | S12 | Newer option from a vendor we use | a vendor's catalogue lists a later model than the one taught | vendor catalogue diff (§B.4) |
-| S13 | Taught API field deprecated | `multiNativeLocale` superseded by `locale` while the course still sends it | the vendor's own API reference |
+| S13 | Taught API member deprecated | `multiNativeLocale` superseded by `locale`, or a method renamed, while the course still uses it | the vendor's own API reference |
+| S14 | Promised outcome not covered | a stated course outcome rests on an area with corroborated topics no session teaches | `registry/outcomes.yaml` + the gap run |
+| S15 | Sign-up or authentication changed | a tool GAINED or LOST an auth mechanism between two runs — the taught setup step is wrong while nothing is broken | the vendor's own page, AUTHORITATIVE only |
 
-S1–S9 and S13 are **regression** signals (what we teach is now wrong). S10–S12 are
-**opportunity** signals (still right, no longer best). They are scored and
-reported in separate sections — mixing them buries the urgent under the
-interesting.
+S1–S9, S13 and S15 are **regression** signals (what we teach is now wrong). S10–S12 and
+S14 are **opportunity** signals (still right, no longer best, or promised and unmet).
+They are scored and reported in separate sections — mixing them buries the urgent under
+the interesting.
 
 S13 is the only one that looks INSIDE the request. Every other regression signal asks
-whether the dependency is still there; a vendor can retire a field without retiring
+whether the dependency is still there; a vendor can retire a member without retiring
 anything else, and `murf.ai` answering 200 with its pricing and docs intact is exactly
 what that looks like from outside.
+
+**S13 covers two shapes, and deliberately one mechanism rather than two detectors.** A
+field is sent (`"multiNativeLocale":`); a method is called (`client.generate_content(`).
+Extraction refuses the same way for both — a key is only a key inside a payload, a
+method is only a method when called on something — and the vendor's own page settles
+ownership for both, by DECLARING the member: a field states a type, a method states a
+signature. The alternative was a rename detector built from a phrase list, and one
+already exists in `research/official.py`; measured over the whole inventory its cues
+(`renamed`, `replaced`, `removed the`) produced three claims, none substantiating, two
+of them Wikipedia prose about OpenAI removing a chief executive. A phrase list finds
+sentences containing a word, which is why the taught-symbol route was taken instead.
+
+The method half carries a stated limit. Its no-false-positive behaviour is proven on
+real pages — the eight held-out `fields` fixtures and a live LangChain API index that
+lists classes as deprecated in a navigation table and is correctly ignored. Its
+detection is proven on constructed pages only, because the SDK references that declare
+deprecated methods (LangChain, python-genai) are client-rendered and the probe does not
+execute JavaScript. That is a limit on reach, not on the rule.
 
 ---
 

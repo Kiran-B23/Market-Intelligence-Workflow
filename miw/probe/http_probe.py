@@ -214,6 +214,24 @@ _TYPE_TOKEN = re.compile(
 # capitalised acronym mid-sentence, not a field anyone can rename to.
 _LOOKS_LIKE_FIELD = re.compile(r"^(?=.*[a-z])([a-z][A-Za-z0-9_.]*|[A-Za-z0-9]+[_.][A-Za-z0-9_.]+)$")
 
+# A METHOD declares a signature where a field declares a type, and that is the only
+# difference between them worth encoding. Both are the same proof - this name is a
+# member the vendor documents, not a word occurring in a sentence - so this is one more
+# accepted shape of declaration rather than a second detector.
+#
+# Written this way on purpose. The obvious alternative was a rename detector of its own,
+# built from a phrase list, and there is already one: `official.py`'s IMPLEMENTATION
+# cues ("renamed", "replaced", "removed the"). Measured over the whole inventory it
+# produced three claims, none substantiating, two of them Wikipedia prose about OpenAI
+# removing a chief executive. A phrase list finds sentences; it does not find renames.
+#
+# The parenthesis must follow the name with NO space and must close, because that is
+# what a parameter list is. `^\s*\(` was the first attempt and it is prose-permeable:
+# "voice (and its locale) are deprecated" reports `voice` as a renamed METHOD, offered
+# to a reviewer as a call to go and fix. A declaration is written `generate_content(...)`
+# and never `generate_content (...)`, so the space is the whole distinction.
+_SIGNATURE = re.compile(r"^\([^(]*\)")
+
 
 def deprecated_fields(text: str, limit: int = 30) -> list[dict]:
     """Fields a reference page labels deprecated, with the successor it names.
@@ -234,8 +252,11 @@ def deprecated_fields(text: str, limit: int = 30) -> list[dict]:
         if len(between.split()) > 6:
             continue
         after = m.group("after") or ""
-        # See `_TYPE_TOKEN`: no declared type, no field.
-        if not _TYPE_TOKEN.search(between + " " + after[:60]):
+        # See `_TYPE_TOKEN` and `_SIGNATURE`: a member declares a type or a signature.
+        # Tested against the RAW group - `between` has had its leading punctuation
+        # stripped, and for a signature the very first character is the evidence.
+        signature = bool(_SIGNATURE.match(m.group("between") or ""))
+        if not signature and not _TYPE_TOKEN.search(between + " " + after[:60]):
             continue
         succ = _NAMED_SUCCESSOR.search(after)
         successor = succ.group(1) if succ else ""
@@ -247,7 +268,8 @@ def deprecated_fields(text: str, limit: int = 30) -> list[dict]:
         if len(quote) < 12:
             continue
         seen.add(field.lower())
-        out.append({"field": field, "successor": successor, "quote": quote[:280]})
+        out.append({"field": field, "successor": successor, "quote": quote[:280],
+                    "shape": "method" if signature else "field"})
         if len(out) >= limit:
             break
     return out
