@@ -288,7 +288,7 @@ def research_all(deps: Iterable[Dependency], probes: dict[str, ProbeResult], *,
                  discovery_slice: int = settings.DISCOVERY_SLICE,
                  use_model: bool = False, judge_fit: bool = True,
                  scope=None, dep_state: Optional[dict] = None,
-                 progress=None) -> list[ResearchResult]:
+                 news: bool = False, progress=None) -> list[ResearchResult]:
     """Research everything the probe flagged, plus a rotating slice of critical deps.
 
     The rotation is what catches pricing changes and better alternatives while a URL
@@ -310,6 +310,36 @@ def research_all(deps: Iterable[Dependency], probes: dict[str, ProbeResult], *,
     flagged = [by_id[p.dep_id] for p in probes.values()
                if p.status in ("broken", "changed") and p.dep_id in by_id]
     flagged_ids = {d.dep_id for d in flagged}
+
+    # A third reason to look, after "the probe flagged it" and "the rotation reached
+    # it": somebody wrote about it this week. The headline is NOT evidence and is never
+    # quoted — it only moves a dependency up the queue, and `official.gather` then reads
+    # that vendor's own pages under exactly the same rules as any other. Same shape as
+    # `search.verify_on_official`, whose comment puts it best: search POINTS, it does not
+    # testify.
+    #
+    # Worth the two requests because the rotation is slow: 12 critical dependencies a
+    # week against 93 that can be spoken for, so a vendor announcing something on a
+    # Tuesday waits a median four weeks to be read. A headline is the cheapest available
+    # signal that the wait is wrong for this one.
+    # Off by default, like `use_model` above and for the same reason: this function is
+    # called from tests and from the agent graph, and a default that reaches the network
+    # makes a pure computation impure for every caller that did not ask. `cmd_research`
+    # turns it on, which is where the decision belongs.
+    in_the_news: dict = {}
+    if news:
+        from miw.research.news import dependencies_in_the_news
+        try:
+            in_the_news = dependencies_in_the_news(deps)
+        except Exception as exc:              # a feed being down must not fail the stage
+            in_the_news = {}
+            if progress is not None:
+                print(f"  news feeds unavailable ({type(exc).__name__}); "
+                      f"the rotation is unaffected")
+        for dep_id in in_the_news:
+            if dep_id in by_id and dep_id not in flagged_ids:
+                flagged.append(by_id[dep_id])
+                flagged_ids.add(dep_id)
 
     rotation = [d for d in deps
                 if d.watch_tier == "critical" and d.dep_id not in flagged_ids]
@@ -343,6 +373,13 @@ def research_all(deps: Iterable[Dependency], probes: dict[str, ProbeResult], *,
         res = research_dependency(dep, probes.get(dep.dep_id),
                                   in_discovery_slice=dep.dep_id in discovery,
                                   use_model=use_model, judge_fit=judge_fit)
+        hit = in_the_news.get(dep.dep_id)
+        if hit:
+            # Provenance, not evidence. The claims on this result were lifted from the
+            # vendor's own pages either way; this only records that a headline is why
+            # we read them this week rather than in four.
+            res.looked_because = (f"{hit['source']}: {hit['headline']}"
+                                  + (f" ({hit['url']})" if hit.get("url") else ""))
         out.append(res)
         if progress:
             progress(i, len(todo), dep, res)

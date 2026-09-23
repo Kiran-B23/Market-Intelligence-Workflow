@@ -137,6 +137,22 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    # --- D: news as a lead. The must-not cases are the whole design. ---------
+    ("D a news feed matches a name that is also an ordinary English word",
+     "miw/research/news.py",
+     ("    if len(n) < MIN_NAME or n.lower() in AMBIGUOUS:", "    if False:"),
+     "pytest:tests/test_news_leads.py"),
+    ("D a news feed matches a name inside a longer word",
+     "miw/research/news.py",
+     ('    return re.compile(rf"(?<![\\w.-]){re.escape(n)}(?![\\w-])", re.I)',
+      "    return re.compile(re.escape(n), re.I)"),
+     "pytest:tests/test_news_leads.py"),
+    ("D news points at a dependency with no pages to read",
+     "miw/research/news.py",
+     ("        if not d.subject().official_domains:\n            continue",
+      "        if False:\n            continue"),
+     "pytest:tests/test_news_leads.py"),
+
     # --- C11: a course run that answers all three questions -----------------
     ("C11 the run stages keep the caller's order instead of the pipeline's",
      "miw/api/jobs.py",

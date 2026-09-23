@@ -515,6 +515,11 @@ class ResearchResult:
     alternatives: list[Alternative] = field(default_factory=list)
     # Why a would-be claim was REJECTED - a page said something we could not trust.
     dropped: list[str] = field(default_factory=list)
+    # The headline that moved this dependency up the queue, when one did. Provenance,
+    # never evidence: `research/news.py` uses a feed to decide WHERE to look and the
+    # claims below still rest only on the vendor's own pages. Recorded so a reader can
+    # tell "the rotation reached it" from "somebody wrote about it".
+    looked_because: str = ""
     # Pages we could not read at all. Kept apart from `dropped` because they are a
     # different fact and they swamp it: 169 of 203 `dropped` entries in one real run
     # were speculative well-known-path 404s, which made the genuine rejections

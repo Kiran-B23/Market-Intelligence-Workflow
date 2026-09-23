@@ -420,6 +420,7 @@ def cmd_research(args) -> int:
                            scope=scope, dep_state=state.dep_state(),
                            use_model=getattr(args, "nominate", False),
                            judge_fit=not getattr(args, "no_fit", False),
+                           news=not getattr(args, "no_news", False),
                            progress=progress)
     # Stamp the rotation clock so next week picks up where this run left off.
     state.mark_researched([r.dep_id for r in results], utcnow())
@@ -1902,6 +1903,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_scope_args(pr)
     pr.add_argument("--verbose", action="store_true", help="show ok results too")
     rs = sub.add_parser("research", help="official-source research on flagged deps")
+    rs.add_argument("--no-news", action="store_true",
+                    help="do not let this week's headlines decide what to read. News "
+                         "only picks WHICH vendor pages to open; every claim still "
+                         "rests on the vendor's own page.")
     _add_scope_args(rs)
     # Opt-in, like `analyse --refine`. The deterministic nominators run either way;
     # the model only adds candidates, and every one still faces the same ladder.
