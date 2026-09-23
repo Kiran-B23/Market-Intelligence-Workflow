@@ -223,14 +223,22 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
 
     # --- the UI vocabulary, which nothing enumerated until a signal shipped
     # rendering as the literal string "S13" in five places.
+    #
+    # Anchored on the FIRST entry of each map, and that is the whole point. Both of
+    # these were anchored on the LAST entry and both went STALE three times - once per
+    # signal added, because a new signal is appended and the anchor moves. A STALE
+    # mutation is a gate that silently stopped being tested, which is the failure this
+    # harness exists to catch, so the anchor must not sit where the map grows. `S1` and
+    # `url_gone` are the oldest members of their vocabularies and are enumerated by the
+    # tests below; dropping an entry mid-map leaves valid JS, so the mutation is exactly
+    # "a code ships with no plain word" and nothing else.
     ("UI a drift code ships with no plain word, rendering as raw jargon",
      "miw/api/static/index.html",
-     ("           S14: 'a promise nothing covers'},", "           },"),
+     ("signal: {S1: 'dead or moved link', ", "signal: {"),
      "pytest:tests/test_ui_contract.py"),
     ("UI a probe outcome that becomes a finding has no plain word",
      "miw/api/static/index.html",
-     ("            model_rate_limit_changed: 'the usage limit changed'},",
-      "            },"),
+     ("outcome: {url_gone: '404 / 410 Gone', ", "outcome: {"),
      "pytest:tests/test_ui_contract.py"),
 
     # --- M1: the only place generated text reaches a human ------------------
