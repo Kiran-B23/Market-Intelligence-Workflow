@@ -137,6 +137,23 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    # --- F: how a vendor lets you in ----------------------------------------
+    ("F an auth change ships on a third party's say-so, not the vendor's",
+     "miw/analyse/score.py",
+     ("                if c is not None and c.tier is Tier.AUTHORITATIVE:",
+      "                if c is not None and c.substantiating:"),
+     "pytest:tests/test_auth_change.py"),
+    ("F the first look at a dependency reports every mechanism as gained",
+     "miw/probe/runner.py",
+     ("    if seen_auth is not None and res.auth_signals:",
+      "    if res.auth_signals:"),
+     "pytest:tests/test_auth_change.py"),
+    ("F a page we could not read reports every mechanism as lost",
+     "miw/probe/runner.py",
+     ("    res.auth_signals = sorted({p for o in obs if o.reachable for p in o.auth_phrases})",
+      "    res.auth_signals = sorted({p for o in obs for p in o.auth_phrases})"),
+     "pytest:tests/test_auth_change.py"),
+
     # --- F: commercial terms, parsed since day one and never compared --------
     ("F the terms diff is skipped for a model that is still listed",
      "miw/probe/models.py",

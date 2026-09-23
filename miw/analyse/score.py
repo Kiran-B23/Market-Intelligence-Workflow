@@ -25,7 +25,7 @@ from miw.analyse import notes
 from miw.schema import (Alternative, Claim, Dependency, Finding, Location,
                         ProbeResult,
                         ResearchResult, UncitedClaim, utcnow)
-from miw.trust import ClaimKind, domain as _domain
+from miw.trust import ClaimKind, Tier, domain as _domain
 
 # How much each kind of reference counts toward blast radius.
 EVIDENCE_WEIGHT = {
@@ -68,6 +68,11 @@ SIGNALS = {
     # Opportunity rather than regression: nothing is broken, and whether the promise
     # still stands is a curriculum decision, not a defect.
     "S14": ("Promised outcome not covered", "opportunity", "medium"),
+    # HOW a vendor lets you in, as opposed to whether it does. S2 answers the second:
+    # a wall appeared. This is the case S2 cannot see — the tool is perfectly open and
+    # authenticates differently, so every taught setup step and every screenshot of its
+    # key page is wrong while nothing is broken.
+    "S15": ("Sign-up or authentication changed", "regression", "high"),
 }
 
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
@@ -142,6 +147,7 @@ PROBE_TO_SIGNAL = {
     # the session relies on moved".
     "model_price_changed": "S3",
     "model_rate_limit_changed": "S3",
+    "auth_method_changed": "S15",
     "taught_field_deprecated": "S13",
 }
 
@@ -251,6 +257,13 @@ EVIDENCE_REACH: dict[str, Optional[tuple]] = {
     # one page that mentions it.
     "model_price_changed": None,
     "model_rate_limit_changed": None,
+    # An auth change breaks the SETUP, so it reaches the places that walk a student
+    # through it — the links to the key page, the code that reads a credential — and
+    # not a paragraph that names the vendor. Narrower than money on purpose: a price
+    # changes the instruction everywhere, a login screen changes one step.
+    "auth_method_changed": ("link:a_href", "link:iframe", "link:markdown",
+                            "link:bare", "solution_import", "install_command",
+                            "test_case_enum"),
     "free_tier_language_lost": None, "pricing_restriction_language": None,
     # A model id is passed to an API; the workbook row names it too.
     "model_shutdown_passed": ("model_id", "sheet_declared", "sheet_pin"),
@@ -608,6 +621,37 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
             f.successors = list(probe.successors)
             f.redirects = list(probe.redirects)
             f.deprecated_fields = list(probe.deprecated_fields)
+            f.auth_change = dict(probe.auth_change or {})
+            # An auth change is only ever reported on the vendor's OWN say-so.
+            #
+            # `ClaimKind.AVAILABILITY` sits outside `STRICT_KINDS`, so `substantiates`
+            # would let a merely CORROBORATING source settle "this tool now requires
+            # OAuth" — an independent blog observing a login screen is not the vendor
+            # changing its contract, and a session's setup steps are rewritten off this.
+            # So the bar is raised here rather than by loosening the policy for every
+            # other AVAILABILITY claim: AUTHORITATIVE or the finding does not ship.
+            if sig == "auth_method_changed" and probe.auth_change:
+                url = probe.auth_change.get("evidence_url") or ""
+                moved = (probe.auth_change.get("gained") or []) + \
+                    (probe.auth_change.get("lost") or [])
+                quote = (f"This page names {', '.join(probe.auth_change.get('now') or [])}"
+                         f" where it previously named "
+                         f"{', '.join(probe.auth_change.get('was') or []) or 'nothing'}.")
+                try:
+                    c = Claim.build(
+                        kind=ClaimKind.AVAILABILITY,
+                        statement=(f"{dep.canonical_name} names "
+                                   f"{', '.join(moved[:3])} on its own pages"),
+                        source_url=url, quote=quote, subject=dep.subject())
+                except UncitedClaim:
+                    c = None
+                if c is not None and c.tier is Tier.AUTHORITATIVE:
+                    f.claims.append(c)
+                else:
+                    # Recorded, not swallowed: an auth change we cannot pin on the
+                    # vendor is a thing we saw and may not report.
+                    f.probe_signals = list(f.probe_signals) + [
+                        f"auth_change_unciteable:{_domain(url)}"]
             # A retired field is a vendor DECLARATION, so it goes through the trust
             # layer like every other one — the same construction the n8n and model
             # paths use below. Without this the finding shipped `claims: []`, its
@@ -925,6 +969,19 @@ def findings_for(dep: Dependency, probe: Optional[ProbeResult],
     return sorted(final, key=lambda x: (-SEVERITY_ORDER.index(x.severity), -x.blast_radius))
 
 
+def _auth_summary(dep: Dependency, probe: ProbeResult) -> str:
+    ch = probe.auth_change or {}
+    gained, lost = ch.get("gained") or [], ch.get("lost") or []
+    bits = []
+    if gained:
+        bits.append("now names " + ", ".join(f"`{g}`" for g in gained[:3]))
+    if lost:
+        bits.append("no longer names " + ", ".join(f"`{x}`" for x in lost[:3]))
+    return (f"{dep.canonical_name}'s own pages changed how you authenticate: "
+            + " and ".join(bits) + ".") if bits else (
+        f"{dep.canonical_name} changed how you authenticate.")
+
+
 def _field_summary(dep: Dependency, probe: ProbeResult) -> str:
     """What the vendor said, in the vendor's own terms."""
     rows = probe.deprecated_fields or []
@@ -969,6 +1026,7 @@ def _probe_summary(sig: str, dep: Dependency, probe: ProbeResult) -> str:
         "model_catalogue_unreadable": probe.detail,
         "model_price_changed": probe.detail,
         "model_rate_limit_changed": probe.detail,
+        "auth_method_changed": _auth_summary(dep, probe),
         "breaking_change_declared": probe.detail,
         "breaking_change_possible": probe.detail,
         "n8n_upstream_unreachable": probe.detail,
@@ -1163,6 +1221,24 @@ def recommend(dep: Dependency, f: Finding) -> str:
         s13 = (f"A field the course sends to {dep.canonical_name} is marked deprecated "
                f"on its own API reference; check the payloads in the session.")
 
+    # The setup step, named. "Check Acme's auth" sends a reviewer to read a page that
+    # looks fine; "the key page now offers OAuth where it offered an API key" tells
+    # them which screenshot and which snippet to redo.
+    ac = f.auth_change or {}
+    gained, lost = ac.get("gained") or [], ac.get("lost") or []
+    if gained or lost:
+        moves = []
+        if lost:
+            moves.append("no longer offers " + ", ".join(f"`{x}`" for x in lost[:3]))
+        if gained:
+            moves.append("now offers " + ", ".join(f"`{g}`" for g in gained[:3]))
+        s15 = (f"{dep.canonical_name} {' and '.join(moves)}. Re-do the session's setup "
+               f"steps and any screenshot of its credentials page, then confirm a "
+               f"student can still get a key on the taught path.")
+    else:
+        s15 = (f"Re-check how a student signs in to {dep.canonical_name}; its own "
+               f"pages describe a different mechanism than when we last looked.")
+
     reach = s5_reach(f.redirects)
     moved = next((r for r in (f.redirects or []) if r.get("off_site")), None)
     if reach == "links":
@@ -1248,6 +1324,9 @@ def recommend(dep: Dependency, f: Finding) -> str:
         # would send a reviewer to read a healthy status page; "rename
         # multiNativeLocale to locale" is a find-and-replace they can do today.
         "S13": s13,
+        # S14 is composed by `analyse/outcomes.py`, which has the promise and the
+        # missing topics; it never reaches this map.
+        "S15": s15,
     }[f.signal]
     # Assessment fallout: the reading material is only half the edit.
     q = ""

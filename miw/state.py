@@ -182,6 +182,8 @@ class State:
         ("finding_state", "reported_severity", "TEXT"),
         # Hashes of the deprecation notices already seen on this dependency's pages.
         ("probe_state", "notice_keys", "TEXT"),
+        # The authentication mechanisms this dependency's pages named last time.
+        ("probe_state", "auth_signals", "TEXT"),
     )
 
     def _migrate(self, cur) -> None:
@@ -222,7 +224,8 @@ class State:
                    http_status: Optional[int] = None,
                    repo_archived: Optional[bool] = None,
                    consecutive_failures: int = 0,
-                   notice_keys: Optional[list] = None) -> None:
+                   notice_keys: Optional[list] = None,
+                   auth_signals: Optional[list] = None) -> None:
         prev = self.probe_prev(dep_id)
         first_seen = prev["first_seen"] if prev else checked_at
         # Union, never replacement. A notice that scrolls off a changelog has still
@@ -232,17 +235,18 @@ class State:
         self.conn.execute(
             "INSERT INTO probe_state (dep_id, canonical_name, last_status, last_checked,"
             " text_hash, latest_version, http_status, repo_archived,"
-            " consecutive_failures, first_seen, notice_keys)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+            " consecutive_failures, first_seen, notice_keys, auth_signals)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(dep_id) DO UPDATE SET canonical_name=excluded.canonical_name,"
             " last_status=excluded.last_status, last_checked=excluded.last_checked,"
             " text_hash=excluded.text_hash, latest_version=excluded.latest_version,"
             " http_status=excluded.http_status, repo_archived=excluded.repo_archived,"
             " consecutive_failures=excluded.consecutive_failures,"
-            " notice_keys=excluded.notice_keys",
+            " notice_keys=excluded.notice_keys, auth_signals=excluded.auth_signals",
             (dep_id, canonical_name, status, checked_at, text_hash, latest_version,
              http_status, None if repo_archived is None else int(repo_archived),
-             consecutive_failures, first_seen, json.dumps(keys)))
+             consecutive_failures, first_seen, json.dumps(keys),
+             json.dumps(sorted(set(auth_signals or [])))))
         self.conn.commit()
 
     def terms_prev(self, source_key: str, entry_id: str) -> Optional[sqlite3.Row]:
@@ -261,6 +265,20 @@ class State:
             " rate_limit=excluded.rate_limit, observed_at=excluded.observed_at",
             (source_key, entry_id, price, rate_limit, now, first))
         self.conn.commit()
+
+    def auth_signals(self, dep_id: str) -> Optional[list]:
+        """Mechanisms seen last time, or None when this dependency is new.
+
+        `None` and `[]` are different facts: never looked is not the same as looked and
+        found none, and only the second can produce a change.
+        """
+        row = self.probe_prev(dep_id)
+        if row is None or row["auth_signals"] is None:
+            return None
+        try:
+            return json.loads(row["auth_signals"] or "[]")
+        except (json.JSONDecodeError, TypeError):
+            return None
 
     def notice_keys(self, dep_id: str) -> list:
         """Deprecation notices already seen on this dependency's pages."""

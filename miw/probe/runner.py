@@ -284,7 +284,8 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
             # flood, and none of it would be news.
             res_from_urls(res, obs, prev_hash, dep,
                           seen_notices=set(state.notice_keys(dep.dep_id))
-                          if prev is not None else None)
+                          if prev is not None else None,
+                          seen_auth=state.auth_signals(dep.dep_id))
             # Where did it go? A finding that says "repoint or replace the dead link"
             # and stops hands the reviewer's whole job back to them: they open the URL,
             # see the 404, and then try the obvious candidates on the vendor's own site
@@ -333,7 +334,7 @@ def probe_dependency(dep: Dependency, state: State) -> ProbeResult:
         checked_at=res.checked_at, text_hash=res.text_hash,
         latest_version=res.latest_version or "", http_status=res.http_status,
         repo_archived=res.repo_archived, consecutive_failures=res.consecutive_failures,
-        notice_keys=res.notice_keys,
+        notice_keys=res.notice_keys, auth_signals=res.auth_signals,
     )
     return res
 
@@ -528,7 +529,8 @@ def _record_redirect(res: ProbeResult, o, dep: Optional[Dependency]) -> None:
 
 def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str,
                   dep: Optional[Dependency] = None,
-                  seen_notices: Optional[set] = None) -> None:
+                  seen_notices: Optional[set] = None,
+                  seen_auth: Optional[list] = None) -> None:
     """Fold several URL observations into one dependency status."""
     primary = obs[0]
     res.http_status = primary.status
@@ -562,6 +564,22 @@ def res_from_urls(res: ProbeResult, obs: list[UrlObservation], prev_hash: str,
     if fresh and seen_notices is not None:
         res.flag("deprecation_notice_added")
         res.new_notices = fresh[:3]
+
+    # How the vendor lets you in, and whether that changed. Presence is not the signal
+    # - every docs page names a mechanism - so this fires only when one is GAINED or
+    # LOST between two runs, the shape `pricing.free_signals` already uses. A tool that
+    # swaps an API key for OAuth is perfectly open and every screenshot of its key page
+    # is wrong, which is the case `access_wall_language` cannot see: nothing is walled.
+    res.auth_signals = sorted({p for o in obs if o.reachable for p in o.auth_phrases})
+    if seen_auth is not None and res.auth_signals:
+        gained = [p for p in res.auth_signals if p not in seen_auth]
+        lost = [p for p in seen_auth if p not in res.auth_signals]
+        if gained or lost:
+            res.flag("auth_method_changed")
+            res.auth_change = {"gained": gained, "lost": lost,
+                               "now": res.auth_signals, "was": sorted(seen_auth),
+                               "evidence_url": next((o.final_url or o.url for o in obs
+                                                     if o.auth_phrases), "")}
 
     for o in obs:
         if o.sunset_near_subject:

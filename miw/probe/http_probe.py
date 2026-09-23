@@ -25,6 +25,23 @@ WALL_PHRASES = (
     "you have reached your limit", "quota exceeded", "requires a paid plan",
     "available on paid plans", "this feature requires",
 )
+# HOW a vendor lets you in, as opposed to WHETHER it does. `WALL_PHRASES` above answers
+# the second: a wall appeared and the taught step now demands an account. These answer
+# the first, and the difference matters to a session that walks a student through setup
+# — a tool that swaps an API key for OAuth is perfectly open and every screenshot of its
+# key page is wrong.
+#
+# Presence is NOT the signal; every docs page names a mechanism. A mechanism appearing
+# or disappearing between two runs is, which is the shape `pricing.free_signals` already
+# uses for free-tier wording.
+AUTH_PHRASES = (
+    "api key", "api token", "secret key", "publishable key", "access token",
+    "personal access token", "bearer token", "service account", "client secret",
+    "client id", "oauth", "openid connect", "session token", "basic auth",
+    "sign in with google", "sign in with github", "sign in with microsoft",
+    "device code", "service principal", "managed identity",
+)
+
 # Split by strength. A vendor docs index legitimately contains "migrate to" and
 # "sunset" while describing something else entirely - on Google's model docs those
 # words sit next to a *different* model's deprecation notice. Weak phrases are recorded
@@ -97,6 +114,8 @@ class UrlObservation:
     # on Google's release notes `sunset_near_subject` reads ["now deprecated",
     # "will be shut down"] every week, unchanged, whatever was announced this week.
     sunset_sentences: list[str] = field(default_factory=list)
+    # Which authentication mechanisms this page names. See `AUTH_PHRASES`.
+    auth_phrases: list[str] = field(default_factory=list)
     # Fields this page labels deprecated, with the successor it names. See
     # `deprecated_fields` for why a reference page needs its own reader.
     deprecated_fields: list[dict] = field(default_factory=list)
@@ -264,6 +283,7 @@ def observe(url: str, subject_terms: tuple[str, ...] = ()) -> UrlObservation:
         text = main_text(f.body)
         o.text_hash = text_hash(text)
         o.wall_phrases = _hits(text, WALL_PHRASES)
+        o.auth_phrases = _hits(text, AUTH_PHRASES)
         o.sunset_phrases = _hits(text, SUNSET_PHRASES)
         o.sunset_near_subject = _hits_near(text, SUNSET_PHRASES_STRONG, subject_terms)
         o.sunset_sentences = _sunset_sentences(text, subject_terms)

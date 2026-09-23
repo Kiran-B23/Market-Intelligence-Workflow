@@ -305,9 +305,15 @@ class ProbeResult:
     # `state.probe_save` stores; `new_notices` is the news.
     notice_keys: list[str] = field(default_factory=list)
     new_notices: list[str] = field(default_factory=list)
+    # Authentication mechanisms this dependency's pages name, and how that moved.
+    auth_signals: list[str] = field(default_factory=list)
+    auth_change: dict = field(default_factory=dict)
     # Fields the course writes that the vendor's own reference marks deprecated, each
     # with the successor the vendor names and the verbatim row that says so.
     deprecated_fields: list[dict] = field(default_factory=list)
+    # How the vendor's authentication moved: what was named last time, what is named
+    # now, and which mechanisms were gained or lost.
+    auth_change: dict = field(default_factory=dict)
     detail: str = ""
     evidence_url: str = ""
     consecutive_failures: int = 0
@@ -624,6 +630,9 @@ class Finding:
     # Fields the course writes that the vendor's own reference marks deprecated, each
     # with the successor the vendor names and the verbatim row that says so.
     deprecated_fields: list[dict] = field(default_factory=list)
+    # How the vendor's authentication moved: what was named last time, what is
+    # named now, and which mechanisms were gained or lost.
+    auth_change: dict = field(default_factory=dict)
     screenshots_at_risk: int = 0
     questions_executing: int = 0
     questions_mentioning: int = 0
