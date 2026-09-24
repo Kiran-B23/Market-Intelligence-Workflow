@@ -1655,10 +1655,32 @@ def recommend(dep: Dependency, f: Finding) -> str:
         "S17": s17,
     }[f.signal]
     # Assessment fallout: the reading material is only half the edit.
+    #
+    # "and will break" used to be appended to EVERY signal that had executing
+    # questions, which made it false more often than true. Measured on the live
+    # artifact: 30 findings asserted it over 298 graded items, and for 13 of them
+    # nothing breaks at all - a published CVE in `langchain` does not stop 50 coding
+    # questions running, and a pinned version being behind the latest is precisely the
+    # case where the pinned code still works.
+    #
+    # The sentence below it already drew this distinction for questions that merely
+    # NAME the thing ("one dead docs link does not make 814 MCQs wrong"); this is the
+    # same argument applied to the half that runs it. Two classes, and the line between
+    # them is whether the thing the course calls is GONE:
+    #
+    #   gone      the package left the registry, the model id is past its shutdown
+    #             date, the node is out of n8n's tree - the call fails today
+    #   moved     a version is behind, a field is deprecated, a CVE is published -
+    #             the code runs, and these are the items the change lands on
     q = ""
     if f.questions_executing:
-        q = (f" {f.questions_executing} graded item(s) run this in solution code or "
-             f"test cases and will break.")
+        n = f.questions_executing
+        gone = (f.signal in ("S4", "S7")
+                or "node_removed_upstream" in (f.probe_signals or []))
+        q = (f" {n} graded item(s) run this in solution code or test cases and will "
+             f"break." if gone else
+             f" {n} graded item(s) run this in solution code or test cases; they still "
+             f"run today, and they are what this change lands on.")
     # Only when the *tool* is gone does merely naming it date a question. One dead
     # docs link does not make 814 MCQs wrong, and saying so destroys the estimate.
     if f.questions_mentioning and f.signal in ("S4", "S7"):

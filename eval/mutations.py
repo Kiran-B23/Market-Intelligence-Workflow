@@ -174,6 +174,13 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "    return scope"),
      "pytest:tests/test_location_scoping.py"),
 
+    ("reach a finding claims breakage for any change, not only for a thing that is gone",
+     "miw/analyse/score.py",
+     ('        gone = (f.signal in ("S4", "S7")\n'
+      '                or "node_removed_upstream" in (f.probe_signals or []))',
+      "        gone = True"),
+     "pytest:tests/test_reach_discipline.py"),
+
     # --- S17: a known hole in the version the course pins --------------------
     ("S17 the row count is reported, so one CVE in two databases counts twice",
      "miw/probe/advisories.py",

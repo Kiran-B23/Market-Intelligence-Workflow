@@ -195,3 +195,66 @@ def test_the_live_artifact_obeys_the_rule():
                                                                      "title")):
                 bad.append((f["canonical_name"], f["signal"], l["evidence_source"]))
     assert not bad, bad[:10]
+
+
+# --------------------------------------- a finding may not claim breakage it has no
+# --------------------------------------- evidence for
+#
+# `recommend()` appended "and will break" to EVERY signal that had executing questions.
+# Measured on the live artifact: 30 findings asserted it over 298 graded items, and for
+# 13 of them nothing breaks at all - a published CVE in `langchain` does not stop 50
+# coding questions running, and a pinned version being behind the latest is exactly the
+# case where the pinned code still works.
+#
+# This is the same family as every other defect in this file: the claim was keyed on
+# "there are executing questions" when the thing that decides it is "is the thing the
+# course calls GONE". The sentence immediately below it in `recommend()` already drew
+# that distinction for questions that merely NAME the dependency.
+
+def _finding_with_executing(signal, probe_signals, n=5):
+    from miw.schema import Dependency, Finding, Location, ProbeResult
+    from miw.analyse.score import recommend, scope_locations
+    dep = Dependency(kind="package", canonical_name="pkg", registry="pypi",
+                     taught_version="1.0.0",
+                     locations=[Location(course="C", topic_name="T", unit_id="u",
+                                         unit_name="U", content_id=f"c{i}",
+                                         field_path="f",
+                                         evidence_source="solution_import",
+                                         object_type="CODING_QUESTIONS")
+                                for i in range(n)])
+    f = Finding(dep_id=dep.dep_id, canonical_name="pkg", signal=signal,
+                signal_label="x", severity="high")
+    f.probe_signals = list(probe_signals)
+    f.questions_executing = n
+    scope_locations(dep, f)
+    return recommend(dep, f)
+
+
+BREAKS = [("S4", ["registry_missing"]), ("S7", ["model_shutdown_passed"]),
+          ("S9", ["node_removed_upstream"])]
+STILL_RUNS = [("S17", ["advisory_affects_pinned_version"]),
+              ("S6", ["major_behind_taught_pin"]),
+              ("S13", ["taught_field_deprecated"]),
+              ("S9", ["breaking_change_declared"])]
+
+
+@pytest.mark.parametrize("signal,probes", BREAKS)
+def test_breakage_is_claimed_only_when_the_thing_is_gone(signal, probes):
+    """The package left the registry, the model id is past its shutdown date, the node
+    is out of n8n's tree. The call fails today."""
+    assert "will break" in _finding_with_executing(signal, probes)
+
+
+@pytest.mark.parametrize("signal,probes", STILL_RUNS)
+def test_a_change_the_code_survives_never_claims_breakage(signal, probes):
+    """A CVE, a version behind, a field deprecated, a declared n8n change. The code
+    runs - these are the items the change LANDS on, which is a different sentence."""
+    out = _finding_with_executing(signal, probes)
+    assert "will break" not in out
+    assert "they still run today" in out
+
+
+def test_the_executing_count_is_still_reported_either_way():
+    """The number is the point; only the claim about it changed."""
+    for signal, probes in BREAKS + STILL_RUNS:
+        assert "5 graded item(s) run this" in _finding_with_executing(signal, probes)
