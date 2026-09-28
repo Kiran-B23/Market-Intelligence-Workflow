@@ -67,7 +67,7 @@ def test_the_page_script_parses():
     assert out.returncode == 0, out.stderr[-2500:]
 
 
-def _row_harness(rows: list) -> str:
+def _row_harness(rows: list, course: str = "") -> str:
     js = _script()
     words = re.search(r"const WORDS = \{.*?\n\};", js, re.S).group(0)
     esc = re.search(r"const esc = s =>.*?;\n", js, re.S).group(0)
@@ -84,6 +84,9 @@ def _row_harness(rows: list) -> str:
         _function(js, "vendorDate"),
         _function(js, "findingRow"),
         "const SUMMARY = {run_date:'2026-01-01'};",
+        # The all-courses view, where the course name is NOT constant and so is shown.
+        # A course page sets this and the row drops it; the tests below cover both.
+        f"const CURRENT_COURSE = {json.dumps(course)};",
         f"const rows = {json.dumps(rows)};",
         "let n = 0; for (const r of rows) {",
         "  const h = findingRow(r);",
@@ -139,7 +142,6 @@ def test_the_row_says_what_the_issue_is_and_nothing_more():
     assert "mcp.composio.dev/dashboard" in html           # the thing we fetched
     assert "404 / 410 Gone" in html                       # what came back
     assert "2 places" in html                             # how many
-    assert ">Unchanged<" in html                          # what this run did to it
 
     # Moved to the panel. Asserted as absent, because leaving them here is the change
     # half-done and every other assertion would still pass.
@@ -172,6 +174,31 @@ def test_the_level_is_readable_without_hovering():
         {**SHAPES[0], "severity": "high", "local_severity": ""},
         {**SHAPES[0], "severity": "medium", "local_severity": ""}])))
     assert ">Major<" in two["sample"]
+
+
+def test_a_row_drops_what_every_other_row_also_says():
+    """A value identical on every row is furniture, not information.
+
+    On a course page the course name was printed once per finding - 31 times for 31
+    findings - and "Unchanged" 31 times out of 31, together about 18% of the text in
+    the list. The course shows only when the list spans more than one, and the status
+    only when this run actually moved the finding.
+    """
+    row = {**SHAPES[0], "diff_class": "unchanged", "courses": ["AI for Finance"]}
+
+    # All-courses view: the course varies between rows, so it earns its place.
+    wide = json.loads(_run(_row_harness([row])))["sample"]
+    assert "AI for Finance" in wide
+    assert ">Unchanged<" not in wide, "unchanged is the default state, not news"
+
+    # Course page: constant by definition.
+    scoped = json.loads(_run(_row_harness([row], course="AI for Finance")))["sample"]
+    assert "AI for Finance" not in scoped
+
+    # What this run DID move still says so - that is the whole point of the chip.
+    movedrow = {**row, "diff_class": "worsened"}
+    moved = json.loads(_run(_row_harness([movedrow])))["sample"]
+    assert ">Worsened<" in moved
 
 
 def test_a_decided_row_does_not_look_like_an_untouched_one():

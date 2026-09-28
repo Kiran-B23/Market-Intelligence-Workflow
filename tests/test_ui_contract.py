@@ -829,3 +829,71 @@ def test_one_severity_vocabulary_across_the_whole_page():
     assert "medium: 'med'" not in PAGE, "medium is amber like high, never its own blue"
     # The headline tile, too. It printed the raw keys in dictionary order.
     assert "Object.entries(sev).map(([k,v]) => `${v} ${k}`)" not in PAGE
+
+
+def test_the_teaching_prose_is_dismissable_and_shown_by_default():
+    """Sentences that teach the page rather than report on it.
+
+    Measured on the AI for Finance findings page: its default state carried 1,412
+    characters of surrounding material and not one finding, because the raised list is
+    empty on a quiet week and a quiet week is the normal case for a drift watcher.
+
+    They are dismissed, not deleted - several of those sentences exist because a
+    reviewer misread something, and the comments record which. Default is SHOWN, so a
+    first-time reader gets the explanation without having to discover a control.
+    """
+    assert 'id="explainbtn"' in PAGE
+    assert "html:not(.explain) .teach{display:none !important}" in PAGE
+    body = PAGE[PAGE.index("function initExplain()"):]
+    body = body[:body.index("\n}\n")]
+    # The INITIAL read specifically. The click handler also defaults to '1', so a
+    # loose substring check passes with the initial read flipped to '0' - which is the
+    # whole bug: a first-time reader never sees the explanation at all.
+    assert body.count("?? '1'") == 2, "both reads default to shown"
+    assert "let on = '1';" in body
+    assert "catch (e)" in body, "private mode throws on localStorage read"
+    assert 'aria-pressed' in body, "the state is not carried by colour alone"
+
+
+def test_the_numbers_are_never_hidden_behind_the_explanation_toggle():
+    """Only the sentences go. How fresh the oldest check is decides whether this page
+    can be trusted today, and that is not something to make a reader opt into."""
+    cov = PAGE[PAGE.index("$('#coverage').innerHTML"):]
+    cov = cov[:cov.index(": '';")]
+    assert "dependencies tracked" in cov and '<span class="teach">' in cov
+    assert cov.index("dependencies tracked") < cov.index('<span class="teach">')
+    # The finding count's own breakdown stays: it is the count, not a gloss on it.
+    assert "TEACH_SUB = new Set(" in PAGE
+    assert "'open findings'" not in PAGE[PAGE.index("TEACH_SUB = new Set("):
+                                          PAGE.index("TEACH_SUB = new Set(") + 200]
+
+
+def test_the_run_stats_are_off_the_triage_path():
+    """Six tiles and four charts stood between opening the page and reading a finding.
+
+    Three of those tiles and all four charts describe the RUN - what was probed, what
+    came back, how much of the inventory is monitorable at all - not the findings a
+    reviewer came to act on.
+    """
+    assert 'id="rundetail"' in PAGE
+    assert 'id="runstrip"' in PAGE
+    rd = PAGE[PAGE.index('<details class="rundetail"'):]
+    rd = rd[:rd.index("</details>")]
+    assert 'id="charts"' in rd, "the charts belong inside the disclosure"
+    assert 'id="runstrip"' in rd
+
+
+def test_a_finding_is_its_own_surface():
+    """Card treatment, row layout. A card GRID at 52 findings reads as a zigzag - is the
+    one on the right worse than the one below? - which is the wrong question to make a
+    reviewer answer about a severity-ordered list."""
+    css = PAGE[PAGE.index("<style>"):PAGE.index("</style>")]
+    frow = css[css.index("  .frow{"):]
+    frow = frow[:frow.index("\n  }")]
+    assert "background:var(--surface)" in frow and "border-radius:var(--r)" in frow
+    assert "margin-bottom" in frow, "cards need to be separated, not stacked flush"
+    # ...and not wrapped in a second box. The settled list used to sit in a `.panel`,
+    # which since the rows became surfaces is a box inside a box. (`#runs` still uses
+    # that wrapper and should: its contents are not cards.)
+    assert '<div class="flist">' in PAGE
+    assert ".settled .flist{" in css and ".settled .panel{" not in css

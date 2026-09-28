@@ -488,11 +488,19 @@
      right where the reader already knows what the thing is; this is for the run view,
      where the list IS the answer and a bare name is not one. Two lines under the head:
      what it is, in the source's words, and the single thing to do about it. */
+  /* A card, but one item tall. Cards buy separation and cost vertical space per item,
+     and at 52 findings a card GRID reads as a zigzag - "is the one on the right worse
+     than the one below?" - which is the wrong question to make a reviewer answer about
+     a severity-ordered list. So: card treatment, row layout. Every finding is its own
+     surface with its own edge, and severity still reads straight down the page. */
   .frow{
-    display:block; position:relative; padding:11px 14px 11px 17px;
-    border-top:1px solid var(--rule); cursor:pointer; font-size:13px;
+    display:block; position:relative; overflow:hidden;
+    padding:12px 15px 13px 18px; margin-bottom:8px; cursor:pointer; font-size:13px;
+    background:var(--surface); border:1px solid var(--rule);
+    border-radius:var(--r); box-shadow:var(--e1);
+    transition:box-shadow .14s ease, border-color .14s ease, transform .14s ease;
   }
-  .frow:first-child{border-top:0}
+  .frow:last-child{margin-bottom:0}
   /* The rail the card used to carry. The dot says the level, but a dot is a poor thing
      to scan a column of - `.card.critical::before` was a 3px edge readable at a glance
      down 43 rows, and dropping the card would have taken it silently. Same widths, same
@@ -515,8 +523,10 @@
     font:500 var(--t-xs)/1 var(--mono); color:var(--crit-ink);
     white-space:nowrap; font-variant-numeric:tabular-nums;
   }
-  .frow:hover{background:color-mix(in srgb,var(--accent-wash) 45%,transparent)}
-  .frow:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  /* Lift rather than wash. The row is a surface now, so raising it reads as "this one
+     is under the cursor" without recolouring a severity-coded object. */
+  .frow:hover{box-shadow:var(--shadow-lift); border-color:var(--rule2); transform:translateY(-1px)}
+  .frow:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
   .fhead{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
   .fhead b{font-size:13.5px; font-weight:650}
   .fhead .note{font-size:12px}
@@ -553,6 +563,12 @@
   }
   .lhead b{font-size:var(--t-bd)}
   .lhead .note{margin-left:auto}
+  /* Sentences that TEACH the page rather than report on it: what "Fixes" means, why a
+     suppressed finding is still on file, what a coverage window is. Every one of them
+     earns its place the first time and costs a reader something on every visit after.
+     So they are shown by default, dismissed with one click, and remembered - the same
+     shape as the theme toggle, `try`-wrapped because private mode throws on read. */
+  html:not(.explain) .teach{display:none !important}
   /* Severity is the axis a reviewer actually navigates by - "show me what is on fire"
      is the first question asked of a list of 82 - and until this existed the only way
      to answer it was to read every row. Segmented rather than a dropdown: the counts
@@ -608,7 +624,20 @@
   }
   .settled .scount{font-weight:600; color:var(--ink)}
   .settled > summary .note{max-width:52ch}
-  .settled .panel{margin-top:var(--s2)}
+  .settled .flist{margin-top:var(--s2)}
+  /* Same disclosure shape as the settled group, so the page has one way of saying
+     "there is more here" rather than two. */
+  .rundetail{margin:var(--s4) 0}
+  .rundetail > summary{
+    display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; cursor:pointer;
+    padding:9px 13px; border:1px solid var(--rule); border-radius:var(--r);
+    background:var(--surface); list-style:none;
+  }
+  .rundetail > summary::-webkit-details-marker{display:none}
+  .rundetail > summary::after{content:"\25be"; margin-left:auto; color:var(--muted)}
+  .rundetail[open] > summary::after{content:"\25b4"}
+  .rundetail > summary:hover{background:var(--sunk)}
+  .rundetail .strip{margin-top:var(--s3)}
   .morewrap{padding:10px 14px; border-top:1px solid var(--rule); text-align:center}
   /* The first-hand observation, as labelled facts rather than a paragraph. */
   .proof{
@@ -1269,6 +1298,8 @@
   <div class="brand">
     <a href="#/" id="home"><span class="mark"><svg viewBox="0 0 24 24"><use href="#i-mark"/></svg></span>
       <span class="bname">Market Intelligence<small>curriculum agent</small></span></a>
+    <button class="themebtn" id="explainbtn" title="Show or hide the explanations"
+            aria-label="Show or hide the explanations" aria-pressed="true">?</button>
     <button class="themebtn" id="themebtn" title="Light / dark" aria-label="Toggle theme">◐</button>
     <button class="sidetoggle" id="sidetoggle" aria-label="Menu" aria-expanded="false">☰</button>
   </div>
@@ -1486,7 +1517,15 @@
     <div class="strip" id="strip"></div>
     <p class="hint" id="coverage"></p>
     <div id="findings"></div>
-    <div class="charts" id="charts"></div>
+    <!-- Everything about the RUN rather than about the findings. On the triage path it
+         was ten boxes a reviewer scrolled past; here it is one line they can open. -->
+    <details class="rundetail" id="rundetail">
+      <summary><span class="slab">Run detail</span>
+        <span class="note teach">what was checked, what came back, and how much of the
+          inventory we can monitor at all</span></summary>
+      <div class="strip" id="runstrip"></div>
+      <div class="charts" id="charts"></div>
+    </details>
     <div id="agentruns"></div>
     <div id="standing"></div>
     <div id="held"></div>
@@ -2276,9 +2315,26 @@ function renderCharts(sum) {
   box.innerHTML = out.join('');
 }
 
+/* Which tile sub-lines TEACH rather than report. "6 critical · 21 major · 5 minor" is
+   the finding count broken down and belongs on screen; "confirmed over 2 runs" explains
+   what the number means and is worth saying once. */
+const TEACH_SUB = new Set(['probed ok', 'broken', 'inconclusive',
+                           'unchanged, suppressed', 'unmonitorable']);
+
+function tile([k, v, s]) {
+  return `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>
+     <div class="s${TEACH_SUB.has(k) ? ' teach' : ''}">${esc(s)}</div></div>`;
+}
+
 function renderStrip() {
   const sev = SUMMARY.findings_by_severity || {}, pc = SUMMARY.probe_counts || {};
-  const tiles = [
+  /* Three, not six. Six tiles and four charts stood between opening the page and
+     reading a single finding - 1,412 characters of surrounding material on a page
+     whose default state showed no findings at all. These three are the ones a reviewer
+     acts on: how much work there is, how much of it is confirmed broken, and why the
+     new-or-changed list is empty. The rest describes the RUN rather than the findings,
+     so it sits behind "Run detail" with the charts. */
+  const lead = [
     /* Folded into the three bands and ordered worst-first. It printed the raw keys in
        whatever order the object arrived in - "11 medium · 6 critical · 10 high · 5 low"
        - which named two levels the rest of the page does not have and buried the one
@@ -2289,15 +2345,17 @@ function renderStrip() {
         .filter(([, n]) => n)
         .map(([b, n]) => `${n} ${word('severity', b).toLowerCase()}`)
         .join(' · ') || 'none this week'],
-    ['probed ok', pc.ok ?? 0, 'no change detected'],
     ['broken', pc.broken ?? 0, 'confirmed over 2 runs'],
-    ['inconclusive', pc.inconclusive ?? 0, 'blocked or robots-refused, not broken'],
     ['unchanged, suppressed', SUMMARY.suppressed_unchanged ?? 0, 'kept out of the digest'],
+  ];
+  const rest = [
+    ['probed ok', pc.ok ?? 0, 'no change detected'],
+    ['inconclusive', pc.inconclusive ?? 0, 'blocked or robots-refused, not broken'],
     ['unmonitorable', SUMMARY.without_authority ?? 0, 'no official domain set'],
   ];
-  $('#strip').innerHTML = tiles.map(([k,v,s]) =>
-    `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>
-     <div class="s">${esc(s)}</div></div>`).join('');
+  $('#strip').innerHTML = lead.map(tile).join('');
+  const r = $('#runstrip');
+  if (r) r.innerHTML = rest.map(tile).join('');
 }
 
 /* ---------- detail slide-over ----------
@@ -3079,15 +3137,17 @@ function vendorDate(iso) {
 function findingRow(r) {
   const sev = r.local_severity || r.severity;
   const places = (r.affects || []).reduce((n, a) => n + a.count, 0);
-  /* Course, then the status - not the severity again. Severity says how bad, status
-     says whether this run moved it, and carrying only the first is why 37 settled
-     findings looked exactly like the 6 that had just changed. Sessions used to sit
-     here too; they are the panel's job now, and they were never on a raised row in the
-     first place - only the standing payload derived them. */
+  /* A value that is the same on every row is not information, it is furniture. On a
+     course page the course name was printed 31 times for 31 findings, and "Unchanged"
+     31 times out of 31 - together about 18% of the text in the list. The course is
+     shown only when the list spans more than one, and the status only when this run
+     actually moved the finding; "Unchanged" is the default state and the settled group
+     it sits in already says so in its own heading. */
   const nc = (r.courses || []).length;
-  const wheres = nc > 1 ? `${nc} courses` : (nc === 1 ? r.courses[0] : '');
+  const wheres = CURRENT_COURSE ? '' : (nc > 1 ? `${nc} courses` : (nc === 1 ? r.courses[0] : ''));
   const ev = evidenceLine(r);
-  const stat = (r.diff_class || '').replace(/[^a-z]/g, '');
+  const moved = ['new', 'worsened'].includes(r.diff_class);
+  const stat = moved ? r.diff_class.replace(/[^a-z]/g, '') : '';
   return `<div class="frow ${esc(sev)}${r._decision ? ' decided' : ''}"
           data-detail="${esc(r.finding_id)}"
           role="button" tabindex="0" title="Open the full detail">
@@ -3114,10 +3174,13 @@ function findingRow(r) {
           outcome the evidence line already renders, so showing the two double-prints
           one fact. */
       ev ? '' : (r.summary ? `<div class="fwhat">${esc(r.summary)}</div>` : '')}
-    <div class="fmeta">${esc(wheres)}
+    ${/* Omitted entirely when it would be empty, which on a single-course page with
+          nothing moved and nothing triaged is every row - an empty div still costs its
+          margin, and 31 of them is a column of blank space under the evidence. */''}
+    ${(wheres || stat || r._decision) ? `<div class="fmeta">${esc(wheres)}
       ${stat ? `<span class="chip st ${stat}"
         title="what this run did to it">${esc(word('status', r.diff_class))}</span>` : ''}
-      ${decisionChip(r._decision)}</div>
+      ${decisionChip(r._decision)}</div>` : ''}
   </div>`;
 }
 
@@ -3197,7 +3260,7 @@ function renderFindings(data, kind) {
           <button class="act" id="showmoved">Show these</button></div>` : '');
 
   $('#findings').innerHTML = head
-    + `<h2>${esc(intro.title)}</h2><p class="hint">${intro.blurb}</p>`
+    + `<h2>${esc(intro.title)}</h2><p class="hint teach">${intro.blurb}</p>`
     + (FINDINGS.length
        ? FINDINGS.map(findingRow).join('')
        /* Only blame the filter for what the filter actually did. This list is already
@@ -3237,9 +3300,9 @@ function renderFindings(data, kind) {
     ? `<details class="settled" ${settled.length <= SHOW ? 'open' : ''}>
          <summary><span class="slab">Open, unchanged</span>
            <span class="scount mono">${settled.length}</span>
-           <span class="note">nothing about them changed this run; still on file,
+           <span class="note teach">nothing about them changed this run; still on file,
              still unresolved</span></summary>
-         <div class="panel" style="padding:0">`
+         <div class="flist">`
        + settled.slice(0, SHOW).map(findingRow).join('')
        + (settled.length > SHOW
           ? `<div class="morewrap"><button class="act" id="moresettled">Show ${
@@ -3250,21 +3313,25 @@ function renderFindings(data, kind) {
   // No re-wiring: the row click handler is delegated on `document`, which is precisely
   // so a re-render cannot leave rows dead.
   if (ms) ms.onclick = () => {
-    ms.closest('.panel').innerHTML = settled.map(findingRow).join('');
+    ms.closest('.flist').innerHTML = settled.map(findingRow).join('');
   };
 
   const cov = data.coverage || {};
   const stamps = Object.values(cov).filter(Boolean).sort();
-  $('#coverage').textContent = stamps.length
-    ? `Coverage: ${Object.keys(cov).length} dependencies tracked, oldest check `
-      + `${stamps[0].slice(0,16).replace('T',' ')} UTC. A scoped run refreshes only its `
-      + `own slice — the rest is carried forward.`
+  /* The figures stay; only the sentence explaining what a scoped run does is behind
+     "?". How fresh the oldest check is decides whether this page can be trusted today,
+     which is not something to make a reader opt into. */
+  $('#coverage').innerHTML = stamps.length
+    ? `${Object.keys(cov).length} dependencies tracked · oldest check `
+      + `${esc(stamps[0].slice(0,16).replace('T',' '))} UTC`
+      + `<span class="teach"> — a scoped run refreshes only its own slice; the rest is
+         carried forward.</span>`
     : '';
 
   const held = data.suppressed_by_reviewer || [];
   $('#held').innerHTML = held.length ? `<h2>You marked these as not a problem</h2>
-    <p class="hint">These recur but a reviewer marked them not actionable. They return
-    automatically if the evidence changes.</p>` + held.map(h =>
+    <p class="hint teach">These recur but a reviewer marked them not actionable. They
+    return automatically if the evidence changes.</p>` + held.map(h =>
       `<div class="card low"><div class="cbody"><div><span class="chip sig" title="${
         esc(h.signal)}">${esc(word('signal', h.signal))}</span>
        <b>${esc(h.canonical_name)}</b></div><div class="note">${esc(h.reason)}</div></div></div>`).join('') : '';
@@ -3723,6 +3790,28 @@ function applyTheme(mode) {
   }
 }
 
+const EXPLAIN_KEY = 'miw-explain';
+
+function initExplain() {
+  let on = '1';
+  try { on = localStorage.getItem(EXPLAIN_KEY) ?? '1'; } catch (e) { /* private mode */ }
+  const apply = v => {
+    document.documentElement.classList.toggle('explain', v === '1');
+    const b = $('#explainbtn');
+    if (b) b.setAttribute('aria-pressed', v === '1' ? 'true' : 'false');
+  };
+  apply(on);
+  const btn = $('#explainbtn');
+  if (!btn) return;
+  btn.onclick = () => {
+    let cur = '1';
+    try { cur = localStorage.getItem(EXPLAIN_KEY) ?? '1'; } catch (e) {}
+    const next = cur === '1' ? '0' : '1';
+    try { localStorage.setItem(EXPLAIN_KEY, next); } catch (e) {}
+    apply(next);
+  };
+}
+
 function initTheme() {
   let mode = '';
   try { mode = localStorage.getItem(THEME_KEY) || ''; } catch (e) { /* private mode */ }
@@ -3764,6 +3853,7 @@ $('#hrun').onclick = () => {
 };
 
 initTheme();
+initExplain();
 initSidebar();
 loadLLM();      // the rail is always visible, so populate it once at startup
 
