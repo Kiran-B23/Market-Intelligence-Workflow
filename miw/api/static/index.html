@@ -757,6 +757,15 @@
     transform:translateX(100%); transition:transform .22s cubic-bezier(.32,.72,0,1);
   }
   .slide.open{transform:translateX(0)}
+  /* `hidden` has to actually hide these two. The page's only `[hidden]` rule is
+     `section[hidden]`, and the slide-over is an <aside> with `display:flex` in the rule
+     above - which beats the user agent's `[hidden]{display:none}` on specificity. So
+     `closeDetail()` setting `el.hidden = true` did nothing to either element, and the
+     panel was dismissed only by `transform:translateX(100%)` when `.open` came off.
+     Any path that clears `hidden` without also clearing `.open` therefore left a fully
+     visible panel sitting over the page - which is what navigating away from an open
+     finding did. Making `hidden` authoritative means the two can never disagree. */
+  .slide[hidden],.scrim[hidden]{display:none!important}
   @media (prefers-reduced-motion:reduce){
     .scrim,.slide{transition:none}
   }
@@ -1821,6 +1830,12 @@ async function route() {
   renderNav(r); renderSwitcher(r);
   if (COURSES.length) renderCoursePicker();
   stopPolling();
+  /* A detail panel belongs to the page it was opened from. It is not part of the
+     route - `openDetail` never touches the hash - so nothing was closing it when the
+     route changed, and clicking any nav item while one was open left it covering the
+     page you had just navigated to. The return-focus target is cleared first: the row
+     it points at belongs to the list being replaced. */
+  if (!$('#slide').hidden) { DETAIL_RETURN = null; closeDetail(); }
 
   if (r.scope === 'overview') { show('overview'); return renderOverview(); }
   if (r.scope === 'watch')    { show('watch'); return renderWatch(); }

@@ -181,6 +181,24 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
       "        gone = True"),
      "pytest:tests/test_reach_discipline.py"),
 
+    ("reach the reason a redirect matters ignores where the redirect landed",
+     "miw/analyse/notes.py",
+     ('    "S5": lambda f: _why_s5(f),',
+      '    "S5": ("The written steps and screenshots no longer match what students see, "\n'
+      '           "which reads to them as the course being wrong."),'),
+     "pytest:tests/test_redirect_reach.py"),
+
+    ("UI hidden stops hiding the detail panel, so it survives a navigation",
+     "miw/api/static/index.html",
+     ("  .slide[hidden],.scrim[hidden]{display:none!important}",
+      "  .slide[hidden],.scrim[hidden]{opacity:.99}"),
+     "pytest:tests/test_ui_render.py"),
+    ("UI navigating away leaves an open detail panel over the new page",
+     "miw/api/static/index.html",
+     ("  if (!$('#slide').hidden) { DETAIL_RETURN = null; closeDetail(); }",
+      "  /* panel left open */"),
+     "pytest:tests/test_ui_render.py"),
+
     # --- S17: a known hole in the version the course pins --------------------
     ("S17 the row count is reported, so one CVE in two databases counts twice",
      "miw/probe/advisories.py",

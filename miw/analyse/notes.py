@@ -26,8 +26,15 @@ WHY = {
           "asked to do.",
     "S4": "Teaching an abandoned tool costs students time on a skill the industry has "
           "already moved off.",
-    "S5": "The written steps and screenshots no longer match what students see, which "
-          "reads to them as the course being wrong.",
+    # A callable for the same reason S7 is one: the flat sentence was wrong on four of
+    # the ten live S5 findings. S5 is produced by a REDIRECT, and a redirect is three
+    # different events - `score.s5_reach` already tells them apart for the action, and
+    # the action and the reason were contradicting each other in the panel:
+    #
+    #   ACTION  "Same vendor, reorganised site - nothing about how OpenAI works
+    #            has changed, so only the 1 link(s) need editing."
+    #   WHY     "The written steps and screenshots no longer match what students see."
+    "S5": lambda f: _why_s5(f),
     "S6": "Code written against the taught version may no longer run on what students "
           "install today.",
     # S7 is a callable because the flat sentence was wrong three times out of four.
@@ -71,6 +78,35 @@ WHEN_BY_SEVERITY = {
     "low": "Opportunistically, when the session is next touched.",
     "info": "No action needed yet; recorded for awareness.",
 }
+
+
+
+def _why_s5(f: Finding) -> str:
+    """Why a redirect matters — which depends entirely on where it landed.
+
+    `links`     the vendor reorganised its own site. Nothing a session teaches has
+                changed; a link points at a page that has moved.
+    `moved`     the product now answers on somebody else's domain, so the prose that
+                names it may be naming something rebranded or absorbed.
+    `behaviour` no redirect at all, so this is a researched implementation claim - the
+                vendor saying it changed how the thing works, which is the only case
+                where a screenshot or a written step actually goes stale.
+    """
+    from miw.analyse.score import s5_reach
+    reach = s5_reach(f.redirects)
+    if reach == "links":
+        return ("A link in the material points at a page that has moved. Nothing the "
+                "session teaches has changed, but a student following it lands "
+                "somewhere the author did not choose.")
+    if reach == "moved":
+        moved = next((r for r in (f.redirects or []) if r.get("off_site")), {})
+        return (f"{f.canonical_name} now answers on a domain it does not own"
+                f"{' (' + str(moved.get('to')) + ')' if moved.get('to') else ''}, which "
+                f"usually means it has been rebranded or acquired — so the places that "
+                f"name it may be naming something that no longer exists under that "
+                f"name.")
+    return ("The written steps and screenshots no longer match what students see, which "
+            "reads to them as the course being wrong.")
 
 
 def _why_s7(f: Finding) -> str:

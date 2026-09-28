@@ -193,3 +193,43 @@ def test_small_text_clears_aa(fg, bg, what):
 def test_white_on_the_action_fill_clears_aa():
     """The one filled button on a screen, so it must not be the least readable thing."""
     assert _ratio("#ffffff", _tokens()["accent"]) >= 4.5
+
+
+# ----------------------------------------------- the detail panel actually closes
+#
+# Found by driving the real UI, not by reading it. Opening a finding and then clicking
+# any nav item left the panel sitting over the page you had just navigated to. Two
+# independent causes, and the second is why the first was invisible:
+#
+#   1. `route()` never closed the panel. The detail is not part of the route -
+#      `openDetail` does not touch the hash - so nothing dismissed it on navigation.
+#   2. `closeDetail()` sets `el.hidden = true`, and that did NOTHING to either element.
+#      The page's only `[hidden]` rule is `section[hidden]`, while the slide-over is an
+#      <aside> whose `.slide` rule sets `display:flex` - which beats the user agent's
+#      `[hidden]{display:none}` on specificity. Dismissal rested entirely on
+#      `transform:translateX(100%)` coming back when `.open` was removed, so any path
+#      that cleared `hidden` while `.open` lingered left a fully visible panel.
+#
+# Measured in the browser after the fix: `hidden:true, display:"none"` on both the
+# panel and the scrim, even with a stale `.open` class still on the element.
+
+def test_navigating_away_closes_the_detail_panel():
+    body = _function(_script(), "route")
+    assert "closeDetail()" in body, "route() must dismiss an open detail panel"
+    assert "DETAIL_RETURN = null" in body, (
+        "the return-focus target belongs to the list being replaced")
+
+
+def test_hidden_actually_hides_the_panel_and_the_scrim():
+    """`hidden` has to win, or it is a flag nothing reads."""
+    assert ".slide[hidden],.scrim[hidden]{display:none!important}" in PAGE
+
+
+def test_the_panel_is_not_a_section_so_the_generic_rule_does_not_cover_it():
+    """This is the trap: `section[hidden]` exists and looks like it covers everything."""
+    import re
+    assert "section[hidden]{display:none!important}" in PAGE
+    m = re.search(r'<(\w+) class="slide" id="slide"', PAGE) or \
+        re.search(r'<(\w+) class="slide"[^>]*id="slide"', PAGE)
+    assert m and m.group(1) != "section", (
+        "the slide-over is not a <section>, so it needs its own [hidden] rule")

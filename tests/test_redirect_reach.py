@@ -20,7 +20,7 @@ Measured before and after, on the live artifact:
 import pytest
 
 from miw.analyse.score import findings_for, reaches, reaching_locations, s5_reach
-from miw.schema import Dependency, Location, ProbeResult
+from miw.schema import Dependency, Finding, Location, ProbeResult
 
 COURSE = "Intro to Gen AI"
 
@@ -169,3 +169,63 @@ def test_an_acquirers_domain_is_not_the_acquired_products_authority():
     e = next(x for x in reg if x["canonical_name"] == "Windsurf")
     assert not any("devin.ai" in d for d in e["official_domains"])
     assert "acquirer does not speak for the product it absorbed" in e["notes"]
+
+
+# ------------------------------------- the action and the reason must not disagree
+#
+# `recommend()` was split into three sentences for the three events a redirect can be;
+# `notes.WHY` was not, and kept a flat "the written steps and screenshots no longer
+# match what students see". Seen side by side in the detail panel, on four of the ten
+# live S5 findings:
+#
+#   ACTION  "Same vendor, reorganised site - nothing about how OpenAI works has
+#            changed, so only the 1 link(s) need editing."
+#   WHY     "The written steps and screenshots no longer match what students see."
+#
+# S7 had already been made a callable for exactly this - "the flat sentence was wrong
+# three times out of four" - and S5 needed the same treatment.
+
+def _composed(redirects, name="OpenAI"):
+    from miw.analyse.notes import compose
+    from miw.analyse.score import scope_locations
+    dep = Dependency(kind="service", canonical_name=name,
+                     homepage=f"https://{name.lower()}.com",
+                     official_domains=[f"{name.lower()}.com"],
+                     locations=[loc("link:a_href", url="https://x.example/a")])
+    f = Finding(dep_id=dep.dep_id, canonical_name=name, signal="S5",
+                signal_label="the taught steps changed", severity="medium")
+    f.probe_signals = ["redirected_off_path"]
+    f.redirects = redirects
+    f.affected_urls = [r["from"] for r in redirects] or ["https://x.example/a"]
+    scope_locations(dep, f)
+    compose(dep, f)
+    return f
+
+
+def test_a_reorganisation_does_not_claim_the_steps_changed():
+    f = _composed(INSIDE)
+    assert "no longer match what students see" not in f.why_to_act
+    assert "Nothing the session teaches has changed" in f.why_to_act
+
+
+def test_a_product_that_moved_says_so_in_the_reason_too():
+    f = _composed(OUTSIDE, name="Windsurf")
+    assert "does not own" in f.why_to_act
+    assert "rebranded or acquired" in f.why_to_act
+
+
+def test_a_researched_behaviour_change_keeps_the_original_reason():
+    """No redirect means the vendor said it changed how the thing works - the one case
+    where a screenshot or a written step really does go stale."""
+    f = _composed([])
+    assert "no longer match what students see" in f.why_to_act
+
+
+@pytest.mark.parametrize("redirects", [INSIDE, OUTSIDE, []])
+def test_the_action_and_the_reason_never_contradict(redirects):
+    """Whatever the case, the two sentences a reviewer reads together must agree about
+    whether the taught material itself changed."""
+    f = _composed(redirects)
+    claims_unchanged = "nothing about how" in f.recommendation.lower()
+    says_steps_stale = "no longer match what students see" in f.why_to_act
+    assert not (claims_unchanged and says_steps_stale)
