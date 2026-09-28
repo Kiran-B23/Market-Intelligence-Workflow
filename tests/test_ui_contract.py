@@ -133,11 +133,10 @@ def test_every_finding_list_renders_through_the_one_row():
     gone and all four lists draw through `findingRow`.
     """
     assert PAGE.count("function findingRow(r)") == 1
-    # Raised, settled - twice, because it opens collapsed and expands in place - and
-    # the run page.
+    # Raised, settled, and the run page. The settled list renders once: it used to be
+    # drawn twice, a four-row slice and then the whole thing behind "Show N more".
     assert PAGE.count("FINDINGS.map(findingRow)") == 1
     assert PAGE.count("settled.map(findingRow)") == 1
-    assert PAGE.count("settled.slice(0, SHOW).map(findingRow)") == 1
     assert PAGE.count("rows.map(findingRow)") == 1
     # Not "unused": a second renderer is how the two lists diverged the first time.
     assert "function card(" not in PAGE
@@ -727,9 +726,9 @@ def test_a_verdict_reaches_the_list_behind_the_panel():
 
     The old marker was `$('#c-' + id)`, the id of a card element that no longer exists -
     it would have thrown on every successful triage. Both halves are required: the DOM
-    patch for immediacy, and the DATA patch because `#moresettled` re-renders the
-    settled rows from an array captured by `renderFindings`, so a DOM-only fix vanishes
-    the moment someone expands the rest of the list.
+    patch for immediacy, and the DATA patch because the severity filter re-renders both
+    lists from arrays captured by `renderFindings`, so a DOM-only fix vanishes the
+    moment someone narrows to a band.
     """
     assert "$('#c-'+id)" not in PAGE and "$('#c-' + id)" not in PAGE
     body = PAGE[PAGE.index("function markDecided("):]
@@ -897,3 +896,29 @@ def test_a_finding_is_its_own_surface():
     # that wrapper and should: its contents are not cards.)
     assert '<div class="flist">' in PAGE
     assert ".settled .flist{" in css and ".settled .panel{" not in css
+
+
+def test_an_unchanged_finding_is_one_click_away_not_two():
+    """It used to be two: open the collapsed group, then "Show 27 more".
+
+    Both tiers were built against the same incident - 37 settled findings drowning the
+    6 that had just moved - and the collapse alone already solves it, because a closed
+    group puts no settled rows above the fold at all. The inner cap only fired after a
+    reviewer had explicitly asked to see them.
+    """
+    body = PAGE[PAGE.index("function renderFindings(data, kind)"):]
+    body = body[:body.index("\n}\n")]
+    assert "settled.map(findingRow)" in body
+    assert "settled.slice(" not in body, "no second cap inside the group"
+    assert "more unchanged findings" not in PAGE
+
+
+def test_the_settled_group_opens_when_nothing_was_raised():
+    """A quiet week is the normal week for a drift watcher - every course on this run
+    raised nothing - and then this group IS the page. Collapsing it hides all of the
+    content behind a click; collapsing it when something DID move is the case it was
+    built for."""
+    body = PAGE[PAGE.index("function renderFindings(data, kind)"):]
+    body = body[:body.index("\n}\n")]
+    assert "const openSettled = FINDINGS.length === 0;" in body
+    assert "${openSettled ? 'open' : ''}" in body

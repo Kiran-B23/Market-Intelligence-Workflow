@@ -638,7 +638,6 @@
   .rundetail[open] > summary::after{content:"\25b4"}
   .rundetail > summary:hover{background:var(--sunk)}
   .rundetail .strip{margin-top:var(--s3)}
-  .morewrap{padding:10px 14px; border-top:1px solid var(--rule); text-align:center}
   /* The first-hand observation, as labelled facts rather than a paragraph. */
   .proof{
     display:grid; grid-template-columns:auto minmax(0,1fr); gap:7px var(--s4);
@@ -1626,8 +1625,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
 const get = async u => (await fetch(u)).json();
 const text = async u => (await fetch(u)).text();
 /* STANDING is held alongside FINDINGS so a verdict reached in the panel can patch the
-   settled rows too. `#moresettled` re-renders from this array, so patching only the DOM
-   would lose the decision the moment the rest of the list is expanded. */
+   settled rows too. The severity filter re-renders both lists from these arrays, so
+   patching only the DOM would lose the decision the moment a band is clicked. */
 let SUMMARY = {}, FINDINGS = [], STANDING = [];
 
 /* Severity is stored five-valued - it orders the list and sets `due_by` - but a reader
@@ -3295,26 +3294,30 @@ function renderFindings(data, kind) {
   /* Collapsed behind its own count. These are real and still unresolved, so they are
      never hidden - but a settled finding is not what a reviewer opened the page for,
      and 37 of them above the fold is why the 6 that moved were missed. */
-  const SHOW = 4;
+  /* One tier of disclosure, not two. There used to be a four-row cap inside this group
+     as well, so reaching an unchanged finding took two clicks: open the group, then
+     "Show 27 more". Both tiers were written against the same incident - 37 settled
+     findings drowning the 6 that had just moved - and the collapse alone already solves
+     it, because a closed group puts ZERO settled rows above the fold. The cap only ever
+     fired after a reviewer had explicitly asked to see them, which is a strange moment
+     to answer a question nobody asked. The cost that justified it is gone too: those
+     were 115-line cards, and a row is three lines.
+
+     Open when nothing was raised. On a quiet week - the normal week for a drift
+     watcher, and every course on this run - the raised list is an empty-state message
+     and this group IS the page, so collapsing it hides all of the content. When
+     something did move it stays shut, which is the case it was built for. */
+  const openSettled = FINDINGS.length === 0;
   $('#standing').innerHTML = settled.length
-    ? `<details class="settled" ${settled.length <= SHOW ? 'open' : ''}>
+    ? `<details class="settled" ${openSettled ? 'open' : ''}>
          <summary><span class="slab">Open, unchanged</span>
            <span class="scount mono">${settled.length}</span>
            <span class="note teach">nothing about them changed this run; still on file,
              still unresolved</span></summary>
          <div class="flist">`
-       + settled.slice(0, SHOW).map(findingRow).join('')
-       + (settled.length > SHOW
-          ? `<div class="morewrap"><button class="act" id="moresettled">Show ${
-               settled.length - SHOW} more unchanged findings</button></div>` : '')
+       + settled.map(findingRow).join('')
        + `</div></details>`
     : '';
-  const ms = $('#moresettled');
-  // No re-wiring: the row click handler is delegated on `document`, which is precisely
-  // so a re-render cannot leave rows dead.
-  if (ms) ms.onclick = () => {
-    ms.closest('.flist').innerHTML = settled.map(findingRow).join('');
-  };
 
   const cov = data.coverage || {};
   const stamps = Object.values(cov).filter(Boolean).sort();
@@ -3339,8 +3342,8 @@ function renderFindings(data, kind) {
 
 /* A verdict reached in the panel leaves every list behind it stale. Both halves are
    needed: the DOM patch so the change is immediate, and the DATA patch because
-   `#moresettled` re-renders the settled rows from an array captured by
-   `renderFindings` — a DOM-only fix vanishes the moment someone expands the rest.
+   the severity filter re-renders both lists from arrays captured by `renderFindings`
+   — a DOM-only fix vanishes the moment someone narrows to a band.
    `[data-detail=…]` catches the raised list, the settled list and the run view at once,
    because all three draw through `findingRow`. */
 function markDecided(id, verdict, reason) {
