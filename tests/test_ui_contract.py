@@ -124,27 +124,54 @@ def test_the_standing_list_is_keyboard_reachable():
     assert ".srow[data-detail], .frow[data-detail]" in PAGE
 
 
-def test_both_finding_lists_share_one_row():
+def test_every_finding_list_renders_through_the_one_row():
     """They had separate markup and drifted, and the copy people actually read was the
-    one showing a bare name with no action."""
+    one showing a bare name with no action.
+
+    The raised list was the last holdout: it drew through `card`, a 115-line article
+    that put everything the system knew on the list, so nothing stood out. `card` is
+    gone and all four lists draw through `findingRow`.
+    """
     assert PAGE.count("function findingRow(r)") == 1
-    # The settled list renders through the same function - twice, because it opens
-    # collapsed and expands in place - and the run page through it as well.
+    # Raised, settled - twice, because it opens collapsed and expands in place - and
+    # the run page.
+    assert PAGE.count("FINDINGS.map(findingRow)") == 1
     assert PAGE.count("settled.map(findingRow)") == 1
     assert PAGE.count("settled.slice(0, SHOW).map(findingRow)") == 1
     assert PAGE.count("rows.map(findingRow)") == 1
+    # Not "unused": a second renderer is how the two lists diverged the first time.
+    assert "function card(" not in PAGE
+    assert "function locLine" not in PAGE, "only card called it"
+    # `#held` still renders `.card`, so the class and its severity rails stay - but no
+    # findings list may scroll to one.
+    assert "#findings .card" not in PAGE
+    assert "#findings .frow" in PAGE
 
 
-def test_a_finding_row_says_what_it_is_and_what_to_do():
-    """The complaint: "I could not understand what mentioned there, what suggestion
-    given and where it needs to be implemented or added." A row that carries only a
-    name answers none of the three."""
+def test_a_finding_row_says_what_it_is_and_the_panel_says_what_to_do():
+    """The row answers WHAT, the panel answers what-to-do and where.
+
+    The earlier complaint - "I could not understand what mentioned there, what
+    suggestion given and where it needs to be implemented" - was about a row carrying
+    only a name, and the fix put all three on the row. With the same treatment applied
+    to raised findings that became 82 essays in a column, so the fix and the location
+    moved into the panel. The guarantee is unchanged: a row still may not be a bare
+    name. Only its address moved.
+    """
     body = PAGE[PAGE.index("function findingRow(r)"):]
     body = body[:body.index("\n}\n")]
     assert "r.summary" in body, "what it is"
-    assert "r.action" in body, "what to do"
-    assert "Do this" in body
-    assert "r.sessions" in body, "where"
+    assert "evidenceLine(r)" in body, "what we observed"
+    assert "r.action" not in body, "the fix belongs in the panel"
+    assert "Do this" not in body
+    assert "r.sessions" not in body, "sessions belong in the panel"
+
+    panel = PAGE[PAGE.index("function renderDetail(d)"):]
+    panel = panel[:panel.index("\nfunction ")]
+    assert "ch.what_to_act" in panel, "what to do"
+    assert "f.summary" in panel, "what it is, for a reviewer who opened it cold"
+    assert "What this affects" in panel, "where"
+    assert 'data-do="accept"' in panel, "and the decision itself"
 
 
 def test_an_unresolvable_location_explains_itself_rather_than_rendering_blank():
@@ -560,7 +587,10 @@ def test_the_gaps_step_is_offered_in_the_form():
 def test_a_topic_gap_is_not_described_as_a_stale_dependency():
     """Its dependency is absent from the inventory BY DESIGN, so the "re-run extract"
     warning would be advice that changes nothing."""
-    assert "f.projection === 'topic'" in PAGE
+    # Keyed on `d.projection`, the value the detail endpoint computes, NOT the
+    # finding's own field - that one is empty on the detail payload, so keying on it
+    # would leave this branch permanently unreachable with nothing to show for it.
+    assert "d.projection === 'topic'" in PAGE
     assert "Where it belongs" in PAGE
 
 
@@ -674,3 +704,63 @@ def test_the_digest_says_what_it_could_not_check_at_all():
                    coverage={"checked": 277, "unchecked": 0, "inconclusive": 0,
                              "no_authority": 0})
     assert "no official domain" not in clean
+
+
+def test_the_triage_box_is_wired_by_element_not_by_scanning_the_page():
+    """`renderAgentRuns` renders a SECOND `.triage` box, for the agent review gate, and
+    it has no `[data-do=toggle]`.
+
+    `wireTriage` used to do `document.querySelectorAll('.triage')`, so it reached that
+    box too and threw on the next line. Nothing had ever surfaced it because
+    `renderFindings` happened to run first. Passing the one element does not narrow the
+    selector, it removes it - there is no longer a selector that could match the wrong
+    thing. `wireAgentReview` keeps its own loop because it legitimately renders N boxes
+    and discriminates by class.
+    """
+    assert "function wireTriage(box)" in PAGE, (
+        "a zero-argument signature is what reintroduces the document-wide scan")
+    assert "document.querySelectorAll('.triage')" not in PAGE
+
+
+def test_a_verdict_reaches_the_list_behind_the_panel():
+    """The decision is made in the panel now, and every list behind it goes stale.
+
+    The old marker was `$('#c-' + id)`, the id of a card element that no longer exists -
+    it would have thrown on every successful triage. Both halves are required: the DOM
+    patch for immediacy, and the DATA patch because `#moresettled` re-renders the
+    settled rows from an array captured by `renderFindings`, so a DOM-only fix vanishes
+    the moment someone expands the rest of the list.
+    """
+    assert "$('#c-'+id)" not in PAGE and "$('#c-' + id)" not in PAGE
+    body = PAGE[PAGE.index("function markDecided("):]
+    body = body[:body.index("\n}\n")]
+    assert "r._decision = verdict" in body, "the data, or a re-render undoes it"
+    assert "[data-detail=" in body, "the DOM, or the list only updates on a reload"
+    assert "STANDING" in body, "the settled list holds most of the page"
+
+
+def test_the_panel_head_is_cleared_when_the_next_finding_loads():
+    """It used to keep the previous finding's chips while the next one fetched.
+
+    Cosmetic until the footer held a Confirm button: a failed load would then leave a
+    live verdict control for finding A under a panel saying finding B could not be
+    loaded, and the handler's captured id is A's.
+    """
+    body = PAGE[PAGE.index("async function openDetail("):]
+    body = body[:body.index("\n}\n")]
+    assert "$('#slide-head').innerHTML" in body
+    assert "$('#slide-foot').innerHTML" in body
+
+
+def test_our_own_deadline_is_never_drawn_as_a_vendors_date():
+    """`due_by` is `today + SEVERITY_OFFSETS[severity]`, so 26 findings share one value.
+
+    On a row it would read as a fact about the world. Only `shutdown_on` - which
+    `parse_shutdown` produced from the vendor's own published string - may appear, and
+    the parse happens server-side so the browser never becomes a second, disagreeing
+    reader of an ambiguous format.
+    """
+    body = PAGE[PAGE.index("function findingRow(r)"):]
+    body = body[:body.index("\n}\n")]
+    assert "vendorDate(r.shutdown_on)" in body
+    assert "due_by" not in body

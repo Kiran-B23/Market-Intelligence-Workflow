@@ -75,13 +75,19 @@ def _row_harness(rows: list) -> str:
         words,
         "const word = (group, key) => (WORDS[group] || {})[key] || key || '';",
         esc,
+        re.search(r"const MONTHS = \[.*?\];", js, re.S).group(0),
         _function(js, "evidenceLine"),
+        # The row's own helpers. They are pure - they read their arguments and nothing
+        # else - which is the property that lets the row be executed in isolation at
+        # all, so they are extracted rather than stubbed.
+        _function(js, "decisionChip"),
+        _function(js, "vendorDate"),
         _function(js, "findingRow"),
         "const SUMMARY = {run_date:'2026-01-01'};",
         f"const rows = {json.dumps(rows)};",
         "let n = 0; for (const r of rows) {",
         "  const h = findingRow(r);",
-        "  if (!h.includes('class=\"frow\"')) throw new Error('no row: ' + r.finding_id);",
+        "  if (!h.includes('class=\"frow ')) throw new Error('no row: ' + r.finding_id);",
         "  if (h.includes('undefined')) throw new Error('undefined in: ' + r.finding_id);",
         "  if (h.includes('[object Object]')) throw new Error('object in: ' + r.finding_id);",
         "  n++; }",
@@ -115,18 +121,62 @@ def test_every_row_shape_renders():
     assert out["n"] == len(SHAPES)
 
 
-def test_the_row_says_severity_evidence_scope_and_status():
+def test_the_row_says_what_the_issue_is_and_nothing_more():
+    """The row answers WHAT, and stops.
+
+    It used to answer what, what-to-do and where, because the alternative it replaced
+    was a row carrying only a name. That went too far the other way: with the same
+    treatment on raised findings, a reviewer scanning 82 of these read 82 essays. So
+    the instruction, the artifact breakdown and the session numbers moved into the
+    panel, and `test_the_panel_says_what_to_do_and_where` is where they are now
+    guaranteed. What must NOT come back is a row that says only a name.
+    """
     out = json.loads(_run(_row_harness(SHAPES[:1])))
     html = out["sample"]
     assert 'class="sev critical"' in html                 # severity, as a dot
+    assert 'class="frow critical' in html                 # and as a rail down the edge
     assert "mcp.composio.dev/dashboard" in html           # the thing we fetched
     assert "404 / 410 Gone" in html                       # what came back
-    assert "2 quiz questions" in html                     # what has to be opened
     assert "2 places" in html                             # how many
     assert ">Unchanged<" in html                          # what this run did to it
-    assert "Repoint it." in html                          # the one instruction
-    # Severity is a level with its definition on hover, never the raw word alone.
+
+    # Moved to the panel. Asserted as absent, because leaving them here is the change
+    # half-done and every other assertion would still pass.
+    assert "Repoint it." not in html, "the fix belongs in the panel"
+    assert "2 quiz questions" not in html, "the artifact breakdown belongs in the panel"
+    # The severity definition stays: it is what makes the dot mean something, and
+    # "A learner hits this today" is the tooltip on it, not the fallout line.
     assert "A learner hits this today" in html
+
+
+def test_a_decided_row_does_not_look_like_an_untouched_one():
+    """A verdict is the one thing about a finding a reviewer cannot re-derive by eye."""
+    row = {**SHAPES[0], "_decision": "accepted"}
+    html = json.loads(_run(_row_harness([row])))["sample"]
+    assert "Confirmed" in html
+    assert "decided" in html, "no visual difference between ruled-on and untouched"
+
+
+def test_only_a_vendors_own_date_reaches_a_row():
+    """`due_by` is ours — today plus a severity offset — and 26 rows share one value.
+
+    Rendering it as a date chip would be severity wearing a date's clothes. Only
+    `shutdown_on`, which `parse_shutdown` produced from the vendor's own string, is
+    allowed to appear, and its tense follows the date.
+    """
+    past = json.loads(_run(_row_harness(
+        [{**SHAPES[0], "shutdown_on": "2026-08-16", "due_by": "2026-10-05"}])))["sample"]
+    assert "shut down 16 Aug 2026" in past
+    assert "2026-10-05" not in past, "due_by is our deadline, not a fact about the world"
+
+    future = json.loads(_run(_row_harness(
+        [{**SHAPES[0], "shutdown_on": "2099-01-02"}])))["sample"]
+    assert "shuts down 2 Jan 2099" in future
+
+    # Nothing parseable, nothing shown - never the vendor's raw unparsed string.
+    bare = json.loads(_run(_row_harness(
+        [{**SHAPES[0], "shutdown_date": "08/16/26", "shutdown_on": ""}])))["sample"]
+    assert "08/16/26" not in bare
 
 
 def test_a_row_renders_for_every_finding_in_the_live_artifact():
@@ -233,3 +283,121 @@ def test_the_panel_is_not_a_section_so_the_generic_rule_does_not_cover_it():
         re.search(r'<(\w+) class="slide"[^>]*id="slide"', PAGE)
     assert m and m.group(1) != "section", (
         "the slide-over is not a <section>, so it needs its own [hidden] rule")
+
+
+# ---------------------------------------------------------------------------------
+# The detail panel, executed.
+#
+# `card` used to carry the what/why/when triad, the projection banner, the evidence,
+# the alternatives and the triage controls; the list showed everything and nothing
+# stood out. All of it now renders in `renderDetail`, which until this harness existed
+# had no execution coverage at all - only `test_the_page_script_parses`, which proves
+# the braces balance and nothing else. A substring test catches a DELETED feature and
+# catches nothing else: `${esc(f.someTypo)}` renders the word "undefined" into the
+# panel and every grep in test_ui_contract.py still passes.
+#
+# Driven by real `/api/finding/{id}` payloads rather than hand-made ones, because the
+# shapes that break a template literal are the ones nobody thought to write down: an
+# empty `alternatives`, a `claims` entry with no quote, a topic gap with no dependency.
+
+
+def _panel_harness(payloads: list) -> str:
+    js = _script()
+    words = re.search(r"const WORDS = \{.*?\n\};", js, re.S).group(0)
+    esc = re.search(r"const esc = s =>.*?;\n", js, re.S).group(0)
+    return "\n".join([
+        words,
+        "const word = (group, key) => (WORDS[group] || {})[key] || key || '';",
+        esc,
+        re.search(r"const MONTHS = \[.*?\];", js, re.S).group(0),
+        # Stubs for what the panel touches outside itself. Each records rather than
+        # acts, so the assertions below can read what the panel produced.
+        "const SLOTS = {};",
+        "const el = id => ({",
+        "  set innerHTML(v) { SLOTS[id] = (SLOTS[id] || '') + v; },",
+        "  get innerHTML() { return SLOTS[id] || ''; },",
+        "  querySelectorAll: () => [], querySelector: () => null,",
+        "  addEventListener: () => {}, set onclick(v) {},",
+        "});",
+        "const $ = sel => el(sel);",
+        "const wireCopy = () => {}; const wireTriage = () => {};",
+        "const closeDetail = () => {}; const get = async () => ({});",
+        "let DETAIL_ID = '', CURRENT_COURSE = '';",
+        "const SUMMARY = {run_date:'2026-01-01'};",
+        re.search(r"const NO_EXCERPT = \{.*?\n\};", js, re.S).group(0),
+        _function(js, "highlight"),
+        _function(js, "idChip"),
+        _function(js, "locBlock"),
+        _function(js, "decisionChip"),
+        _function(js, "renderDetail"),
+        f"const payloads = {json.dumps(payloads)};",
+        "let n = 0;",
+        "for (const d of payloads) {",
+        "  for (const k of Object.keys(SLOTS)) delete SLOTS[k];",
+        "  CURRENT_COURSE = d.course || '';",
+        "  DETAIL_ID = (d.finding || {}).finding_id || '';",
+        "  renderDetail(d);",
+        "  const all = Object.values(SLOTS).join('');",
+        "  const id = DETAIL_ID || '?';",
+        "  if (!all.trim()) throw new Error('empty panel: ' + id);",
+        "  if (/\\bundefined\\b/.test(all)) throw new Error('undefined in: ' + id);",
+        "  if (all.includes('[object Object]')) throw new Error('object in: ' + id);",
+        "  if (all.includes('NaN')) throw new Error('NaN in: ' + id);",
+        "  n++; }",
+        "const last = {};",
+        "for (const k of Object.keys(SLOTS)) last[k] = SLOTS[k];",
+        "console.log(JSON.stringify({n, slots: last}));",
+    ])
+
+
+def _payloads(limit: int = 0) -> list:
+    """Real detail payloads, built through the API rather than hand-written."""
+    arts = sorted((ROOT / "out").glob("findings_*.json"))
+    if not arts:
+        pytest.skip("no findings artifact in this checkout")
+    rows = json.loads(arts[-1].read_text()).get("findings") or []
+    if not rows:
+        pytest.skip("artifact has no findings")
+    from fastapi.testclient import TestClient
+
+    from miw.api.app import app
+
+    client = TestClient(app)
+    out = []
+    for r in (rows[:limit] if limit else rows):
+        resp = client.get(f"/api/finding/{r['finding_id']}")
+        if resp.status_code == 200:
+            out.append(resp.json())
+    if not out:
+        pytest.skip("no detail payloads resolved")
+    return out
+
+
+def test_the_panel_renders_for_every_finding_in_the_live_artifact():
+    """Whatever the pipeline last produced, rendered - not shapes we imagined."""
+    payloads = _payloads()
+    out = json.loads(_run(_panel_harness(payloads)))
+    assert out["n"] == len(payloads)
+
+
+def test_the_panel_says_what_to_do_and_where():
+    """The three things the row stopped saying have to be somewhere, and this is it."""
+    d = next((p for p in _payloads() if (p.get("change") or {}).get("what_to_act")), None)
+    if d is None:
+        pytest.skip("no finding in this artifact carries an action")
+    slots = json.loads(_run(_panel_harness([d])))["slots"]
+    body = slots.get("#slide-body", "")
+    assert d["finding"]["summary"][:40] in body, "what it is"
+    assert d["change"]["what_to_act"][:40] in body, "what to do"
+    assert "What this affects" in body or "Where it belongs" in body, "where"
+
+
+def test_the_decision_is_in_the_panel_and_reachable_without_scrolling():
+    """It moved off the card, so it has to be here - and pinned, because a finding with
+    776 locations would otherwise put Confirm below every one of them."""
+    slots = json.loads(_run(_panel_harness(_payloads(1))))["slots"]
+    foot = slots.get("#slide-foot", "")
+    assert 'data-do="accept"' in foot and 'data-do="reject"' in foot
+    assert "also applies to" in foot or "data-id=" in foot
+    # In the footer, not at the end of the scrolling body.
+    assert 'data-do="accept"' not in slots.get("#slide-body", "")

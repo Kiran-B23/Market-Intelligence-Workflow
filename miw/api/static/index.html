@@ -485,10 +485,33 @@
      where the list IS the answer and a bare name is not one. Two lines under the head:
      what it is, in the source's words, and the single thing to do about it. */
   .frow{
-    display:block; padding:11px 14px; border-top:1px solid var(--rule);
-    cursor:pointer; font-size:13px;
+    display:block; position:relative; padding:11px 14px 11px 17px;
+    border-top:1px solid var(--rule); cursor:pointer; font-size:13px;
   }
   .frow:first-child{border-top:0}
+  /* The rail the card used to carry. The dot says the level, but a dot is a poor thing
+     to scan a column of - `.card.critical::before` was a 3px edge readable at a glance
+     down 43 rows, and dropping the card would have taken it silently. Same widths, same
+     variables, so the two surfaces cannot drift apart. */
+  .frow::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background:var(--rule2);
+  }
+  .frow.critical::before{background:var(--crit)}
+  .frow.high::before{background:var(--high)}
+  .frow.medium::before{background:var(--med)}
+  .frow.low::before,.frow.info::before{background:var(--low)}
+  /* A finding a reviewer has already ruled on must not look like one they have not.
+     This is the "37 settled looked exactly like the 6 that moved" failure, one level
+     down: the decision is invisible until you open it. */
+  .frow.decided{opacity:.62}
+  /* A vendor's own retirement date, and only that. `due_by` is OUR deadline computed
+     from severity, so it is never rendered here - a chip reading "by 2026-10-05" on 26
+     rows at once is severity wearing a date's clothes. */
+  .fdate{
+    font:500 var(--t-xs)/1 var(--mono); color:var(--crit-ink);
+    white-space:nowrap; font-variant-numeric:tabular-nums;
+  }
   .frow:hover{background:color-mix(in srgb,var(--accent-wash) 45%,transparent)}
   .frow:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
   .fhead{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
@@ -782,11 +805,30 @@
   }
   .slide-head .x:hover{background:var(--sunk); color:var(--ink)}
   .slide-body{overflow-y:auto; padding:16px; flex:1 1 auto; overscroll-behavior:contain}
+  /* Pinned, because the panel is long - a finding with 776 locations would otherwise
+     put Confirm below every one of them. `.slide` is already a column flexbox, so this
+     costs one rule: the body scrolls, the decision does not move. */
+  .slide-foot{
+    flex:0 0 auto; border-top:1px solid var(--rule); background:var(--raise);
+  }
+  .slide-foot .triage{border-top:0}
+  .triage.done{opacity:.62}
   .slide-body h3{
     margin:22px 0 8px; font-size:11px; font-weight:700; letter-spacing:.09em;
     text-transform:uppercase; color:var(--muted);
   }
   .slide-body h3:first-child{margin-top:0}
+  /* The sentence that says what happened, set above the first heading and a step larger
+     than the body: a reviewer opening a finding reads this before deciding whether to
+     read anything else. */
+  .lede{
+    margin:0 0 18px; font-size:14px; line-height:1.55; color:var(--ink);
+    max-width:72ch;
+  }
+  .slide-body h3 .chip{
+    text-transform:none; letter-spacing:0; font-weight:500; margin-left:8px;
+    vertical-align:middle;
+  }
 
   /* One location. The excerpt is the point of the panel, so it gets the visual weight
      and everything else is metadata above it. */
@@ -1499,6 +1541,10 @@
     <button class="x" id="slide-x" aria-label="Close details">&times;</button>
   </div>
   <div class="slide-body" id="slide-body"></div>
+  <!-- The decision. Here, not built by JS, for the same reason the head and the close
+       control are here: a reviewer who opened a finding must be able to rule on it even
+       if part of the fetch failed. Filled by `renderDetail`, emptied by `openDetail`. -->
+  <div class="slide-foot" id="slide-foot"></div>
 </aside>
 
 <script>
@@ -1507,7 +1553,10 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const get = async u => (await fetch(u)).json();
 const text = async u => (await fetch(u)).text();
-let SUMMARY = {}, FINDINGS = [];
+/* STANDING is held alongside FINDINGS so a verdict reached in the panel can patch the
+   settled rows too. `#moresettled` re-renders from this array, so patching only the DOM
+   would lose the decision the moment the rest of the list is expanded. */
+let SUMMARY = {}, FINDINGS = [], STANDING = [];
 
 /* ---------- routing ----------
    Hash routing, so a course page is linkable, bookmarkable and survives a reload —
@@ -2181,133 +2230,6 @@ function renderStrip() {
      <div class="s">${esc(s)}</div></div>`).join('');
 }
 
-/* ---------- findings ---------- */
-function locLine(f) {
-  const by = {};
-  (f.locations||[]).forEach(l => {
-    const tag = l.session_no ? 's'+l.session_no
-      : (String(l.evidence_source||'').startsWith('sheet') ? 'workbook' : 'unit');
-    (by[l.course] = by[l.course] || new Set()).add(tag);
-  });
-  return Object.entries(by).map(([c,s]) =>
-    `<b>${esc(c)}</b> (${[...s].slice(0,6).join(', ')})`).join('; ') || '—';
-}
-
-function card(f) {
-  const done = f._decision ? ' done' : '';
-  const ev = (f.claims||[]).filter(c => c.tier === 'AUTHORITATIVE').map(c =>
-    `<div class="ev"><a href="${esc(c.source_url)}" target="_blank" rel="noopener">${esc(c.source_url)}</a>
-     <span class="chip n">${esc(c.tier.toLowerCase())} · ${esc((c.retrieved_at||'').slice(0,10))}</span>
-     <blockquote>${esc(c.quote)}</blockquote></div>`).join('');
-  const alts = (f.alternatives||[]).filter(a => (a.claims||[]).length).map(a =>
-    `<div>${esc(a.name)} — <a href="${esc(a.homepage)}" target="_blank" rel="noopener">${esc(a.homepage)}</a>
-     ${a.free_student_path ? '<span class="chip ok">free path</span>' : ''}
-     ${a.signup_required ? '<span class="chip n">signup required</span>' : ''}</div>`).join('');
-  const fallout = f.questions_executing
-    ? `${f.questions_executing} graded item(s) execute this and will break`
-    : '';
-
-  const rows = [
-    /* "affects" is also the way in to the detail panel: the summary line is exactly
-       where a reviewer asks "where, and what do I change" - so the button sits on the
-       answer that prompts the question rather than in a corner of the card. */
-    ['affects', `${locLine(f)} <span class="chip n" title="A weighted count of where\
- it is used: a coding question that runs it counts far more than a passing mention.">\
-impact ${f.blast_radius}</span>
-       <button class="openbtn" data-detail="${esc(f.finding_id)}"
-         style="margin-left:6px">Where &amp; what to change →</button>`],
-    ['what to do', esc(f.what_to_act || f.recommendation)],
-    ['why', esc(f.why_to_act)],
-    ['when', esc(f.when_to_act)],
-    fallout ? ['assessments', esc(fallout)] : null,
-    f.probe_signals?.length ? ['observed', `<span class="mono">${esc([...new Set(f.probe_signals)].join(', '))}</span>`] : null,
-    ev ? ['evidence', ev] : null,
-    alts ? ['alternatives', alts] : null,
-  ].filter(Boolean);
-
-  /* A course page shows this finding's SHARE, and must say so. Without this a
-     reviewer reads one course's slice as the whole exposure — llama-3.3-70b-versatile
-     is blast radius 65 across the curriculum and 12 inside Intro to Gen AI. */
-  let proj = '';
-  if (f.projection === 'ok' && CURRENT_COURSE) {
-    const share = (f.total_locations && f.local_locations !== f.total_locations)
-      ? `${f.local_locations} of ${f.total_locations} references are in this course`
-      : `all ${f.total_locations || f.local_locations} references are in this course`;
-    const elsewhere = (f.also_in || []).map(a =>
-      `<a href="#/c/${esc(a.slug)}/findings#c-${esc(f.finding_id)}">${esc(a.course)}</a>
-       (${a.locations} use${a.locations === 1 ? '' : 's'}, impact ${a.blast_radius})`
-    ).join(' · ');
-    proj = `<div class="proj">${esc(share)}; the numbers below are this course's share.
-      ${elsewhere ? 'Also taught in ' + elsewhere + '.' : ''}</div>`;
-  } else if (f.projection === 'topic') {
-    /* Not a stale row. A topic gap has no inventory entry by design, and its
-       per-course figures are exact — the sessions below ARE its locations — so telling
-       the reviewer to re-run `extract` would be advice that changes nothing. */
-    proj = `<div class="proj">This is a topic we do not teach yet, so there is no tool
-      to count. The sessions listed below are the ones in this course that already
-      cover the area.</div>`;
-  } else if (f.projection === 'unavailable') {
-    proj = `<div class="warn">This tool is no longer in the list of tools used, so the
-      figures below are the <b>whole-curriculum</b> totals, not this course's share.
-      Re-run the <code>extract</code> step.</div>`;
-  }
-
-  /* Severity is global because that is what the store and the precision metric use.
-     Showing only that would put CRITICAL above a single prose mention, so the local
-     reading is shown beside it whenever the two differ. */
-  const localSev = (CURRENT_COURSE && f.local_severity && f.local_severity !== f.severity)
-    ? `<span class="chip n">in this course: ${esc(word('severity', f.local_severity))}</span>` : '';
-  const stat = (f.diff_class || '').replace(/[^a-z]/g, '');
-  const places = (f.affects || []).reduce((n, a) => n + a.count, 0);
-
-  /* The same head a settled row has: severity as a level, the drift class in plain
-     words, the place count hard right, and STATUS as its own chip. A raised finding
-     and a settled one are the same kind of object and used to be drawn two different
-     ways, so the eye had to learn the page twice. */
-  return `<article class="card ${esc(f.severity)}${done}" id="c-${esc(f.finding_id)}">
-    <div class="chead">
-      <span class="chip ${esc(f.severity)}"
-            title="${esc(f.severity)} — ${esc(word('sevwhy', f.severity))}">${
-        esc(word('severity', f.severity))}</span>
-      ${localSev}
-      <span class="chip sig" title="${esc(f.signal)}">${esc(word('signal', f.signal))}</span>
-      <span class="name">${esc(f.canonical_name)}</span>
-      <span class="chip ${f.kind_of_signal === 'opportunity' ? 'opportunity' : 'n'}">${esc(word('kind', f.kind_of_signal))}</span>
-      ${stat ? `<span class="chip st ${stat}"
-        title="what this run did to it">${esc(word('status', f.diff_class))}</span>` : ''}
-      ${f.note_source === 'llm' ? `<span class="chip n">note refined${f.note_provider ? ' · ' + esc(f.note_provider) : ''}</span>` : ''}
-      ${f._decision ? `<span class="chip ${f._decision === 'accepted' ? 'ok' : 'critical'}">${esc(
-        f._decision === 'accepted' ? 'confirmed' : 'not a problem')}</span>` : ''}
-      ${places ? `<span class="fplaces">${places} place${places === 1 ? '' : 's'}</span>` : ''}
-    </div>
-    <div class="cbody">
-      <div>${esc(f.summary)}</div>
-      ${evidenceLine(f)}
-      ${proj}
-      ${rows.map(([l,v]) => `<div class="row"><div class="lab">${esc(l)}</div><div>${v}</div></div>`).join('')}
-    </div>
-    <div class="triage" data-id="${esc(f.finding_id)}">
-      ${(CURRENT_COURSE && (f.also_in || []).length)
-        ? `<div class="warn">A triage decision is recorded against the finding, which
-             has no course in it — so accepting or rejecting here also applies to
-             ${(f.also_in || []).map(a => esc(a.course)).join(' and ')}.</div>` : ''}
-      <button class="act accent" data-do="accept">Confirm</button>
-      <button class="act danger" data-do="reject">Not a problem…</button>
-      <button class="act" data-do="toggle">Correct wording…</button>
-      <span class="note" data-role="status">${f._decision
-        ? esc(f._decision + (f._decision_reason ? ' — ' + f._decision_reason : ''))
-        : (f._split === 'learn' ? 'this one will teach the next run' : 'held out for scoring')}</span>
-      <div class="correct">
-        <label>reason (required to reject)</label>
-        <input class="ti" data-f="reason" placeholder="e.g. we cite that blog, it is not a taught step">
-        <label>correct “what to do”</label><input class="ti" data-f="what">
-        <label>correct “why it matters”</label><input class="ti" data-f="why">
-        <label>correct “when”</label><input class="ti" data-f="when">
-      </div>
-    </div>
-  </article>`;
-}
-
 /* ---------- detail slide-over ----------
    Answers the three questions a card cannot: *where* is this in the course, *what
    proves it*, and *what do I change*. Everything rendered here comes from
@@ -2430,6 +2352,10 @@ function renderDetail(d) {
     <span class="name" id="slide-title">${esc(f.canonical_name || dep.canonical_name)}</span>
     ${f.diff_class ? `<span class="chip st ${(f.diff_class || '').replace(/[^a-z]/g, '')}"
       title="what this run did to it">${esc(word('status', f.diff_class))}</span>` : ''}
+    ${/* Filled here on open and rewritten in place by `wireTriage` on a verdict, so a
+          reviewer reopening a finding sees what they already decided without scrolling
+          to the footer to find out. */''}
+    <span id="slide-decision">${decisionChip(f._decision)}</span>
     <button class="x" id="slide-x" aria-label="Close details">&times;</button>`;
   $('#slide-x').onclick = closeDetail;
 
@@ -2526,7 +2452,23 @@ function renderDetail(d) {
         ? ` <a href="${esc(x.evidence_url)}" target="_blank" rel="noopener">notice</a>`
         : ''}</div></div>`).join('');
 
-  const change = `<h3>What needs to change</h3>
+  /* What the issue IS, in one sentence, before anything about acting on it. The row
+     carries this only when it has no evidence line to carry instead, so for every probe
+     finding the panel is the one place it appears — and a reviewer who opened a finding
+     cold otherwise meets a name, some chips and an instruction, with no sentence saying
+     what happened. */
+  const lede = f.summary ? `<p class="lede">${esc(f.summary)}</p>` : '';
+
+  /* Which of the sentences below a model wrote. It qualifies the triad, so it sits on
+     the triad and not in the head with severity and status — those describe the
+     finding, this describes its wording. The distinction is the whole reason the chip
+     exists: a model's rewrite is not evidence, and nothing else on this panel says so. */
+  const refined = ch.note_source === 'llm'
+    ? `<span class="chip n" title="a model rewrote this wording; the evidence below is
+        unchanged and is what the finding rests on">note refined${
+        f.note_provider ? ' · ' + esc(f.note_provider) : ''}</span>` : '';
+
+  const change = lede + `<h3>What needs to change ${refined}</h3>
     ${moves}${fields}${apiv}
     <div class="kv">
       <div class="lab">action</div><div>${esc(ch.what_to_act || ch.recommendation || '—')}</div>
@@ -2602,14 +2544,53 @@ function renderDetail(d) {
     ? `<p class="hint warn">We could not establish which places this change reaches, so
         nothing below is claimed as affected — confirm by hand.</p>` : '';
 
+  /* A course page shows this finding's SHARE, and must say so. Without this a reviewer
+     reads one course's slice as the whole exposure — llama-3.3-70b-versatile is blast
+     radius 65 across the curriculum and 12 inside Intro to Gen AI. It sits directly
+     under the count it qualifies.
+     Read from `d.projection`, NOT `f.projection`: the detail endpoint computes the
+     authoritative value top-level and leaves the finding's own field empty, so keying
+     on the finding would silently never fire the `topic` and `unavailable` branches. */
+  let proj = '';
+  if (d.projection === 'ok' && d.course) {
+    const share = (f.total_locations && f.local_locations !== f.total_locations)
+      ? `${f.local_locations} of ${f.total_locations} references are in this course`
+      : `all ${f.total_locations || f.local_locations} references are in this course`;
+    /* No "Also taught in …" clause here: `elsewhere` renders exactly that list three
+       lines below from the same `d.also_in`, and the triage warning names the same
+       courses a third time. */
+    proj = `<div class="proj">${esc(share)}; the numbers here are this course's share.</div>`;
+  } else if (d.projection === 'topic') {
+    /* Not a stale row. A topic gap has no inventory entry by design, and its per-course
+       figures are exact — the sessions below ARE its locations — so telling the
+       reviewer to re-run `extract` would be advice that changes nothing. */
+    proj = `<div class="proj">This is a topic we do not teach yet, so there is no tool
+      to count. The sessions listed here are the ones in this course that already cover
+      the area.</div>`;
+  } else if (d.projection === 'unavailable') {
+    proj = `<div class="warn">This tool is no longer in the list of tools used, so the
+      figures here are the <b>whole-curriculum</b> totals, not this course's share.
+      Re-run the <code>extract</code> step.</div>`;
+  }
+
+  /* The only statement here about a STUDENT. Everything else counts artifacts; this
+     counts the ones that execute, which is the difference between a stale mention and
+     something that fails in front of a learner. `project.py` recomputes it per course,
+     so on a course page this is that course's number. */
+  const fallout = f.questions_executing
+    ? `<p class="hint warn">${f.questions_executing} graded item${
+        f.questions_executing === 1 ? '' : 's'} execute${
+        f.questions_executing === 1 ? 's' : ''} this — a student running ${
+        f.questions_executing === 1 ? 'it' : 'them'} hits this today.</p>` : '';
+
   const where = isGap
     ? `<h3>Where it belongs — ${total} session${total === 1 ? '' : 's'} ${scope}</h3>
        <p class="hint">These sessions already cover this area, and none of their
          outlines mention this topic. Each line points at the workbook row the
          placement was judged against.</p>
-       ${elsewhere}${grouped}`
+       ${proj}${elsewhere}${grouped}`
     : `<h3>What this affects — ${total} place${total === 1 ? '' : 's'} ${scope}</h3>
-       ${unscoped}${kindline}
+       ${unscoped}${proj}${kindline}${fallout}
        ${groups.length > 1 ? '' : cap}${elsewhere}
        ${grouped}${mline}`;
 
@@ -2709,6 +2690,33 @@ function renderDetail(d) {
 
   $('#slide-body').innerHTML = change + where + linkNote + source + altBlock + about;
 
+  /* The decision, in the footer rather than at the end of the body. A finding with 776
+     locations would otherwise put Confirm below every one of them, and the reviewer
+     deciding is the reason the panel was opened. `class="triage findingtriage"`: the
+     agent-review gate renders its own `.triage` box, and the two are wired by different
+     functions, so they are told apart by class as well as by wiring path. */
+  $('#slide-foot').innerHTML = `<div class="triage findingtriage"
+       data-id="${esc(f.finding_id)}">
+    ${(d.course && (d.also_in || []).length)
+      ? `<div class="warn">A triage decision is recorded against the finding, which has
+           no course in it — so accepting or rejecting here also applies to
+           ${(d.also_in || []).map(a => esc(a.course)).join(' and ')}.</div>` : ''}
+    <button class="act accent" data-do="accept">Confirm</button>
+    <button class="act danger" data-do="reject">Not a problem…</button>
+    <button class="act" data-do="toggle">Correct wording…</button>
+    <span class="note" data-role="status">${f._decision
+      ? esc(f._decision + (f._decision_reason ? ' — ' + f._decision_reason : ''))
+      : (f._split === 'learn' ? 'this one will teach the next run' : 'held out for scoring')}</span>
+    <div class="correct">
+      <label>reason (required to reject)</label>
+      <input class="ti" data-f="reason" placeholder="e.g. we cite that blog, it is not a taught step">
+      <label>correct “what to do”</label><input class="ti" data-f="what">
+      <label>correct “why it matters”</label><input class="ti" data-f="why">
+      <label>correct “when”</label><input class="ti" data-f="when">
+    </div>
+  </div>`;
+  wireTriage($('#slide-foot').querySelector('.triage'));
+
   /* Lazy: a session's excerpts are fetched the first time it is opened, so opening a
      finding costs one page of excerpts however many occurrences it has. */
   $('#slide-body').querySelectorAll('.grp[data-group]').forEach(el => {
@@ -2760,6 +2768,13 @@ async function openDetail(findingId, returnTo) {
     $('#scrim').classList.add('open'); $('#slide').classList.add('open');
   });
   $('#slide-body').innerHTML = '<div class="empty">Loading…</div>';
+  /* The head and the foot are cleared too, not just the body. They used to keep the
+     PREVIOUS finding's chips while the next one loaded — cosmetic until the footer
+     held a Confirm button, at which point a failed load would leave a live verdict
+     control for finding A under a panel saying finding B could not be loaded. */
+  $('#slide-head').innerHTML = '<button class="x" id="slide-x" aria-label="Close details">&times;</button>';
+  $('#slide-x').onclick = closeDetail;
+  $('#slide-foot').innerHTML = '';
   $('#slide').focus();
   const q = CURRENT_COURSE ? `?course=${encodeURIComponent(CURRENT_COURSE)}` : '';
   try {
@@ -2956,29 +2971,55 @@ function evidenceLine(r) {
   }${more}</div>`;
 }
 
+/* The verdict, drawn once. The row and the panel head both show it, and writing the
+   markup twice is exactly how the two finding lists drifted apart before they were
+   merged. */
+function decisionChip(verdict) {
+  if (!verdict) return '';
+  const ok = verdict === 'accepted';
+  return `<span class="chip ${ok ? 'ok' : 'critical'}" data-role="decision">${
+    ok ? 'Confirmed' : 'Not a problem'}</span>`;
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* The vendor's own retirement date, and only ever that. `shutdown_on` is parsed
+   server-side by `parse_shutdown` - the same function every other decision about this
+   date went through - so this renders what that parser could read and nothing else.
+   `due_by` is deliberately absent: it is OUR deadline, `today + SEVERITY_OFFSETS[sev]`,
+   and a chip reading "by 2026-10-05" on 26 rows at once is severity in a date's
+   clothes. Tense comes from the date, because "shuts down" about a date six weeks past
+   is wrong in the direction that matters. */
+function vendorDate(iso) {
+  if (!iso) return '';
+  const p = iso.split('-');
+  if (p.length !== 3) return '';
+  const when = `${+p[2]} ${MONTHS[+p[1] - 1] || p[1]} ${p[0]}`;
+  const past = iso < new Date().toISOString().slice(0, 10);
+  return `<span class="fdate" title="the vendor's own date for this, as they published it">${
+    past ? 'shut down' : 'shuts down'} ${esc(when)}</span>`;
+}
+
+/* One row for every finding on the page - raised, settled, and the run view. It says
+   WHAT the issue is and nothing else: the fix, the sessions, the artifact counts and
+   the evidence all live in the panel, which is what opening a finding is for. The
+   previous split - an essay-sized card for raised findings and this row for settled
+   ones - meant a reviewer scanning 82 findings read 82 essays and the eye had to learn
+   the page twice. */
 function findingRow(r) {
   const sev = r.local_severity || r.severity;
   const places = (r.affects || []).reduce((n, a) => n + a.count, 0);
-  /* Course and session, then the status - not the severity again. Severity says how
-     bad, status says whether this run moved it, and carrying only the first is why 37
-     settled findings looked exactly like the 6 that had just changed. */
-  const wheres = [];
+  /* Course, then the status - not the severity again. Severity says how bad, status
+     says whether this run moved it, and carrying only the first is why 37 settled
+     findings looked exactly like the 6 that had just changed. Sessions used to sit
+     here too; they are the panel's job now, and they were never on a raised row in the
+     first place - only the standing payload derived them. */
   const nc = (r.courses || []).length;
-  if (nc > 1) wheres.push(`${nc} courses`);
-  else if (nc === 1) wheres.push(r.courses[0]);
-  if ((r.sessions || []).length) {
-    wheres.push('session' + (r.sessions.length === 1 ? ' ' : 's ')
-                + r.sessions.slice(0, 6).join(', ')
-                + (r.sessions.length > 6 ? '…' : ''));
-  }
-  /* What has to be opened, named by artifact type. "Coding Practice" used to appear
-     here via the unit name on 25 of 43 findings, none of which pointed at a coding
-     question - the MCQ bank lives in a unit with that name. This reads `object_type`,
-     which is recorded rather than chosen. */
-  const affects = (r.affects || []).map(a => `${a.count} ${a.label}`).join(' · ');
+  const wheres = nc > 1 ? `${nc} courses` : (nc === 1 ? r.courses[0] : '');
   const ev = evidenceLine(r);
   const stat = (r.diff_class || '').replace(/[^a-z]/g, '');
-  return `<div class="frow" data-detail="${esc(r.finding_id)}"
+  return `<div class="frow ${esc(sev)}${r._decision ? ' decided' : ''}"
+          data-detail="${esc(r.finding_id)}"
           role="button" tabindex="0" title="Open the full detail">
     <div class="fhead">
       <span class="sev ${esc(sev)}" title="${esc(sev)} — ${esc(word('sevwhy', sev))}"
@@ -2987,22 +3028,20 @@ function findingRow(r) {
       <span class="chip sig" title="${esc(r.signal)}">${esc(word('signal', r.signal))}</span>
       ${/* No "N graded" chip. `graded_locations` counts the DEPENDENCY's graded
             references, not the finding's, so a finding affecting two places sat under
-            "5 graded" - and the line below already says "2 quiz questions", which is
-            the same fact correctly scoped. */''}
+            "5 graded". The panel names what has to be opened, correctly scoped. */''}
+      ${vendorDate(r.shutdown_on)}
       ${places ? `<span class="fplaces">${places} place${places === 1 ? '' : 's'}</span>` : ''}
     </div>
     ${ev}
     ${/* No URL and no recorded outcome means no evidence line, so the summary has to
-          carry "what it is" - a row that says only a name answers none of the three
-          questions a reviewer asks of it. */
+          carry "what it is". Never both: for S1/S2/S5/S8 the summary IS the URL and
+          outcome the evidence line already renders, so showing the two double-prints
+          one fact. */
       ev ? '' : (r.summary ? `<div class="fwhat">${esc(r.summary)}</div>` : '')}
-    ${affects ? `<div class="faff">${esc(affects)}</div>` : ''}
-    <div class="fmeta">${esc(wheres.join(' · '))}
+    <div class="fmeta">${esc(wheres)}
       ${stat ? `<span class="chip st ${stat}"
         title="what this run did to it">${esc(word('status', r.diff_class))}</span>` : ''}
-      ${r._decision ? `<span class="chip st">${esc(
-        r._decision === 'accepted' ? 'Confirmed' : 'Not a problem')}</span>` : ''}</div>
-    ${r.action ? `<div class="fdo"><span class="lab">Do this</span>${esc(r.action)}</div>` : ''}
+      ${decisionChip(r._decision)}</div>
   </div>`;
 }
 
@@ -3032,7 +3071,8 @@ function renderFindings(data, kind) {
   const mine = r => (r.kind_of_signal || 'regression') === kind;
   const intro = KIND_INTRO[kind];
   FINDINGS = (data.findings || []).filter(mine);
-  const settled = (data.standing || []).filter(mine);
+  STANDING = (data.standing || []).filter(mine);
+  const settled = STANDING;
   const moved = FINDINGS.filter(f => ['new', 'worsened'].includes(f.diff_class));
 
   /* A count line and, when this run moved something, a banner for it. The page used to
@@ -3052,13 +3092,13 @@ function renderFindings(data, kind) {
   $('#findings').innerHTML = head
     + `<h2>${esc(intro.title)}</h2><p class="hint">${intro.blurb}</p>`
     + (FINDINGS.length
-       ? FINDINGS.map(card).join('')
+       ? FINDINGS.map(findingRow).join('')
        : `<div class="empty">No new or changed ones this week.<br>
           <span class="note">${esc(SUMMARY.suppressed_unchanged||0)} unchanged
           finding(s) suppressed; anything still open is listed below.</span></div>`);
   const sm = $('#showmoved');
   if (sm) sm.onclick = () => {
-    const first = document.querySelector('#findings .card');
+    const first = document.querySelector('#findings .frow');
     if (first) first.scrollIntoView({behavior: 'smooth', block: 'center'});
   };
 
@@ -3104,26 +3144,59 @@ function renderFindings(data, kind) {
       `<div class="card low"><div class="cbody"><div><span class="chip sig" title="${
         esc(h.signal)}">${esc(word('signal', h.signal))}</span>
        <b>${esc(h.canonical_name)}</b></div><div class="note">${esc(h.reason)}</div></div></div>`).join('') : '';
-  wireTriage();
 }
 
-function wireTriage() {
-  document.querySelectorAll('.triage').forEach(box => {
-    const id = box.dataset.id, status = box.querySelector('[data-role=status]');
-    const panel = box.querySelector('.correct');
-    const val = f => (box.querySelector(`[data-f=${f}]`) || {}).value || '';
-    box.querySelector('[data-do=toggle]').onclick = () => panel.classList.toggle('open');
-    const send = async verdict => {
-      if (verdict === 'rejected' && !val('reason').trim()) {
-        panel.classList.add('open');
-        status.textContent = 'say why it is not a problem — that is what the next run learns from';
-        return;
-      }
-      box.querySelectorAll('button').forEach(b => b.disabled = true);
-      status.textContent = 'saving…';
+/* A verdict reached in the panel leaves every list behind it stale. Both halves are
+   needed: the DOM patch so the change is immediate, and the DATA patch because
+   `#moresettled` re-renders the settled rows from an array captured by
+   `renderFindings` — a DOM-only fix vanishes the moment someone expands the rest.
+   `[data-detail=…]` catches the raised list, the settled list and the run view at once,
+   because all three draw through `findingRow`. */
+function markDecided(id, verdict, reason) {
+  for (const list of [FINDINGS, STANDING]) {
+    for (const r of list || []) {
+      if (r.finding_id === id) { r._decision = verdict; r._decision_reason = reason || ''; }
+    }
+  }
+  document.querySelectorAll(`.frow[data-detail="${CSS.escape(id)}"]`).forEach(row => {
+    row.classList.add('decided');
+    const meta = row.querySelector('.fmeta');
+    if (!meta) return;
+    const had = meta.querySelector('[data-role=decision]');
+    if (had) had.outerHTML = decisionChip(verdict);
+    else meta.insertAdjacentHTML('beforeend', decisionChip(verdict));
+  });
+  const head = $('#slide-decision');
+  if (head) head.innerHTML = decisionChip(verdict);
+}
+
+/* Takes the ONE box it wires, rather than scanning the document for `.triage`. The
+   scan was a live hazard: `renderAgentRuns` renders a second `.triage` box with no
+   `[data-do=toggle]`, so the selector matching it threw on the next line — masked only
+   by `renderFindings` happening to run first. Passing the element does not narrow the
+   selector, it removes it. `wireAgentReview` keeps its own loop because it legitimately
+   renders N boxes and discriminates by class. */
+function wireTriage(box) {
+  if (!box) return;
+  const id = box.dataset.id, status = box.querySelector('[data-role=status]');
+  const panel = box.querySelector('.correct');
+  const val = f => (box.querySelector(`[data-f=${f}]`) || {}).value || '';
+  box.querySelector('[data-do=toggle]').onclick = () => panel.classList.toggle('open');
+  const send = async verdict => {
+    if (verdict === 'rejected' && !val('reason').trim()) {
+      panel.classList.add('open');
+      status.textContent = 'say why it is not a problem — that is what the next run learns from';
+      return;
+    }
+    const reason = val('reason');
+    box.querySelectorAll('button').forEach(b => b.disabled = true);
+    status.textContent = 'saving…';
+    /* Wrapped, because it was not: a dropped connection left the buttons disabled for
+       good and the status frozen at "saving…", with no way back but a reload. */
+    try {
       const r = await fetch('/api/triage', {method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({finding_id:id, verdict, reason:val('reason'),
+        body: JSON.stringify({finding_id:id, verdict, reason,
           corrected_what:val('what'), corrected_why:val('why'), corrected_when:val('when')})});
       const d = await r.json();
       if (!r.ok) { status.textContent = 'error: ' + (d.detail || r.status);
@@ -3132,13 +3205,17 @@ function wireTriage() {
       status.textContent = `${d.verdict}${d.suppresses_recurrence ? ' · will be held back while evidence is unchanged' : ''}`
         + ` · precision ${p.precision === null ? 'n/a' : (p.precision*100).toFixed(0)+'%'} of ${p.triaged}`
         + (d.learning ? ' · teaching the next run' : ' · held out for scoring');
-      $('#c-'+id).classList.add('done');
+      box.classList.add('done');
       panel.classList.remove('open');
+      markDecided(id, d.verdict, reason);
       SUMMARY.precision = p; renderHeader();
-    };
-    box.querySelector('[data-do=accept]').onclick = () => send('accepted');
-    box.querySelector('[data-do=reject]').onclick = () => send('rejected');
-  });
+    } catch (e) {
+      status.textContent = 'could not save — ' + (e.message || e);
+      box.querySelectorAll('button').forEach(b => b.disabled = false);
+    }
+  };
+  box.querySelector('[data-do=accept]').onclick = () => send('accepted');
+  box.querySelector('[data-do=reject]').onclick = () => send('rejected');
 }
 
 /* ---------- inventory ---------- */

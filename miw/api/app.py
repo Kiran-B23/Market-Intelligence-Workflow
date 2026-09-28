@@ -286,6 +286,7 @@ def findings(course: str = "") -> dict:
     from miw import triage
     from config.constants import ARTIFACT_ORDER, artifact_word
     from miw.analyse.score import action_only
+    from miw.probe.catalogue import parse_shutdown
     from miw.state import State
 
     data = _read("findings_*.json")
@@ -323,8 +324,15 @@ def findings(course: str = "") -> dict:
         # ... session 25" clause is the panel's job, and repeating it here made every
         # row carry a sentence a reviewer has to read past to reach the next one.
         r["action"] = action_only(r)
+        # The vendor's own retirement date, normalised HERE rather than in the browser.
+        # `shutdown_date` is the vendor's string verbatim ("08/16/26" on the two rows
+        # that have one), and a JS date guess would be a second, disagreeing parser of
+        # an ambiguous format. `parse_shutdown` is the one that produced every other
+        # decision about this date, so the row renders only what it could read.
+        _sd = parse_shutdown(r.get("shutdown_date", "") or "")
+        r["shutdown_on"] = _sd.isoformat() if _sd else ""
     state = State()
-    for f in rows:
+    for f in rows + standing:
         d = state.latest_decision(f["finding_id"])
         f["_decision"] = d["verdict"] if d else None
         f["_decision_reason"] = (d["reason"] if d else "") or ""
@@ -368,6 +376,15 @@ def findings(course: str = "") -> dict:
                           "affected_urls": r.get("affected_urls") or [],
                           "probe_signals": r.get("probe_signals") or [],
                           "diff_class": r.get("diff_class", "unchanged"),
+                          # The vendor's own retirement date, already parsed above, and
+                          # the reviewer's verdict. Both lists draw through one row
+                          # renderer now, so a key the raised rows carry and this
+                          # whitelist omits is a difference with no reason - it is how
+                          # a settled finding someone already dismissed came to look
+                          # exactly like one nobody had opened.
+                          "shutdown_on": r.get("shutdown_on", ""),
+                          "_decision": r.get("_decision"),
+                          "_decision_reason": r.get("_decision_reason", ""),
                           "blast_radius": r.get("blast_radius", 0)}
                          for r in standing],
             "resolved": data.get("resolved", []),
@@ -735,6 +752,22 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
     for a in row.get("alternatives", []) or []:
         for c in a.get("claims", []) or []:
             claims.append({**c, "about_alternative": a.get("name", "")})
+
+    # The triage controls live in this panel, so the panel has to know what a reviewer
+    # already decided. Without these three the buttons render, but the status line says
+    # "held out for scoring" on a finding that was confirmed last week.
+    from miw import triage
+    from miw.probe.catalogue import parse_shutdown
+    from miw.state import State
+    _st = State()
+    _d = _st.latest_decision(finding_id)
+    _st.close()
+    _sd = parse_shutdown(shown.get("shutdown_date", "") or "")
+    shown = {**shown,
+             "shutdown_on": _sd.isoformat() if _sd else "",
+             "_decision": _d["verdict"] if _d else None,
+             "_decision_reason": (_d["reason"] if _d else "") or "",
+             "_split": triage.split_of(finding_id)}
 
     return {
         "finding": shown,

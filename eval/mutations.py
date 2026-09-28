@@ -198,6 +198,22 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
      ("  if (!$('#slide').hidden) { DETAIL_RETURN = null; closeDetail(); }",
       "  /* panel left open */"),
      "pytest:tests/test_ui_render.py"),
+    # The triage controls moved off the card and into the panel footer. These three
+    # restore what that move had to fix.
+    ("UI a verdict marks a card element that no longer exists",
+     "miw/api/static/index.html",
+     ("      markDecided(id, d.verdict, reason);",
+      "      $('#c-'+id).classList.add('done');"),
+     "pytest:tests/test_ui_contract.py"),
+    ("UI wiring triage by scanning the page reaches the agent-review box too",
+     "miw/api/static/index.html",
+     ("function wireTriage(box) {\n  if (!box) return;",
+      "function wireTriage() {\n  const box = document.querySelectorAll('.triage')[0];"),
+     "pytest:tests/test_ui_contract.py"),
+    ("UI our own severity-derived deadline is drawn as the vendor's retirement date",
+     "miw/api/static/index.html",
+     ("      ${vendorDate(r.shutdown_on)}", "      ${vendorDate(r.due_by)}"),
+     "pytest:tests/test_ui_render.py"),
 
     # --- S17: a known hole in the version the course pins --------------------
     ("S17 the row count is reported, so one CVE in two databases counts twice",
