@@ -133,8 +133,9 @@ def test_the_row_says_what_the_issue_is_and_nothing_more():
     """
     out = json.loads(_run(_row_harness(SHAPES[:1])))
     html = out["sample"]
-    assert 'class="sev critical"' in html                 # severity, as a dot
-    assert 'class="frow critical' in html                 # and as a rail down the edge
+    assert ">Critical<" in html                           # the level, as a word
+    assert 'class="chip critical"' in html                # colour, and a square dot
+    assert 'class="frow critical' in html                 # and a rail down the edge
     assert "mcp.composio.dev/dashboard" in html           # the thing we fetched
     assert "404 / 410 Gone" in html                       # what came back
     assert "2 places" in html                             # how many
@@ -147,6 +148,30 @@ def test_the_row_says_what_the_issue_is_and_nothing_more():
     # The severity definition stays: it is what makes the dot mean something, and
     # "A learner hits this today" is the tooltip on it, not the fallout line.
     assert "A learner hits this today" in html
+
+
+def test_the_level_is_readable_without_hovering():
+    """Three bands are shown, not five: `WORDS.severity` maps high and medium both to
+    "Major" and low and info both to "Minor".
+
+    The row carried severity as a bare 8px dot while every raised finding was ALSO
+    drawn as a card spelling "Critical" out in full. Deleting the card took the only
+    readable severity on the page with it, and left a colour whose meaning was
+    available only on hover.
+    """
+    out = json.loads(_run(_row_harness([
+        {**SHAPES[0], "severity": s, "local_severity": ""} for s in
+        ("critical", "high", "medium", "low", "info")])))
+    assert out["n"] == 5
+    first = out["sample"]
+    assert ">Critical<" in first
+
+    # high and medium are one band and must render identically; a row claiming a
+    # fourth level the filter does not offer is a row nobody can navigate by.
+    two = json.loads(_run(_row_harness([
+        {**SHAPES[0], "severity": "high", "local_severity": ""},
+        {**SHAPES[0], "severity": "medium", "local_severity": ""}])))
+    assert ">Major<" in two["sample"]
 
 
 def test_a_decided_row_does_not_look_like_an_untouched_one():

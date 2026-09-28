@@ -764,3 +764,68 @@ def test_our_own_deadline_is_never_drawn_as_a_vendors_date():
     body = body[:body.index("\n}\n")]
     assert "vendorDate(r.shutdown_on)" in body
     assert "due_by" not in body
+
+
+def test_the_list_can_be_narrowed_to_one_severity_band():
+    """82 findings with no way to ask "what is on fire" means reading all 82."""
+    assert "class=\"sevfilter\"" in PAGE
+    assert "data-sev=" in PAGE
+    # Pressed state is never colour alone.
+    assert "aria-pressed=" in PAGE
+    body = PAGE[PAGE.index("function renderFindings(data, kind)"):]
+    body = body[:body.index("\n}\n")]
+    assert "SEV_FILTER" in body
+    # Both lists, or the filter lies about what it hid.
+    assert "FINDINGS = all.filter(keep)" in body
+    assert "STANDING = allSettled.filter(keep)" in body
+
+
+def test_the_severity_counts_are_of_everything_not_of_what_survived_the_filter():
+    """A count that changes when you press it is a count you cannot navigate by."""
+    body = PAGE[PAGE.index("function renderFindings(data, kind)"):]
+    body = body[:body.index("\n}\n")]
+    assert "for (const r of all.concat(allSettled)) counts[band(r)]" in body
+
+
+def test_the_filter_offers_exactly_the_bands_the_rows_show():
+    """Severity is five-valued in the store and three-banded on the page: `high` and
+    `medium` both read "Major", `low` and `info` both read "Minor".
+
+    A filter offering a band the rows do not distinguish is a filter that returns a
+    surprising set, so one function decides the band for the chip, the rail and the
+    control alike.
+    """
+    assert "function sevBand(sev)" in PAGE
+    assert "const SEV_BANDS = ['critical', 'high', 'low'];" in PAGE
+    css = PAGE[PAGE.index("<style>"):PAGE.index("</style>")]
+    # The rail must group the same way. A `--med` rail under an amber chip is how the
+    # two vocabularies drifted apart the first time.
+    assert ".frow.high::before,.frow.medium::before{background:var(--high)}" in css
+    assert ".frow.medium::before{background:var(--med)}" not in css
+    assert ".card.high::before,.card.medium::before{background:var(--high)}" in css
+
+
+def test_an_empty_list_says_whether_the_filter_emptied_it():
+    """"No new or changed ones this week" is false when a filter hid them."""
+    body = PAGE[PAGE.index("function renderFindings(data, kind)"):]
+    body = body[:body.index("\n}\n")]
+    # ...and only when the filter is what emptied it. On most runs nothing new broke,
+    # so this list is empty regardless, and blaming the filter there is a plain untruth
+    # with the matching findings sitting in the settled list just below.
+    assert "SEV_FILTER && all.length" in body
+    assert "are at other levels" in body
+
+
+def test_one_severity_vocabulary_across_the_whole_page():
+    """The urgency strip used to print the stored keys - "critical, high, medium, low" -
+    beside a list whose rows read "Critical, Major, Minor", and coloured medium blue
+    against the list's amber. Two schemes, neither labelled, on one screen.
+
+    Everything a reader sees now goes through `sevBand` and `WORDS.severity`.
+    """
+    assert "SEV_ORDER.map(k => [k," not in PAGE, "the strip must not label with stored keys"
+    assert "SEV_BANDS.map(b => [word('severity', b)" in PAGE
+    assert "const SEV_VAR = {critical: 'crit', high: 'high', low: 'low'};" in PAGE
+    assert "medium: 'med'" not in PAGE, "medium is amber like high, never its own blue"
+    # The headline tile, too. It printed the raw keys in dictionary order.
+    assert "Object.entries(sev).map(([k,v]) => `${v} ${k}`)" not in PAGE

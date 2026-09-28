@@ -324,9 +324,13 @@
     content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
     background:var(--rule2);
   }
+  /* Three bands, because three is what a reader is shown: `WORDS.severity` maps high
+     and medium both to "Major", so a rail that made them different colours would be
+     the only thing on the page claiming four levels. `--med` is deliberately not used
+     here - it is the blue of the medium CHIP elsewhere, and a blue rail under an amber
+     dot is how this drifted the first time. */
   .card.critical::before{background:var(--crit)}
-  .card.high::before{background:var(--high)}
-  .card.medium::before{background:var(--med)}
+  .card.high::before,.card.medium::before{background:var(--high)}
   .card.low::before,.card.info::before{background:var(--low)}
   .card.done{opacity:.62}
   .chead{
@@ -498,8 +502,7 @@
     background:var(--rule2);
   }
   .frow.critical::before{background:var(--crit)}
-  .frow.high::before{background:var(--high)}
-  .frow.medium::before{background:var(--med)}
+  .frow.high::before,.frow.medium::before{background:var(--high)}
   .frow.low::before,.frow.info::before{background:var(--low)}
   /* A finding a reviewer has already ruled on must not look like one they have not.
      This is the "37 settled looked exactly like the 6 that moved" failure, one level
@@ -550,6 +553,36 @@
   }
   .lhead b{font-size:var(--t-bd)}
   .lhead .note{margin-left:auto}
+  /* Severity is the axis a reviewer actually navigates by - "show me what is on fire"
+     is the first question asked of a list of 82 - and until this existed the only way
+     to answer it was to read every row. Segmented rather than a dropdown: the counts
+     are the information, and a dropdown hides them behind a click. */
+  .sevfilter{display:flex; gap:0; flex-basis:100%; margin-top:var(--s2)}
+  .sevbtn{
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    padding:5px 11px; font:500 var(--t-xs)/1 var(--sans); color:var(--soft);
+    background:var(--surface); border:1px solid var(--rule2); margin-left:-1px;
+  }
+  .sevbtn:first-child{margin-left:0; border-radius:var(--r-sm) 0 0 var(--r-sm)}
+  .sevbtn:last-child{border-radius:0 var(--r-sm) var(--r-sm) 0}
+  .sevbtn:hover:not(:disabled){background:var(--sunk); color:var(--ink)}
+  .sevbtn:disabled{opacity:.45; cursor:default}
+  .sevbtn .n{font:600 var(--t-xs)/1 var(--mono); font-variant-numeric:tabular-nums}
+  /* The band's own colour on the button, so the control and the rows agree without
+     the reader having to learn a second key. */
+  .sevbtn::before{
+    content:""; width:6px; height:6px; border-radius:50%; background:currentColor;
+    flex:none; opacity:0;
+  }
+  .sevbtn.critical{color:var(--crit-ink)}
+  .sevbtn.critical::before{opacity:1; border-radius:1.5px}
+  .sevbtn.high{color:var(--high-ink)}
+  .sevbtn.high::before{opacity:1}
+  .sevbtn.low{color:var(--low-ink)}
+  .sevbtn.low::before{opacity:1}
+  /* The selected band, stated by fill and by `aria-pressed` - never by colour alone. */
+  .sevbtn.on{background:var(--ink); color:var(--surface); border-color:var(--ink)}
+  .sevbtn.on::before{opacity:1}
   /* What this run moved. Amber, not red: it is a call to look, not an alarm. */
   .banner{
     display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap;
@@ -1558,6 +1591,23 @@ const text = async u => (await fetch(u)).text();
    would lose the decision the moment the rest of the list is expanded. */
 let SUMMARY = {}, FINDINGS = [], STANDING = [];
 
+/* Severity is stored five-valued - it orders the list and sets `due_by` - but a reader
+   is shown three bands, because `WORDS.severity` maps high and medium both to "Major"
+   and low and info both to "Minor". The filter has to group the same way or it would
+   offer buckets the rows themselves do not distinguish. One function, so the chip, the
+   rail and the filter can never disagree about which band a finding is in. */
+const SEV_BANDS = ['critical', 'high', 'low'];
+function sevBand(sev) {
+  if (sev === 'critical') return 'critical';
+  if (sev === 'high' || sev === 'medium') return 'high';
+  return 'low';
+}
+/* Which band the list is showing, '' for all. Held across a re-render so that opening
+   a finding and coming back does not silently widen the list underneath the reviewer,
+   and reset by `renderFindings` when the KIND changes - fixes and changes are two
+   different lists and a filter carried between them is a filter nobody set. */
+let SEV_FILTER = '', SEV_FILTER_KIND = '', LAST_FINDINGS = [{}, ''];
+
 /* ---------- routing ----------
    Hash routing, so a course page is linkable, bookmarkable and survives a reload —
    the three things the old tab buttons could not do. The fragment is never sent to
@@ -1628,6 +1678,9 @@ const VIEW_KIND = {findings: 'regression', changes: 'opportunity'};
 
 /* The sidebar replaces the top tab bar. Same COURSE_TABS/GLOBAL_TABS, same hash
    routes — only the presentation changed, so nothing about routing moved. */
+/* The stored order, five-valued: it sorts the list and sets `due_by`. What a READER is
+   shown is three bands - see `sevBand` and `WORDS.severity` - so nothing may print
+   these keys as labels. */
 const SEV_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 
 /* ---------- plain words for internal names ----------------------------------------
@@ -2160,7 +2213,11 @@ function renderHeader() {
    `/api/summary` already returns everything these need, so none of this added an
    endpoint: findings_by_severity, watch_tiers, by_kind, probe_counts,
    with_authority/without_authority, precision and llm_budget. */
-const SEV_VAR = {critical: 'crit', high: 'high', medium: 'med', low: 'low', info: 'low'};
+/* Keyed on the BAND, not on the stored level. It used to map medium to `--med`, so the
+   urgency strip drew a blue bar labelled "medium" beside a list whose medium findings
+   were amber chips reading "Major" - the page taught two severity schemes and neither
+   said so. */
+const SEV_VAR = {critical: 'crit', high: 'high', low: 'low'};
 
 function bar(title, parts, opts = {}) {
   /* parts: [[label, value, cssColor], ...] — one scale, the sum. */
@@ -2189,8 +2246,13 @@ function renderCharts(sum) {
   const probe = sum.probe_counts || {};
   const out = [];
 
+  /* Summed into the three bands the rest of the page uses, and labelled with the same
+     words. The counts still come from the five stored levels, so the total is
+     unchanged - only the grouping a reader sees is. */
+  const sevBands = {};
+  for (const k of SEV_ORDER) sevBands[sevBand(k)] = (sevBands[sevBand(k)] || 0) + (sev[k] || 0);
   out.push(bar('Open issues, by urgency',
-    SEV_ORDER.map(k => [k, sev[k] || 0, `var(--${SEV_VAR[k]})`]),
+    SEV_BANDS.map(b => [word('severity', b), sevBands[b] || 0, `var(--${SEV_VAR[b]})`]),
     {lead: sum.findings_total || 0, empty: 'nothing open'}));
 
   out.push(bar('Is there an official source we can quote?', [
@@ -2217,8 +2279,16 @@ function renderCharts(sum) {
 function renderStrip() {
   const sev = SUMMARY.findings_by_severity || {}, pc = SUMMARY.probe_counts || {};
   const tiles = [
+    /* Folded into the three bands and ordered worst-first. It printed the raw keys in
+       whatever order the object arrived in - "11 medium · 6 critical · 10 high · 5 low"
+       - which named two levels the rest of the page does not have and buried the one
+       number a reader is looking for in third place. */
     ['open findings', SUMMARY.findings_total ?? 0,
-      Object.entries(sev).map(([k,v]) => `${v} ${k}`).join(' · ') || 'none this week'],
+      SEV_BANDS.map(b => [b, SEV_ORDER.filter(k => sevBand(k) === b)
+                              .reduce((n, k) => n + (sev[k] || 0), 0)])
+        .filter(([, n]) => n)
+        .map(([b, n]) => `${n} ${word('severity', b).toLowerCase()}`)
+        .join(' · ') || 'none this week'],
     ['probed ok', pc.ok ?? 0, 'no change detected'],
     ['broken', pc.broken ?? 0, 'confirmed over 2 runs'],
     ['inconclusive', pc.inconclusive ?? 0, 'blocked or robots-refused, not broken'],
@@ -3022,8 +3092,14 @@ function findingRow(r) {
           data-detail="${esc(r.finding_id)}"
           role="button" tabindex="0" title="Open the full detail">
     <div class="fhead">
-      <span class="sev ${esc(sev)}" title="${esc(sev)} — ${esc(word('sevwhy', sev))}"
-            aria-label="${esc(word('severity', sev))}"></span>
+      ${/* The level as a WORD, not a bare dot. The dot was fine while this row was
+            the secondary list and every raised finding was drawn as a card carrying
+            "Critical" in full - once the card went, the page had no readable severity
+            left anywhere and a reviewer could only get it by hovering. The chip brings
+            its own dot (`.chip::before`), square for critical, so shape and colour and
+            word all carry it. */''}
+      <span class="chip ${esc(sev)}" title="${esc(word('sevwhy', sev))}">${
+        esc(word('severity', sev))}</span>
       <b>${esc(r.canonical_name || r.name || '')}</b>
       <span class="chip sig" title="${esc(r.signal)}">${esc(word('signal', r.signal))}</span>
       ${/* No "N graded" chip. `graded_locations` counts the DEPENDENCY's graded
@@ -3070,8 +3146,24 @@ function renderFindings(data, kind) {
   kind = kind || 'regression';
   const mine = r => (r.kind_of_signal || 'regression') === kind;
   const intro = KIND_INTRO[kind];
-  FINDINGS = (data.findings || []).filter(mine);
-  STANDING = (data.standing || []).filter(mine);
+  /* Held so the severity filter can redraw both lists without refetching. A filter
+     that costs a round trip gets used once. */
+  LAST_FINDINGS = [data, kind];
+  if (SEV_FILTER_KIND !== kind) { SEV_FILTER = ''; SEV_FILTER_KIND = kind; }
+
+  const all = (data.findings || []).filter(mine);
+  const allSettled = (data.standing || []).filter(mine);
+  /* Counted over EVERYTHING of this kind, raised and settled together, and never over
+     what the filter left behind - a count that changes when you click it is a count
+     you cannot navigate by. The band reads `local_severity` first for the same reason
+     the row does: on a course page, this course's reading is the true one. */
+  const band = r => sevBand(r.local_severity || r.severity);
+  const counts = {};
+  for (const r of all.concat(allSettled)) counts[band(r)] = (counts[band(r)] || 0) + 1;
+
+  const keep = r => !SEV_FILTER || band(r) === SEV_FILTER;
+  FINDINGS = all.filter(keep);
+  STANDING = allSettled.filter(keep);
   const settled = STANDING;
   const moved = FINDINGS.filter(f => ['new', 'worsened'].includes(f.diff_class));
 
@@ -3081,8 +3173,23 @@ function renderFindings(data, kind) {
      looked exactly like the 6 that had just changed. "How many, and how many of them
      are news" is the first question, so it is the first line. */
   const total = FINDINGS.length + settled.length;
+  const grand = all.length + allSettled.length;
+  /* Every band is drawn even at zero, and disabled rather than hidden: a control that
+     reflows as you use it makes you re-find the button you just pressed, and
+     "Critical 0" is itself the answer to the question being asked. */
+  const sevfilter = `<div class="sevfilter" role="group" aria-label="Filter by severity">
+      <button class="sevbtn${SEV_FILTER ? '' : ' on'}" data-sev=""
+        aria-pressed="${SEV_FILTER ? 'false' : 'true'}">All
+        <span class="n">${grand}</span></button>`
+    + SEV_BANDS.map(b => `<button class="sevbtn ${b}${SEV_FILTER === b ? ' on' : ''}"
+        data-sev="${b}" aria-pressed="${SEV_FILTER === b ? 'true' : 'false'}"
+        title="${esc(word('sevwhy', b))}"${counts[b] ? '' : ' disabled'}>${
+        esc(word('severity', b))} <span class="n">${counts[b] || 0}</span></button>`).join('')
+    + `</div>`;
   const head = `<div class="lhead"><b>${total} finding${total === 1 ? '' : 's'}</b>
-      <span class="note">${esc(intro.title.toLowerCase())} · one per dependency</span></div>`
+      <span class="note">${esc(intro.title.toLowerCase())} · one per dependency${
+        SEV_FILTER ? ` · showing ${esc(word('severity', SEV_FILTER))} only` : ''}</span>
+      ${sevfilter}</div>`
     + (moved.length
        ? `<div class="banner"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use
             href="#i-alert"/></svg>
@@ -3093,9 +3200,26 @@ function renderFindings(data, kind) {
     + `<h2>${esc(intro.title)}</h2><p class="hint">${intro.blurb}</p>`
     + (FINDINGS.length
        ? FINDINGS.map(findingRow).join('')
-       : `<div class="empty">No new or changed ones this week.<br>
-          <span class="note">${esc(SUMMARY.suppressed_unchanged||0)} unchanged
-          finding(s) suppressed; anything still open is listed below.</span></div>`);
+       /* Only blame the filter for what the filter actually did. This list is already
+          empty on most runs - nothing new broke - and saying "hidden by the Critical
+          filter" there would be a straight untruth, with the matching findings sitting
+          in the settled list two inches below. */
+       : (SEV_FILTER && all.length
+          ? `<div class="empty">None of this run's new or changed findings are
+             ${esc(word('severity', SEV_FILTER))}.<br>
+             <span class="note">${all.length} of them are at other levels${
+               settled.length ? `, and the ${settled.length} still-open ${
+                 esc(word('severity', SEV_FILTER))} finding(s) are listed below` : ''
+             } — choose All to see everything.</span></div>`
+          : `<div class="empty">No new or changed ones this week.<br>
+             <span class="note">${esc(SUMMARY.suppressed_unchanged||0)} unchanged
+             finding(s) suppressed; anything still open is listed below.</span></div>`));
+  $('#findings').querySelectorAll('.sevbtn').forEach(b => {
+    b.onclick = () => {
+      SEV_FILTER = b.dataset.sev;
+      renderFindings(LAST_FINDINGS[0], LAST_FINDINGS[1]);
+    };
+  });
   const sm = $('#showmoved');
   if (sm) sm.onclick = () => {
     const first = document.querySelector('#findings .frow');
