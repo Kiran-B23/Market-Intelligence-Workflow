@@ -133,11 +133,14 @@ def test_every_finding_list_renders_through_the_one_row():
     gone and all four lists draw through `findingRow`.
     """
     assert PAGE.count("function findingRow(r)") == 1
-    # Raised, settled, and the run page. The settled list renders once: it used to be
-    # drawn twice, a four-row slice and then the whole thing behind "Show N more".
-    assert PAGE.count("FINDINGS.map(findingRow)") == 1
-    assert PAGE.count("settled.map(findingRow)") == 1
-    assert PAGE.count("rows.map(findingRow)") == 1
+    # ONE call site now, inside `pagedGrid`. Raised, settled and the run view all reach
+    # the row through it, so the three lists cannot page, grid or render differently
+    # from one another by accident.
+    assert PAGE.count("map(findingRow)") == 1
+    assert PAGE.count("function pagedGrid(") == 1
+    for call in ("pagedGrid(FINDINGS, 'raised')", "pagedGrid(settled, 'settled')",
+                 "pagedGrid(rows, 'run')"):
+        assert PAGE.count(call) == 1, call
     # Not "unused": a second renderer is how the two lists diverged the first time.
     assert "function card(" not in PAGE
     assert "function locLine" not in PAGE, "only card called it"
@@ -512,7 +515,7 @@ def test_each_finding_from_a_run_opens_the_detail_panel():
     body = body[:body.index("\n}\n")]
     assert "data-detail=" in body, "reuses the existing slide-over"
     assert 'role="button" tabindex="0"' in body, "and stays keyboard reachable"
-    assert "rows.map(findingRow)" in PAGE, "and the run view uses that row"
+    assert "pagedGrid(rows, 'run')" in PAGE, "and the run view uses that row"
 
 
 def test_carried_forward_findings_are_not_passed_off_as_new():
@@ -908,7 +911,7 @@ def test_an_unchanged_finding_is_one_click_away_not_two():
     """
     body = PAGE[PAGE.index("function renderFindings(data, kind)"):]
     body = body[:body.index("\n}\n")]
-    assert "settled.map(findingRow)" in body
+    assert "pagedGrid(settled, 'settled')" in body
     assert "settled.slice(" not in body, "no second cap inside the group"
     assert "more unchanged findings" not in PAGE
 
@@ -922,3 +925,55 @@ def test_the_settled_group_opens_when_nothing_was_raised():
     body = body[:body.index("\n}\n")]
     assert "const openSettled = FINDINGS.length === 0;" in body
     assert "${openSettled ? 'open' : ''}" in body
+
+
+def test_findings_are_a_three_across_grid_of_nine():
+    """Three per row, nine to a view, then a numbered pager.
+
+    Every list pages independently, so the key matters: leaving the raised and settled
+    lists sharing one page number means opening page 3 of one silently moves the other.
+    """
+    assert "const PAGE_SIZE = 9;" in PAGE
+    css = PAGE[PAGE.index("<style>"):PAGE.index("</style>")]
+    assert ".fgrid{" in css
+    assert "grid-template-columns:repeat(3,minmax(0,1fr))" in css
+    # A third of a phone screen is a word per line, so it steps down to 2 then 1.
+    assert "grid-template-columns:repeat(2,minmax(0,1fr))" in css
+    assert "grid-template-columns:minmax(0,1fr)" in css
+    body = PAGE[PAGE.index("function pagedGrid(items, key)"):]
+    body = body[:body.index("\n}\n")]
+    assert "PAGES[key]" in body, "each list holds its own page number"
+    assert "Math.min(Math.max(PAGES[key] || 0, 0), pages - 1)" in body, (
+        "a stale page number from a longer list must clamp, not render blank")
+
+
+def test_narrowing_the_list_returns_you_to_its_first_page():
+    """Filtering to Critical while on page 4 of 9 would otherwise land on a page that
+    no longer exists. The clamp in `pagedGrid` catches it; this resets it properly."""
+    body = PAGE[PAGE.index("function renderFindings(data, kind)"):]
+    body = body[:body.index("\n}\n")]
+    assert body.count("PAGES = {}") >= 2, "reset on both a kind change and a filter"
+
+
+def test_a_card_does_not_stretch_to_its_longest_neighbour():
+    """Cards in a grid row are equal height, so one long line sets all three.
+
+    The S5 summaries carry a redirect target with a query string - 297 characters on
+    one finding - and the whole value is in the panel anyway.
+    """
+    css = PAGE[PAGE.index("<style>"):PAGE.index("</style>")]
+    for sel in (".fev{", ".fwhat{"):
+        block = css[css.index(sel):]
+        block = block[:block.index("\n  }")]
+        assert "-webkit-line-clamp:3" in block, sel
+
+
+def test_the_course_is_chosen_in_one_place():
+    """The header carried a course dropdown listing exactly what the sidebar already
+    lists as links. Two controls for one choice is one of them going stale - the select
+    had to be re-rendered on every route just to keep `selected` honest."""
+    assert "renderSwitcher" not in PAGE
+    assert 'id="courseSel"' not in PAGE
+    assert 'id="switcher"' not in PAGE
+    # The sidebar still offers every course and the all-courses view.
+    assert '#/c/${esc(c.slug)}/findings' in PAGE or "#/c/" in PAGE

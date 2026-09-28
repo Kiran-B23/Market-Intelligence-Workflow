@@ -171,14 +171,6 @@
   }
   header h1 a{color:var(--ink); text-decoration:none; font-weight:700}
   header h1 span{color:var(--accent); font-weight:400}
-  .switcher{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted)}
-  .switcher select{
-    font:inherit; font-size:12.5px; padding:5px 26px 5px 9px; color:var(--ink);
-    background:var(--sunk) no-repeat right 8px center/9px 6px;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6'%3E%3Cpath d='M.5.5 4.5 4.5 8.5.5' stroke='%236d8085' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    border:1px solid var(--rule2); border-radius:var(--r-sm); appearance:none; cursor:pointer;
-  }
-  .switcher select:hover{border-color:var(--accent)}
   .meta{
     margin-left:auto; display:flex; flex-wrap:wrap; gap:6px;
     font-family:var(--mono); font-size:11px; color:var(--muted);
@@ -500,7 +492,37 @@
     border-radius:var(--r); box-shadow:var(--e1);
     transition:box-shadow .14s ease, border-color .14s ease, transform .14s ease;
   }
-  .frow:last-child{margin-bottom:0}
+  .frow{margin-bottom:0}
+  /* Three across, and equal height inside a row because grid stretches them - so the
+     cards line up rather than stepping down the page as the evidence lines vary. Two
+     columns on a tablet and one on a phone, because a third of 380px is not a card,
+     it is a word per line. */
+  .fgrid{
+    display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;
+    align-items:stretch;
+  }
+  .fgrid > .frow{display:flex; flex-direction:column; height:100%}
+  @media (max-width:1180px){ .fgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:720px){ .fgrid{grid-template-columns:minmax(0,1fr)} }
+  .fname{display:block; margin-top:7px; font-size:14px; font-weight:650; line-height:1.3;
+         overflow-wrap:anywhere}
+  .fsig{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:7px}
+  /* Nine to a view. Numbered rather than "load more", because the severity filter
+     sits directly above and a reader who narrows to Critical needs to see that the
+     list got shorter, not scroll to discover it. */
+  .pager{
+    display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:var(--s3);
+  }
+  .pbtn{
+    min-width:28px; padding:5px 8px; cursor:pointer; font:500 var(--t-xs)/1 var(--mono);
+    color:var(--soft); background:var(--surface); border:1px solid var(--rule2);
+    border-radius:var(--r-sm); font-variant-numeric:tabular-nums;
+  }
+  .pbtn:hover:not(:disabled){background:var(--sunk); color:var(--ink)}
+  .pbtn:disabled{opacity:.4; cursor:default}
+  .pbtn.on{background:var(--ink); color:var(--surface); border-color:var(--ink)}
+  .pnote{margin-left:auto; font:500 var(--t-xs)/1 var(--mono); color:var(--muted);
+         font-variant-numeric:tabular-nums}
   /* The rail the card used to carry. The dot says the level, but a dot is a poor thing
      to scan a column of - `.card.critical::before` was a 3px edge readable at a glance
      down 43 rows, and dropping the card would have taken it silently. Same widths, same
@@ -530,7 +552,11 @@
   .fhead{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
   .fhead b{font-size:13.5px; font-weight:650}
   .fhead .note{font-size:12px}
-  .fwhat{margin-top:5px; color:var(--soft); line-height:1.5; max-width:78ch}
+  .fwhat{
+    margin-top:7px; color:var(--soft); line-height:1.5;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
   /* Severity as a dot rather than a word. The word is redundant next to the colour and
      it cost the row its first eight characters; the level and its definition are on
      hover, and `aria-label` carries the word for a screen reader. Critical is a SQUARE,
@@ -549,11 +575,19 @@
     font-variant-numeric:tabular-nums; white-space:nowrap;
   }
   /* The observation, in the source's own characters. */
-  .fev{margin-top:5px; font-size:11.5px; color:var(--soft); overflow-wrap:anywhere}
+  /* Clamped. A card is a third of a row wide and the S5 summaries carry a redirect
+     target with a query string on it - 297 characters on one finding - which would set
+     the height of every card in its row. The whole value is in the panel. */
+  .fev{
+    margin-top:7px; font-size:11.5px; color:var(--soft); overflow-wrap:anywhere;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
   .fev .arr{color:var(--faint)}
   .fev b{font-weight:500; color:var(--crit-ink)}
   .fmeta{
-    margin-top:5px; display:flex; flex-wrap:wrap; align-items:center; gap:7px;
+    margin-top:auto; padding-top:8px; display:flex; flex-wrap:wrap; align-items:center;
+    gap:7px;
     font-size:12px; color:var(--muted);
   }
   /* The list's own header: how many, and what they are. */
@@ -1337,7 +1371,6 @@
     <h1 id="pagetitle">What changed in the courses</h1>
     <div class="hsub" id="pagesub"></div>
   </div>
-  <div class="switcher" id="switcher"></div>
   <button class="act primary hrun" id="hrun" hidden>Start check</button>
 </header>
 
@@ -1646,6 +1679,60 @@ function sevBand(sev) {
    different lists and a filter carried between them is a filter nobody set. */
 let SEV_FILTER = '', SEV_FILTER_KIND = '', LAST_FINDINGS = [{}, ''];
 
+/* Nine to a view, three across. Which list a page number belongs to is keyed, because
+   the raised and settled lists page independently and the run view is a third. Reset
+   whenever the set underneath changes - a filter that leaves you on page 4 of a list
+   that now has two pages is a blank screen with no explanation. */
+const PAGE_SIZE = 9;
+let PAGES = {};
+
+function pagedGrid(items, key) {
+  if (!items.length) return '';
+  const pages = Math.ceil(items.length / PAGE_SIZE);
+  const p = Math.min(Math.max(PAGES[key] || 0, 0), pages - 1);
+  const from = p * PAGE_SIZE;
+  const grid = `<div class="fgrid">`
+    + items.slice(from, from + PAGE_SIZE).map(findingRow).join('') + `</div>`;
+  if (pages < 2) return grid;
+  const nums = [];
+  for (let i = 0; i < pages; i++) {
+    nums.push(`<button class="pbtn${i === p ? ' on' : ''}" data-pg="${key}:${i}"${
+      i === p ? ' aria-current="page"' : ''}>${i + 1}</button>`);
+  }
+  return grid + `<div class="pager">
+    <button class="pbtn" data-pg="${key}:${p - 1}"${p ? '' : ' disabled'}
+      aria-label="Previous page">&lsaquo;</button>
+    ${nums.join('')}
+    <button class="pbtn" data-pg="${key}:${p + 1}"${p < pages - 1 ? '' : ' disabled'}
+      aria-label="Next page">&rsaquo;</button>
+    <span class="pnote">${from + 1}\u2013${Math.min(from + PAGE_SIZE, items.length)
+      } of ${items.length}</span>
+  </div>`;
+}
+
+/* Delegated on `document`, not bound per render, for the same reason the row click
+   handler is: binding needs the markup to exist first, and the settled list is written
+   AFTER the point where the wiring used to sit - so its pager was bound to the previous
+   render's buttons and every page number silently did nothing. Delegation removes the
+   ordering question rather than answering it correctly once.
+   `RERENDER_RUN` is held because the run view is not drawn by `renderFindings` and has
+   no other way back to its own data. */
+let RERENDER_RUN = null;
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('.pbtn[data-pg]');
+  if (!b || b.disabled) return;
+  const [k, i] = b.dataset.pg.split(':');
+  PAGES[k] = +i;
+  if (k === 'run') { if (RERENDER_RUN) RERENDER_RUN(); }
+  else renderFindings(LAST_FINDINGS[0], LAST_FINDINGS[1]);
+  /* Back to the top of the list that moved. Nine cards is about a screen, so landing
+     mid-grid after a page change leaves the first three off-screen above. */
+  const grid = document.querySelector(`.pbtn[data-pg^="${k}:"]`);
+  const wrap = grid && grid.closest('.pager').previousElementSibling;
+  if (wrap) wrap.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+});
+
 /* ---------- routing ----------
    Hash routing, so a course page is linkable, bookmarkable and survives a reload —
    the three things the old tab buttons could not do. The fragment is never sent to
@@ -1946,28 +2033,18 @@ function show(view) {
   VIEWS.forEach(v => { const el = $('#tab-' + v); if (el) el.hidden = (v !== view); });
 }
 
-function renderSwitcher(r) {
-  if (!COURSES.length) { $('#switcher').innerHTML = ''; return; }
-  const opts = COURSES.map(c =>
-    `<option value="${esc(c.slug)}" ${c.slug === r.slug ? 'selected' : ''}>
-       ${esc(c.title)}${c.ingested ? '' : ' (not ingested)'}</option>`).join('');
-  $('#switcher').innerHTML =
-    `<label>course <select id="courseSel">
-       <option value="">— all courses —</option>${opts}</select></label>`;
-  $('#courseSel').onchange = e => {
-    location.hash = e.target.value
-      ? `#/c/${e.target.value}/${r.view && r.view !== 'runs' ? r.view : 'findings'}`
-      : '#/';
-  };
-}
-
 async function route() {
   const r = parseHash();
   CURRENT_COURSE = r.scope === 'course' ? r.slug : null;
   const known = COURSES.find(c => c.slug === CURRENT_COURSE);
   COURSE_TITLE = known ? known.title : '';
 
-  renderNav(r); renderSwitcher(r);
+  /* No course dropdown in the header. The sidebar already lists every course and "All
+     courses" as links, and the same choice offered twice on one screen is one of them
+     going stale - the header select had to be re-rendered on every route just to keep
+     its `selected` attribute honest. On a narrow screen the sidebar is one tap behind
+     the menu button, which is what the dropdown cost anyway. */
+  renderNav(r);
   if (COURSES.length) renderCoursePicker();
   stopPolling();
   /* A detail panel belongs to the page it was opened from. It is not part of the
@@ -3150,22 +3227,25 @@ function findingRow(r) {
   return `<div class="frow ${esc(sev)}${r._decision ? ' decided' : ''}"
           data-detail="${esc(r.finding_id)}"
           role="button" tabindex="0" title="Open the full detail">
+    ${/* A third of a row wide, so the head is a strip - level on the left, count hard
+          right - and the name gets its own line beneath it rather than competing with
+          two chips for the same one. The level is a WORD, not a bare dot: the dot was
+          fine while this was the secondary list and every raised finding was drawn as
+          a card carrying "Critical" in full, but once that card went the page had no
+          readable severity left anywhere. The chip brings its own dot (`.chip::before`),
+          square for critical, so shape and colour and word all carry it. */''}
     <div class="fhead">
-      ${/* The level as a WORD, not a bare dot. The dot was fine while this row was
-            the secondary list and every raised finding was drawn as a card carrying
-            "Critical" in full - once the card went, the page had no readable severity
-            left anywhere and a reviewer could only get it by hovering. The chip brings
-            its own dot (`.chip::before`), square for critical, so shape and colour and
-            word all carry it. */''}
       <span class="chip ${esc(sev)}" title="${esc(word('sevwhy', sev))}">${
         esc(word('severity', sev))}</span>
-      <b>${esc(r.canonical_name || r.name || '')}</b>
-      <span class="chip sig" title="${esc(r.signal)}">${esc(word('signal', r.signal))}</span>
       ${/* No "N graded" chip. `graded_locations` counts the DEPENDENCY's graded
             references, not the finding's, so a finding affecting two places sat under
             "5 graded". The panel names what has to be opened, correctly scoped. */''}
-      ${vendorDate(r.shutdown_on)}
       ${places ? `<span class="fplaces">${places} place${places === 1 ? '' : 's'}</span>` : ''}
+    </div>
+    <b class="fname">${esc(r.canonical_name || r.name || '')}</b>
+    <div class="fsig">
+      <span class="chip sig" title="${esc(r.signal)}">${esc(word('signal', r.signal))}</span>
+      ${vendorDate(r.shutdown_on)}
     </div>
     ${ev}
     ${/* No URL and no recorded outcome means no evidence line, so the summary has to
@@ -3211,7 +3291,7 @@ function renderFindings(data, kind) {
   /* Held so the severity filter can redraw both lists without refetching. A filter
      that costs a round trip gets used once. */
   LAST_FINDINGS = [data, kind];
-  if (SEV_FILTER_KIND !== kind) { SEV_FILTER = ''; SEV_FILTER_KIND = kind; }
+  if (SEV_FILTER_KIND !== kind) { SEV_FILTER = ''; SEV_FILTER_KIND = kind; PAGES = {}; }
 
   const all = (data.findings || []).filter(mine);
   const allSettled = (data.standing || []).filter(mine);
@@ -3261,7 +3341,7 @@ function renderFindings(data, kind) {
   $('#findings').innerHTML = head
     + `<h2>${esc(intro.title)}</h2><p class="hint teach">${intro.blurb}</p>`
     + (FINDINGS.length
-       ? FINDINGS.map(findingRow).join('')
+       ? pagedGrid(FINDINGS, 'raised')
        /* Only blame the filter for what the filter actually did. This list is already
           empty on most runs - nothing new broke - and saying "hidden by the Critical
           filter" there would be a straight untruth, with the matching findings sitting
@@ -3279,6 +3359,7 @@ function renderFindings(data, kind) {
   $('#findings').querySelectorAll('.sevbtn').forEach(b => {
     b.onclick = () => {
       SEV_FILTER = b.dataset.sev;
+      PAGES = {};
       renderFindings(LAST_FINDINGS[0], LAST_FINDINGS[1]);
     };
   });
@@ -3291,9 +3372,6 @@ function renderFindings(data, kind) {
   /* Findings that are still open but unchanged are held in the store and kept out of
      the report. Saying so is the point: hiding them silently is the same dishonesty as
      the artifact-clobbering bug this replaced. */
-  /* Collapsed behind its own count. These are real and still unresolved, so they are
-     never hidden - but a settled finding is not what a reviewer opened the page for,
-     and 37 of them above the fold is why the 6 that moved were missed. */
   /* One tier of disclosure, not two. There used to be a four-row cap inside this group
      as well, so reaching an unchanged finding took two clicks: open the group, then
      "Show 27 more". Both tiers were written against the same incident - 37 settled
@@ -3315,7 +3393,7 @@ function renderFindings(data, kind) {
            <span class="note teach">nothing about them changed this run; still on file,
              still unresolved</span></summary>
          <div class="flist">`
-       + settled.map(findingRow).join('')
+       + pagedGrid(settled, 'settled')
        + `</div></details>`
     : '';
 
@@ -3557,8 +3635,8 @@ function renderCoursePicker() {
       <span class="pname">${esc(c.title)}</span>
       <span class="cnt">${esc(open || size)}</span></label>`;
   }).join('') + `</div>` + (CURRENT_COURSE
-    ? `<div class="hint">Locked to this course. Use the course switcher, or
-       <a href="#/global/runs">all runs</a>, to change it.</div>` : '');
+    ? `<div class="hint">Locked to this course. Pick another in the sidebar, or run
+       <a href="#/global/runs">across all courses</a>.</div>` : '');
   document.querySelectorAll('.course,.tier').forEach(el => el.onchange = preview);
 }
 
@@ -3920,9 +3998,8 @@ function renderRunFindings(rows, run) {
          unchanged.`
       : `All ${rows.length} were already open and unchanged — this run confirmed them
          rather than finding anything new.`} Click one to see where it is, what proves
-      it, and what to change.</p>
-    <div class="panel" style="padding:0">`
-    + rows.map(findingRow).join('') + '</div>';
+      it, and what to change.</p>` + pagedGrid(rows, 'run');
+  RERENDER_RUN = () => renderRunFindings(rows, run);
 }
 
 async function loadRuns() {
