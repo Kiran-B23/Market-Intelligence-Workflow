@@ -15,11 +15,15 @@ so three protections are built in rather than bolted on:
   never supplies facts. Callers pass already-verified claims. Nothing here can create
   a `Claim`, because `Claim.build()` requires a fetched source and a quote.
 
-Providers, in the order `auto` tries them: `claude_code` (the CLI), `anthropic` (only
-if `ANTHROPIC_API_KEY` is set), `openrouter` (only if `OPENROUTER_API_KEY` is set), then
-`none` — which returns a miss so every caller must already have a deterministic fallback
-path. The CLI comes first on purpose: a key exported for some unrelated tool must not
-silently start metered spend, so spending is opt-in via `MIW_LLM_PROVIDER=anthropic`.
+Providers, in the order `auto` tries them: `openrouter` (if `OPENROUTER_API_KEY` holds
+a key), `claude_code` (the CLI, if `claude` is on PATH), `anthropic` (if
+`ANTHROPIC_API_KEY` is set), then `none` — which returns a miss so every caller must
+already have a deterministic fallback path.
+
+OpenRouter is first because it is the only one that works anywhere: the CLI exists on a
+developer laptop and nowhere else. `claude_code` still precedes `anthropic` for the
+reason it once led the list — a key exported for some unrelated tool must not quietly
+become the billing path. `MIW_LLM_PROVIDER=claude_code` restores the old order.
 
 Parity across providers, and the one asymmetry that cannot be closed
 --------------------------------------------------------------------
@@ -230,8 +234,16 @@ class ProviderSpec:
     name: str
     call: object                       # (prompt, model) -> LLMResult
     available: object                  # () -> bool
-    why_unavailable: str
+    # A string, or a callable returning one. Callable because "not set" and "set to
+    # something that is not a key" are different problems with different fixes, and
+    # telling an operator the first when it is the second sends them to add a variable
+    # that is already there.
+    why_unavailable: object
     grants_tools: bool = False
+
+    def reason(self) -> str:
+        w = self.why_unavailable
+        return w() if callable(w) else str(w)
 
 
 def _claude_code_available() -> bool:
@@ -242,8 +254,27 @@ def _anthropic_available() -> bool:
     return bool(os.getenv("ANTHROPIC_API_KEY", "").strip())
 
 
+# OpenRouter issues keys with this prefix. Checked because "the variable is set" and
+# "the variable holds a key" are different claims, and only the first was being made.
+# A truncated paste reports the provider as AVAILABLE, gets selected ahead of a working
+# one, and then fails every call with a 401 partway through a run - which now matters
+# more than it did, because this provider is first in `AUTO_ORDER`. A credential that
+# cannot work should be unavailable before it is chosen, not after.
+OPENROUTER_KEY_PREFIX = "sk-or-"
+
+
+def _openrouter_problem() -> str:
+    key = (settings.OPENROUTER_API_KEY or "").strip()
+    if not key:
+        return "OPENROUTER_API_KEY is not set"
+    if not key.startswith(OPENROUTER_KEY_PREFIX):
+        return (f"OPENROUTER_API_KEY does not look like an OpenRouter key — they begin "
+                f"{OPENROUTER_KEY_PREFIX!r}. Check .env for a truncated paste.")
+    return ""
+
+
 def _openrouter_available() -> bool:
-    return bool(settings.OPENROUTER_API_KEY)
+    return not _openrouter_problem()
 
 
 def _providers() -> dict:
@@ -254,15 +285,28 @@ def _providers() -> dict:
         ProviderSpec("anthropic", _anthropic, _anthropic_available,
                      "ANTHROPIC_API_KEY is not set"),
         ProviderSpec("openrouter", _openrouter, _openrouter_available,
-                     "OPENROUTER_API_KEY is not set"),
+                     _openrouter_problem),
     )}
 
 
-# `claude_code` first, on purpose. Testing runs on a Claude Code entitlement precisely
-# to avoid metered spend, so an ANTHROPIC_API_KEY exported for some unrelated tool must
-# not silently start charging on the next `analyse --refine`. Spending is opt-in:
-# MIW_LLM_PROVIDER=anthropic.
-AUTO_ORDER = ("claude_code", "anthropic", "openrouter")
+# OpenRouter first. This reverses the original order, and the reason it was written
+# still stands, so it is worth saying what changed rather than just what is.
+#
+# It was `claude_code` first to avoid metered spend: testing ran on a Claude Code
+# entitlement, and an API key exported for some unrelated tool must not silently start
+# charging. What changed is that the tool now has to be usable by someone who is not
+# sitting at this machine - a reviewer running it themselves, and any host other than
+# a developer laptop, neither of which has the `claude` CLI on PATH. A default that
+# only works in one place is not a default.
+#
+# The cost argument is answered by structure rather than by ordering: an LLM call
+# happens only under `--refine` or an agent run, never on an ordinary `run`, and
+# `MAX_CALLS` / `MAX_SPEND_USD` cap the day. To go back to the old behaviour for a
+# session, `MIW_LLM_PROVIDER=claude_code`.
+#
+# `claude_code` stays ahead of `anthropic` for the original reason: a stray
+# ANTHROPIC_API_KEY should not become the billing path by accident.
+AUTO_ORDER = ("openrouter", "claude_code", "anthropic")
 
 
 def available_provider() -> str:
@@ -299,7 +343,7 @@ def provider_status() -> dict:
         "model_logical": logical,
         "model_resolved": resolve_model(logical, chosen) if chosen != "none" else "",
         "candidates": [{"name": s.name, "available": bool(s.available()),
-                        "why": "" if s.available() else s.why_unavailable}
+                        "why": "" if s.available() else s.reason()}
                        for s in _providers().values()],
     }
 

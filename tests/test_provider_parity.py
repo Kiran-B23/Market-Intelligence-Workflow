@@ -182,12 +182,22 @@ def test_forcing_none_is_honoured():
         assert llm.available_provider() == "none"
 
 
+# OpenRouter first, then the CLI, then Anthropic. The order was reversed deliberately:
+# the CLI only exists on a developer laptop, and the tool has to work for a reviewer
+# running it themselves and on any host. `claude_code` stays AHEAD of `anthropic` for
+# the reason it was originally first — a stray ANTHROPIC_API_KEY must not quietly
+# become the billing path.
 @pytest.mark.parametrize("has_cli,ant,orouter,want", [
-    (True,  "",    "",    "claude_code"),
-    (True,  "key", "key", "claude_code"),   # the CLI wins: no silent metered spend
-    (False, "key", "key", "anthropic"),
-    (False, "",    "key", "openrouter"),
-    (False, "",    "",    "none"),
+    (True,  "",    "",              "claude_code"),
+    (True,  "key", "sk-or-v1-key",  "openrouter"),
+    (True,  "key", "",              "claude_code"),   # no OpenRouter key: CLI, not Anthropic
+    (False, "key", "sk-or-v1-key",  "openrouter"),
+    (False, "key", "",              "anthropic"),
+    (False, "",    "sk-or-v1-key",  "openrouter"),
+    (False, "",    "",              "none"),
+    # Present but not a key: unavailable, so it cannot be chosen and then 401 mid-run.
+    (True,  "",    "or-v1-truncated", "claude_code"),
+    (False, "",    "or-v1-truncated", "none"),
 ])
 def test_auto_provider_order(has_cli, ant, orouter, want):
     with patch.dict("os.environ", {"MIW_LLM_PROVIDER": "auto", "ANTHROPIC_API_KEY": ant}), \
@@ -196,12 +206,46 @@ def test_auto_provider_order(has_cli, ant, orouter, want):
         assert llm.available_provider() == want
 
 
-def test_an_exported_key_does_not_start_spending_on_its_own():
-    """The whole reason testing runs on the CLI is to avoid metered spend."""
+def test_a_stray_anthropic_key_does_not_start_spending_on_its_own():
+    """Narrower than it was, and still the point.
+
+    This used to assert the CLI beat every key, which is no longer true: OpenRouter is
+    the default now, because a default that only works where the `claude` CLI is
+    installed is not a default. What has NOT changed is that a key exported for some
+    unrelated tool must not become the billing path on its own — so `anthropic` stays
+    behind the CLI, and only the provider that was deliberately made the default is
+    allowed to win by merely being configured.
+    """
     with patch.dict("os.environ", {"MIW_LLM_PROVIDER": "auto",
                                    "ANTHROPIC_API_KEY": "sk-ant-whatever"}), \
-         patch.object(llm.shutil, "which", lambda n: "/usr/bin/claude"):
+         patch.object(llm.shutil, "which", lambda n: "/usr/bin/claude"), \
+         patch.object(llm.settings, "OPENROUTER_API_KEY", ""):
         assert llm.available_provider() == "claude_code"
+
+
+def test_the_old_behaviour_is_one_variable_away():
+    """Reversing a default has to leave a way back, or it is a removal."""
+    with patch.dict("os.environ", {"MIW_LLM_PROVIDER": "claude_code"}), \
+         patch.object(llm.shutil, "which", lambda n: "/usr/bin/claude"), \
+         patch.object(llm.settings, "OPENROUTER_API_KEY", "sk-or-v1-key"):
+        assert llm.available_provider() == "claude_code"
+
+
+def test_a_malformed_openrouter_key_is_unavailable_with_a_specific_reason():
+    """"Set" and "holds a key" are different claims, and only the first was checked.
+
+    It matters more now the provider is first in the order: a truncated paste would be
+    selected ahead of a working backend and then 401 every call partway through a run.
+    The reason has to name the actual problem — telling an operator the variable is
+    "not set" when it is set but wrong sends them to add what is already there.
+    """
+    with patch.object(llm.settings, "OPENROUTER_API_KEY", "or-v1-missing-the-prefix"):
+        spec = llm._providers()["openrouter"]
+        assert spec.available() is False
+        assert "does not look like" in spec.reason()
+        assert "not set" not in spec.reason()
+    with patch.object(llm.settings, "OPENROUTER_API_KEY", ""):
+        assert "not set" in llm._providers()["openrouter"].reason()
 
 
 def test_logical_model_resolves_per_provider_and_passes_snapshots_through():
@@ -302,3 +346,66 @@ def test_capability_note_reports_the_live_provider_not_a_hardcoded_claim():
     note = capability_note()
     assert "no LLM stage in Phase 1" not in note
     assert "note refinement" in note
+
+
+def test_a_real_but_wrong_version_is_rejected():
+    """The failure that made this check narrower than the rest, observed live.
+
+    The deterministic note said "1.4.6 clears it" — the max fixed version across the
+    advisories. A model rewrote it as "update the pin from 1.3.1 to 1.4.2", which is
+    `latest_version`, the newest release. Both numbers are real and both appear in the
+    finding, so the provenance check passed them both — and only one of them clears the
+    advisory. A reviewer following that note would still be exposed while believing
+    they were done.
+
+    Provenance is the wrong question for a version. It has to come from the sentence
+    computed to answer THIS finding, not from anywhere in the evidence.
+    """
+    from miw.analyse import notes
+    from miw.schema import Dependency, Finding
+
+    dep = Dependency(dep_id="pkg:pypi/langchain", canonical_name="langchain",
+                     kind="package", taught_version="1.3.1")
+    f = Finding(
+        finding_id="f1", dep_id=dep.dep_id, canonical_name="langchain", signal="S17",
+        signal_label="known vulnerability in the version we pin", severity="high",
+        what_to_act="Upgrade langchain from the pinned 1.3.1 — 1.4.6 clears it.",
+        why_to_act="Published advisories affect the pinned version.",
+        when_to_act="Within two weeks.",
+        latest_version="1.4.2",        # real, newest, and NOT what clears the advisory
+    )
+    triad, reason = notes.judge_rewrite(dep, f, {
+        "what_to_act": "Update the langchain pin from 1.3.1 to 1.4.2.",
+        "why_to_act": "Published advisories affect the pinned version.",
+        "when_to_act": "Within two weeks."})
+    assert triad is None, "a version we never recommended was accepted"
+    assert "1.4.2" in reason
+
+    # The version we DID recommend still passes, or the gate is just a blocker.
+    triad, reason = notes.judge_rewrite(dep, f, {
+        "what_to_act": "Update the langchain pin from 1.3.1 to 1.4.6.",
+        "why_to_act": "Published advisories affect the pinned version.",
+        "when_to_act": "Within two weeks."})
+    assert triad is not None, reason
+
+
+def test_quoting_a_date_from_the_evidence_is_still_allowed():
+    """Only versions are narrowed. A shutdown date lifted from a vendor page is a
+    legitimate thing for a rewrite to carry, and rejecting it would push the gate from
+    protecting the note to preventing it."""
+    from miw.analyse import notes
+    from miw.schema import Claim, Dependency, Finding
+
+    dep = Dependency(dep_id="m:x", canonical_name="gpt-4", kind="model")
+    f = Finding(finding_id="f2", dep_id=dep.dep_id, canonical_name="gpt-4", signal="S7",
+                signal_label="model retired",
+                severity="critical", what_to_act="Replace gpt-4.",
+                why_to_act="It is retired.", when_to_act="Before the next cohort.",
+                claims=[Claim(source_url="https://example.test/models",
+                              statement="gpt-4 is retired",
+                              quote="gpt-4 shuts down on 2027-03-01.",
+                              tier="AUTHORITATIVE", kind="EXISTENCE")])
+    triad, reason = notes.judge_rewrite(dep, f, {
+        "what_to_act": "Replace gpt-4 before it shuts down on 2027-03-01.",
+        "why_to_act": "It is retired.", "when_to_act": "Before the next cohort."})
+    assert triad is not None, reason

@@ -688,6 +688,14 @@ def suite_prose(verbose: bool) -> Suite:
                     signal=spec["signal"], signal_label="l", kind_of_signal="regression",
                     severity=spec["severity"], summary=spec.get("summary", ""),
                     latest_version=spec.get("latest_version", ""),
+                    # The deterministic triad, which the harness could not previously
+                    # express - so every case ran as though nothing had been
+                    # recommended yet, and no case could describe a rewrite that
+                    # CONTRADICTS a recommendation rather than inventing one. Defaults
+                    # to empty, so the existing cases are unchanged.
+                    what_to_act=spec.get("what_to_act", ""),
+                    why_to_act=spec.get("why_to_act", ""),
+                    when_to_act=spec.get("when_to_act", ""),
                     affected_urls=list(spec.get("affected_urls") or []))
         triad, reason = judge_rewrite(dep, f, c["reply"])
         accepted = triad is not None

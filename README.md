@@ -454,11 +454,19 @@ MIW_LLM_PROVIDER=openrouter python3 -c \
   "from miw.llm import provider_status; print(provider_status())"
 ```
 
-`auto` tries **`claude_code` → `anthropic` → `openrouter`** and stops at the first one
-available, so with the `claude` CLI on `PATH` OpenRouter is never reached. That order is
-deliberate: a key exported for some other tool must not silently start charging. Set the
-variable per command, or put `MIW_LLM_PROVIDER=openrouter` in `.env` to make it the
-default.
+`auto` tries **`openrouter` → `claude_code` → `anthropic`** and stops at the first one
+available, so with `OPENROUTER_API_KEY` set it is the default everywhere.
+
+That is a reversal of the original order, which put the CLI first to avoid metered
+spend. What changed: the `claude` CLI exists on a developer laptop and nowhere else, so
+a reviewer running this themselves — or any host it is deployed to — had no provider at
+all. The cost argument is answered by structure instead. An LLM call happens only under
+`--refine` or an agent run, never on an ordinary `run`, and `LLM_MAX_CALLS` (120/day)
+and `LLM_MAX_SPEND_USD` ($2/day) cap it. `MIW_LLM_PROVIDER=claude_code` restores the
+old behaviour for a session.
+
+`claude_code` still precedes `anthropic`, for the reason it once led the list: a key
+exported for some other tool must not quietly become the billing path.
 
 ### 3. Run something that uses it
 

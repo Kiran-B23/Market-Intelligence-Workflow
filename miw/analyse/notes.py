@@ -313,6 +313,11 @@ def build_refine_prompt(dep: Dependency, f: Finding, feedback: str = "") -> str:
 # narrow - the model is being asked to write prose, and prose that names none of these
 # is exactly what it is for. Bare integers are excluded: "2 places" and "session 12"
 # are counts we supplied, not claims about the world.
+# The version half of `_FACTUAL`, checked separately and against a narrower source.
+# See `judge_rewrite` for why: a version that is real but is the wrong one of two reads
+# exactly like a correct one, and it is the number the reviewer acts on.
+_VERSION = re.compile(r"\bv?\d+\.\d+(?:\.\d+)*\b")
+
 _FACTUAL = re.compile(
     r"\$\d[\d,.]*"                                           # $0.42, $1,000
     r"|\b\d{4}-\d{2}-\d{2}\b"                                # 2027-03-01
@@ -378,6 +383,26 @@ def judge_rewrite(dep: Dependency, f: Finding,
     for token in _FACTUAL.findall(prose):
         if token.lower() not in grounded:
             return None, f"stated an unsourced fact: {token}"
+
+    # Versions get a narrower test than the rest, and the reason is a real rewrite this
+    # gate accepted. The deterministic note said "1.4.6 clears it" - the max fixed
+    # version across the advisories. The model wrote "update the pin from 1.3.1 to
+    # 1.4.2", which is `latest_version`, the newest release. Both numbers are real and
+    # both appear in the finding, so a provenance check passes them both; only one of
+    # them clears the advisory, and a reviewer following that note would still be
+    # exposed while believing they were done.
+    #
+    # The failure is SUBSTITUTION, not invention, so the test is about contradiction
+    # rather than provenance: where we computed a recommendation naming versions, that
+    # set is authoritative and a rewrite may not reach past it for a different number.
+    # Where we named none - S6 says only "pinned 1.60.0, latest 2.24.0" - there is
+    # nothing to contradict, and restating the finding's own numbers is exactly what a
+    # rewrite is for, so the wider provenance check above is the right and only test.
+    recommended = {v.lower() for v in _VERSION.findall(prose_source(f))}
+    if recommended:
+        for token in _VERSION.findall(prose):
+            if token.lower() not in recommended:
+                return None, f"substituted a version we did not recommend: {token}"
     return (what, why, when), "accepted"
 
 
