@@ -28,3 +28,5 @@ data/.staging/
 # Build output of tools/build_font.py. The base64 it produces is inlined into
 # index.html, which IS tracked; this intermediate is not worth versioning.
 tools/fonts.generated.css
+.vercel
+.env*

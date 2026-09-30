@@ -70,6 +70,48 @@ print mode, which is not in the image. Without it the deterministic path still w
 full — probing, scoring, findings, digest — and only the note-refinement step is
 skipped, which is the same posture as `requirements-optional.txt` not being installed.
 
+## Vercel
+
+Vercel runs this as a serverless function, which fixes what the deployment can be. It
+is a **read-only view**: the findings list, the severity filter, the detail panel, the
+digest and the inventory. Not triage, not adding a course, not runs.
+
+That is not a configuration choice. The filesystem is read-only apart from an ephemeral
+`/tmp`, and every write here is SQLite under `state/` — so a triage verdict would
+return 200, print its precision figure, and be gone by the next request, with nothing
+to tell the reviewer it never happened. `MIW_READ_ONLY=1` makes those endpoints refuse
+with a 503 that says why, and the page stops drawing the Confirm button at all.
+
+```sh
+vercel login                                    # interactive — run it yourself
+vercel env add MIW_AUTH_TOKEN production        # paste `openssl rand -hex 24`
+vercel --prod
+```
+
+**Set the token before the first deploy, not after.** A hosted deployment with no token
+serves nothing at all — 503 on every path but `/healthz` — because the bind check that
+protects the container cannot help here: a serverless platform imports the ASGI app
+directly, so there is no host argument to refuse.
+
+### What is uploaded, and what is not
+
+`.vercelignore` keeps out `data/` and `out/content_records.jsonl` — the session bodies
+and quiz text, about 60MB of it. The upload is ~12MB of findings, gaps, probe results
+and the inventory.
+
+The cost is the detail panel's excerpts: without the exports it cannot quote the line a
+term appears on, and it says so in place of the excerpt. Everything else about a
+location survives — which session, what kind of item, how many, the change, the
+evidence, the alternatives. That is the trade this deployment makes, and it is the
+reason it can exist at all.
+
+### Before you point anyone at it
+
+The findings include, by design, published advisories against the exact package
+versions these courses pin. That is a useful list to a reviewer and a useful list to
+somebody else, which is why the token is mandatory rather than advisory, and why the
+responses carry `X-Robots-Tag: noindex`.
+
 ## Railway, Render, or any other container host
 
 The same `Dockerfile` runs unchanged. What they need instead of `fly.toml`:

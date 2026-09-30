@@ -1,0 +1,38 @@
+# What must not be uploaded.
+#
+# The deployment needs the artifacts the API reads, and nothing else. Two exclusions
+# here are about content rather than size:
+#
+#   data/                       course exports - session bodies, quiz text. `.gitignore`
+#                               calls them "large, proprietary". Without them the detail
+#                               panel's excerpts are unavailable and it says so through
+#                               its existing `NO_EXCERPT` path; every other fact about a
+#                               finding - where, what, the fix, the evidence - still
+#                               renders. That is the trade this deployment makes.
+#   out/content_records.jsonl   34MB of the same course text, read only by ingest and
+#                               analyse, never by the API.
+#
+# state/ is excluded because it is writable state on a host that has no writable state.
+data/
+state/
+out/content_records.jsonl
+out/screenshots/
+out/decks_*.json
+
+.git/
+.github/
+tests/
+eval/
+docs/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.local
+Dockerfile
+docker-entrypoint.sh
+.dockerignore
+fly.toml

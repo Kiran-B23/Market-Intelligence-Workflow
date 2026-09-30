@@ -2507,7 +2507,16 @@ function locBlock(w) {
     || (ex.container && ex.container.object_type === 'SESSION_PPT');
   const body = ex.resolved
     ? `<pre class="excerpt">${highlight(ex)}</pre>`
-    : `<div class="noex">${esc(NO_EXCERPT[ex.reason] || 'No excerpt available.')}</div>`;
+    /* On a read-only deployment the course exports were deliberately not uploaded -
+       they are the session bodies and quiz text - so the stock wording, which reads as
+       a local data problem to go and fix, would send a reader looking for a fault that
+       is a decision. */
+    : `<div class="noex">${esc(
+        (SUMMARY.read_only && ex.reason === 'course_export_missing')
+          ? 'Excerpts are not part of this deployment: the course exports stay on the '
+            + 'machine that holds them. Everything else about this location — the '
+            + 'session, what kind of item it is, and the change — is above.'
+          : (NO_EXCERPT[ex.reason] || 'No excerpt available.'))}</div>`;
   const trunc = (ex.resolved && ex.truncated)
     ? `<span class="note"> · showing part of ${ex.text_len} characters</span>` : '';
   /* A location found via a referenced URL rather than the name is weaker evidence that
@@ -2899,7 +2908,14 @@ function renderDetail(d) {
      deciding is the reason the panel was opened. `class="triage findingtriage"`: the
      agent-review gate renders its own `.triage` box, and the two are wired by different
      functions, so they are told apart by class as well as by wiring path. */
-  $('#slide-foot').innerHTML = `<div class="triage findingtriage"
+  /* A deployment whose filesystem does not outlive the request cannot record a
+     verdict, so it does not offer one. The buttons would 503 - which is honest, and
+     still worse than not being there: a reviewer would read the finding, decide, click,
+     and only then learn their decision was never possible. */
+  $('#slide-foot').innerHTML = SUMMARY.read_only
+    ? `<div class="triage"><span class="note">Read-only view — triage decisions are
+         recorded in the local app, which has somewhere to keep them.</span></div>`
+    : `<div class="triage findingtriage"
        data-id="${esc(f.finding_id)}">
     ${(d.course && (d.also_in || []).length)
       ? `<div class="warn">A triage decision is recorded against the finding, which has

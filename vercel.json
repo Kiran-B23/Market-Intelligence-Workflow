@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.py": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.py",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow",
+        "Referrer-Policy": "no-referrer"
+      }
+    }
+  ],
+  "env": {
+    "MIW_READ_ONLY": "1",
+    "MIW_HOSTED": "1"
+  }
+}

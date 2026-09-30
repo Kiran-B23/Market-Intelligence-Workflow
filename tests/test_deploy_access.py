@@ -147,3 +147,194 @@ def test_the_refusal_is_not_maskable_by_an_unrelated_failure():
     body = src[src.index("def cmd_serve("):]
     body = body[:body.index("\ndef ")]
     assert body.index("Refusing to serve") < body.index("import uvicorn")
+
+
+# ---------------------------------------------------------------------------------
+# A host whose filesystem does not outlive the request.
+#
+# Every write in this app is SQLite under `state/`. On a serverless platform that
+# write goes to an ephemeral `/tmp` and disappears, so a triage verdict would return
+# 200, print its precision figure, and be gone by the next request — with nothing to
+# tell the reviewer their decision never happened, and the holdout split quietly
+# computed from nothing. Refusing is the honest failure.
+
+
+@pytest.fixture
+def ro_client(monkeypatch):
+    def build(read_only: bool):
+        monkeypatch.setenv("MIW_READ_ONLY", "1" if read_only else "0")
+        monkeypatch.delenv("MIW_AUTH_TOKEN", raising=False)
+        import miw.api.app as app_mod
+        importlib.reload(app_mod)
+        return TestClient(app_mod.app)
+    return build
+
+
+def test_every_write_is_refused_not_swallowed(ro_client):
+    c = ro_client(True)
+    for method, path, body in (
+        ("post", "/api/triage", {"finding_id": "x", "verdict": "accepted"}),
+        ("post", "/api/runs", {"stages": ["probe"]}),
+        ("post", "/api/courses", {"slug": "x"}),
+        ("delete", "/api/courses/x", None),
+        ("post", "/api/agent-runs/t/review", {"verdict": "accepted"}),
+    ):
+        r = getattr(c, method)(path, **({"json": body} if body is not None else {}))
+        assert r.status_code == 503, f"{method} {path} returned {r.status_code}"
+        assert "read-only" in r.json()["detail"]
+
+
+def test_reading_is_untouched(ro_client):
+    c = ro_client(True)
+    for path in ("/", "/api/summary", "/api/findings"):
+        assert c.get(path).status_code == 200, path
+
+
+def test_the_page_is_told_so_it_can_stop_offering_the_button(ro_client):
+    """A Confirm button that 503s is honest. One that is never drawn is kinder: the
+    reviewer would otherwise read the finding, decide, click, and only then learn the
+    decision was never possible."""
+    assert ro_client(True).get("/api/summary").json()["read_only"] is True
+    assert ro_client(False).get("/api/summary").json()["read_only"] is False
+    page = (ROOT / "miw" / "api" / "static" / "index.html").read_text()
+    assert "SUMMARY.read_only" in page
+    panel = page[page.index("$('#slide-foot').innerHTML"):]
+    panel = panel[:panel.index("wireTriage(")]
+    assert "Read-only view" in panel
+    assert panel.index("SUMMARY.read_only") < panel.index('data-do="accept"')
+
+
+def test_writes_are_allowed_when_the_filesystem_is_real(ro_client):
+    """The local app is the case this was all built for; it must be unaffected."""
+    c = ro_client(False)
+    r = c.post("/api/triage", json={"finding_id": "nope", "verdict": "accepted"})
+    assert r.status_code != 503
+
+
+def test_the_deployment_carries_no_course_text():
+    """`data/` is the session bodies and quiz text, and `content_records.jsonl` is
+    34MB of the same thing. Neither is read by the API, and neither is uploaded — the
+    detail panel loses its excerpts and says why, and keeps everything else."""
+    ignore = (ROOT / ".vercelignore").read_text()
+    active = {l.strip() for l in ignore.splitlines()
+              if l.strip() and not l.strip().startswith("#")}
+    assert "data/" in active
+    assert "out/content_records.jsonl" in active
+    assert "state/" in active
+    # ...and the artifacts the API actually reads are NOT excluded.
+    for needed in ("out/findings_", "out/inventory.json", "miw/"):
+        assert not any(a.rstrip("/") == needed.rstrip("/") for a in active), needed
+
+
+def test_the_serverless_entrypoint_defaults_to_read_only():
+    """Set in two places on purpose: `vercel.json` can be edited in the dashboard, and
+    the entrypoint cannot."""
+    import json
+    entry = (ROOT / "api" / "index.py").read_text()
+    assert 'setdefault("MIW_READ_ONLY", "1")' in entry
+    cfg = json.loads((ROOT / "vercel.json").read_text())
+    assert cfg["env"]["MIW_READ_ONLY"] == "1"
+    # A findings page is not something to hand a crawler. Set in the platform config
+    # AND in the app, because the first is one dashboard edit away and the second is not.
+    assert "noindex" in cfg["routes"][0]["headers"]["X-Robots-Tag"]
+    assert "X-Robots-Tag" in (ROOT / "miw" / "api" / "app.py").read_text()
+
+
+def test_the_original_request_path_reaches_the_app():
+    """`rewrites` REPLACES the path with its destination, so every request arrived as
+    `/api/index.py`: FastAPI matched no route and `/healthz` was never recognised as
+    the one open path. The first working deploy failed on exactly this, and the build
+    output had said so. `routes` passes the path through."""
+    import json
+    cfg = json.loads((ROOT / "vercel.json").read_text())
+    assert "rewrites" not in cfg, "a rewrite destination becomes the request path"
+    assert cfg["routes"][0]["src"] == "/(.*)"
+    assert cfg["routes"][0]["dest"] == "/api/index.py"
+
+
+def test_a_hosted_deployment_with_no_token_serves_nothing(monkeypatch):
+    """The gap the bind check cannot cover.
+
+    `main.py serve` refuses a non-loopback host without a token, but a serverless
+    platform imports the ASGI app directly — there is no host argument to refuse. The
+    token guard is opt-in by construction: it only fires once someone has set a token.
+    So a deployment where nobody set one was open to the internet with every test
+    passing, serving among other things the published advisories against the exact
+    package versions these courses pin.
+    """
+    monkeypatch.setenv("MIW_HOSTED", "1")
+    monkeypatch.delenv("MIW_AUTH_TOKEN", raising=False)
+    import miw.api.app as app_mod
+    importlib.reload(app_mod)
+    c = TestClient(app_mod.app)
+    for path in ("/", "/api/summary", "/api/findings"):
+        r = c.get(path)
+        assert r.status_code == 503, path
+        assert "MIW_AUTH_TOKEN" in r.text
+    # Empty would be the kinder-looking failure and the worse one: it reads as
+    # "no findings" rather than "this is misconfigured".
+    assert "[]" not in c.get("/api/findings").text
+    assert c.get("/healthz").status_code == 200
+
+
+def test_the_platforms_own_variable_also_counts(monkeypatch):
+    """Removing MIW_HOSTED from the config must not reopen it."""
+    monkeypatch.delenv("MIW_HOSTED", raising=False)
+    monkeypatch.delenv("MIW_AUTH_TOKEN", raising=False)
+    monkeypatch.setenv("VERCEL", "1")
+    import miw.api.app as app_mod
+    importlib.reload(app_mod)
+    assert TestClient(app_mod.app).get("/api/findings").status_code == 503
+
+
+def test_the_local_app_is_still_open_on_loopback(monkeypatch):
+    for var in ("MIW_HOSTED", "MIW_AUTH_TOKEN", "VERCEL", "MIW_READ_ONLY"):
+        monkeypatch.delenv(var, raising=False)
+    import miw.api.app as app_mod
+    importlib.reload(app_mod)
+    assert TestClient(app_mod.app).get("/api/findings").status_code == 200
+
+
+def test_no_read_path_opens_the_state_store(ro_client):
+    """The first deploy died on this, and it died at STARTUP so nothing served at all.
+
+    Opening the jobs or decision database creates `state/`, and on a read-only host
+    `mkdir` raises. The store is not uploaded there either — it is a reviewer's
+    decision history and belongs on the machine that took the decisions — so every
+    read path has to answer without it rather than crash reaching for it.
+    """
+    import miw.api.app as app_mod
+    c = ro_client(True)
+    bad = []
+    for route in app_mod.app.routes:
+        methods = getattr(route, "methods", set()) or set()
+        if "GET" not in methods or "{" in route.path:
+            continue
+        code = c.get(route.path).status_code
+        if code >= 500:
+            bad.append((route.path, code))
+    assert not bad, bad
+
+
+def test_startup_does_not_reach_for_a_writable_disk(ro_client):
+    """`TestClient` as a context manager fires the startup event; without the guard
+    this raises and the application never comes up."""
+    import miw.api.app as app_mod
+    with TestClient(app_mod.app) as c:  # noqa: F841 — the construction is the assertion
+        pass
+    body = (ROOT / "miw" / "api" / "app.py").read_text()
+    startup = body[body.index("def _startup()"):]
+    startup = startup[:startup.index("\ndef ")]
+    assert "_read_only()" in startup
+    assert startup.index("_read_only()") < startup.index("runner()")
+
+
+def test_an_absent_decision_history_reads_as_absent_not_as_a_verdict(ro_client):
+    """`_decision` must come back empty rather than defaulting to something. A finding
+    shown as "Confirmed" because the store could not be opened would be a lie with a
+    chip on it."""
+    c = ro_client(True)
+    rows = c.get("/api/findings").json()
+    for f in rows["findings"] + rows["standing"]:
+        assert f["_decision"] is None, f["finding_id"]
+    assert c.get("/api/summary").json()["precision"]["triaged"] == 0

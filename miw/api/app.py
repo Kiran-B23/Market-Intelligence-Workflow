@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -63,6 +63,21 @@ app = FastAPI(title="MIW — Curriculum Drift Watch", docs_url="/api/docs")
 # HTTP Basic, so a browser prompts natively and `fetch` re-sends the credential
 # by itself - the page makes no external request and gains no login screen.
 AUTH_ENV = "MIW_AUTH_TOKEN"
+# A deployment whose filesystem does not outlive the request. Every write here lands
+# in SQLite under `state/`, so on such a host a triage verdict would return 200, show
+# its precision figure, and be gone by the next request - the reviewer would have no
+# way to know their decision never happened, and the holdout split would quietly be
+# computed from nothing. Refusing the write is the honest failure; accepting it is not.
+READ_ONLY_ENV = "MIW_READ_ONLY"
+# Set by any entry point that is not `main.py serve` binding a loopback socket. It
+# exists because the bind check cannot: a serverless platform imports the ASGI app
+# directly, so there is no host argument to refuse. Without this the guard below is
+# opt-in - it only fires once someone has set a token - and a deployment where nobody
+# set one is open to the internet while every test still passes. The findings it would
+# serve include published advisories against the exact versions the courses pin, which
+# is not a list to leave in public.
+HOSTED_ENV = "MIW_HOSTED"
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # Liveness only. It returns no data, so a platform health probe does not need a
 # credential and a leaked URL reveals nothing but that something is listening.
 OPEN_PATHS = frozenset({"/healthz"})
@@ -88,10 +103,40 @@ def _presented(request: Request) -> str:
     return ""
 
 
+def _truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes"}
+
+
+def _read_only() -> bool:
+    return _truthy(READ_ONLY_ENV)
+
+
+def _hosted() -> bool:
+    """Reachable from somewhere other than this machine. `VERCEL` is set by the
+    platform itself, so a deployment cannot become un-hosted by dropping a variable."""
+    return _truthy(HOSTED_ENV) or bool(os.environ.get("VERCEL", "").strip())
+
+
 @app.middleware("http")
 async def _require_token(request: Request, call_next):
+    if _read_only() and request.method not in SAFE_METHODS:
+        return JSONResponse(
+            status_code=503,
+            content={"detail":
+                     "This deployment is read-only: its filesystem does not survive "
+                     "the request, so a triage decision, a course change or a run "
+                     "would be accepted and then lost. Use the local app, or a host "
+                     "with a persistent volume — see DEPLOY.md."})
     token = _auth_token()
-    if not token or request.url.path in OPEN_PATHS:
+    if request.url.path in OPEN_PATHS:
+        return await call_next(request)
+    if not token:
+        if _hosted():
+            # Serve nothing rather than serve it to everyone. An empty page would be a
+            # kinder-looking failure and a worse one: it reads as "no findings".
+            return PlainTextResponse(
+                "This deployment has no MIW_AUTH_TOKEN set, so it is refusing to "
+                "serve. Set one and redeploy — see DEPLOY.md.", status_code=503)
         return await call_next(request)
     # `compare_digest` rather than `==`: the comparison is on a secret and the
     # short-circuit in `==` leaks its length through timing.
@@ -102,6 +147,17 @@ async def _require_token(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def _no_index(request: Request, call_next):
+    """Set here as well as in the platform config, because the platform config is one
+    dashboard edit away and this is not. A findings list carrying published advisories
+    against the versions these courses pin is not something to hand a crawler."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
 @app.get("/healthz")
 def healthz() -> PlainTextResponse:
     """For a platform's health probe. Deliberately says nothing else."""
@@ -110,6 +166,13 @@ def healthz() -> PlainTextResponse:
 
 @app.on_event("startup")
 def _startup() -> None:
+    # Constructing the job runner opens the jobs database, and opening it creates
+    # `state/` - which on a read-only host raises, fails startup, and takes the whole
+    # application down with it. Nothing is lost by skipping it: recovering a run that
+    # a previous process left half-finished is only meaningful where a run can be
+    # started, and this is the deployment where one cannot.
+    if _read_only():
+        return
     from miw.api.jobs import runner
     n = runner().recover_interrupted()
     if n:
@@ -271,12 +334,22 @@ def summary(course: str = "") -> dict:
     for d in deps:
         by_kind[d.get("kind", "?")] = by_kind.get(d.get("kind", "?"), 0) + 1
 
-    state = State()
-    precision = state.precision_stats()
-    state.close()
+    # Opening the store creates `state/`, which on a read-only host raises. The store
+    # is not uploaded there either - it is a reviewer's decision history and belongs on
+    # the machine that took the decisions - so there is nothing to read and the honest
+    # answer is the same empty shape a first run gives.
+    if _read_only():
+        precision = {"precision": None, "triaged": 0}
+    else:
+        state = State()
+        precision = state.precision_stats()
+        state.close()
 
     fp = _latest("findings_*.json")
     return {
+        # Said up front, so the page can stop offering a control that cannot work. A
+        # Confirm button that 503s is honest; one that is never shown is kinder.
+        "read_only": _read_only(),
         "run_date": findings.get("analysed_at") or inv.get("generated_at") or "",
         "findings_file": fp.name if fp else "",
         "dependencies": len(deps),
@@ -395,13 +468,19 @@ def findings(course: str = "") -> dict:
         # decision about this date, so the row renders only what it could read.
         _sd = parse_shutdown(r.get("shutdown_date", "") or "")
         r["shutdown_on"] = _sd.isoformat() if _sd else ""
-    state = State()
-    for f in rows + standing:
-        d = state.latest_decision(f["finding_id"])
-        f["_decision"] = d["verdict"] if d else None
-        f["_decision_reason"] = (d["reason"] if d else "") or ""
-        f["_split"] = triage.split_of(f["finding_id"])
-    state.close()
+    if _read_only():
+        for f in rows + standing:
+            f["_decision"] = None
+            f["_decision_reason"] = ""
+            f["_split"] = ""
+    else:
+        state = State()
+        for f in rows + standing:
+            d = state.latest_decision(f["finding_id"])
+            f["_decision"] = d["verdict"] if d else None
+            f["_decision_reason"] = (d["reason"] if d else "") or ""
+            f["_split"] = triage.split_of(f["finding_id"])
+        state.close()
     return {"run_date": data.get("analysed_at", ""), "findings": rows,
             "course": title,
             # `finding_id` is carried because a standing finding is still openable:
@@ -820,18 +899,22 @@ def finding_detail(finding_id: str, course: str = "", session: str = "",
     # The triage controls live in this panel, so the panel has to know what a reviewer
     # already decided. Without these three the buttons render, but the status line says
     # "held out for scoring" on a finding that was confirmed last week.
-    from miw import triage
     from miw.probe.catalogue import parse_shutdown
-    from miw.state import State
-    _st = State()
-    _d = _st.latest_decision(finding_id)
-    _st.close()
+    if _read_only():
+        _d, _split = None, ""
+    else:
+        from miw import triage
+        from miw.state import State
+        _st = State()
+        _d = _st.latest_decision(finding_id)
+        _st.close()
+        _split = triage.split_of(finding_id)
     _sd = parse_shutdown(shown.get("shutdown_date", "") or "")
     shown = {**shown,
              "shutdown_on": _sd.isoformat() if _sd else "",
              "_decision": _d["verdict"] if _d else None,
              "_decision_reason": (_d["reason"] if _d else "") or "",
-             "_split": triage.split_of(finding_id)}
+             "_split": _split}
 
     return {
         "finding": shown,
@@ -1436,9 +1519,15 @@ def list_runs(limit: int = 20, course: str = "") -> dict:
     An UNSCOPED sweep appears in every course's history, because it really did audit
     every course. A run scoped to one course appears only there.
     """
-    from miw.api.jobs import runner
     from miw.scope import slug_of
     title = _resolve_course(course)
+    # The run history lives in the jobs database, which is not uploaded to a read-only
+    # deployment and could not be opened there anyway - constructing the runner creates
+    # `state/`. An empty history is the truthful answer: no run has ever happened on
+    # this host, and none can.
+    if _read_only():
+        return {"active": [], "runs": [], "course": title}
+    from miw.api.jobs import runner
     r = runner()
     rows = r.list(limit, course_slug=slug_of(title) if title else "")
     out = []
@@ -1454,6 +1543,8 @@ def list_runs(limit: int = 20, course: str = "") -> dict:
 
 @app.get("/api/runs/{run_id}")
 def get_run(run_id: str, after: int = 0) -> dict:
+    if _read_only():
+        raise HTTPException(404, f"no run {run_id}")
     from miw.api.jobs import runner
     r = runner()
     row = r.get(run_id)
