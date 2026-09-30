@@ -1,0 +1,40 @@
+# Fly.io. The same Dockerfile runs unchanged on Railway or Render; what those need
+# instead of this file is a volume mounted at /data and MIW_AUTH_TOKEN in the
+# environment.
+app = "miw-curriculum-watch"
+primary_region = "sin"          # closest to the team; `fly platform regions` lists them
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  MIW_DATA_DIR = "/data"
+
+# The whole reason this is not a serverless deploy. Triage decisions, job records and
+# upstream snapshots are SQLite writes, and SQLite on a network filesystem corrupts -
+# so this is a real block device, and the app is single-instance by consequence.
+[mounts]
+  source = "miw_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # A run takes minutes and holds its process. Stopping the machine between requests
+  # would kill one mid-probe and leave the job row marked interrupted.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    path = "/healthz"
+    interval = "30s"
+    timeout = "4s"
+    grace_period = "20s"
+
+# One. Two machines would each mount their own volume and diverge: two triage
+# histories, two job tables, and a precision figure computed from half the evidence.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

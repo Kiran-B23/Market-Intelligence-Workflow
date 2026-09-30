@@ -26,7 +26,10 @@ writes the operator's own local state. Do not expose it to a network.
 """
 from __future__ import annotations
 
+import base64
 import json
+import os
+import secrets
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +45,67 @@ OUT = ROOT / "out"
 STATIC = Path(__file__).parent / "static"
 
 app = FastAPI(title="MIW — Curriculum Drift Watch", docs_url="/api/docs")
+
+# --------------------------------------------------------------------- access
+# This app has no user model and never needed one: it reads and writes the local
+# state of one operator's machine. The moment it is reachable from anywhere else
+# that is not a missing feature, it is an open door - every endpoint is
+# unauthenticated, `POST /api/triage` writes reviewer verdicts that feed the
+# precision metric, and the detail panel returns verbatim session excerpts and
+# quiz text from proprietary course exports.
+#
+# So the rule is structural rather than advisory. `cmd_serve` refuses to bind a
+# non-loopback host without a token, and this guard requires the token on every
+# request once one is set. Both, because either alone has a gap: the bind check
+# cannot see a platform that proxies to loopback, and the guard cannot fire if
+# nobody ever sets the variable.
+#
+# HTTP Basic, so a browser prompts natively and `fetch` re-sends the credential
+# by itself - the page makes no external request and gains no login screen.
+AUTH_ENV = "MIW_AUTH_TOKEN"
+# Liveness only. It returns no data, so a platform health probe does not need a
+# credential and a leaked URL reveals nothing but that something is listening.
+OPEN_PATHS = frozenset({"/healthz"})
+
+
+def _auth_token() -> str:
+    return os.environ.get(AUTH_ENV, "").strip()
+
+
+def _presented(request: Request) -> str:
+    """The password from Basic auth, or a bearer token. Never the username: the
+    browser needs *a* username and there is no user model to check it against."""
+    header = request.headers.get("authorization", "")
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() == "bearer":
+        return value.strip()
+    if scheme.lower() == "basic":
+        try:
+            decoded = base64.b64decode(value.strip(), validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return ""
+        return decoded.partition(":")[2]
+    return ""
+
+
+@app.middleware("http")
+async def _require_token(request: Request, call_next):
+    token = _auth_token()
+    if not token or request.url.path in OPEN_PATHS:
+        return await call_next(request)
+    # `compare_digest` rather than `==`: the comparison is on a secret and the
+    # short-circuit in `==` leaks its length through timing.
+    if not secrets.compare_digest(_presented(request), token):
+        return PlainTextResponse(
+            "Authentication required.", status_code=401,
+            headers={"WWW-Authenticate": 'Basic realm="MIW", charset="UTF-8"'})
+    return await call_next(request)
+
+
+@app.get("/healthz")
+def healthz() -> PlainTextResponse:
+    """For a platform's health probe. Deliberately says nothing else."""
+    return PlainTextResponse("ok")
 
 
 @app.on_event("startup")

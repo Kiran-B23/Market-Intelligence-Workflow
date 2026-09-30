@@ -1,0 +1,21 @@
+# Everything the image must not carry. `out/`, `state/` and `data/` are also in
+# .gitignore - data/ as "large, proprietary" - and repeating them here is the point:
+# a build from a working checkout would otherwise pick up 80MB of course exports,
+# findings and SQLite state and bake them into a pushable image.
+out/
+state/
+data/
+.git/
+.github/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.local
+tests/
+docs/
+*.md
+!DEPLOY.md

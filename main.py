@@ -1893,14 +1893,33 @@ def cmd_verify(args) -> int:
 
 def cmd_serve(args) -> int:
     """Start the local read-and-triage UI."""
+    # First, before anything that can fail for an unrelated reason. Structural, not
+    # advisory: this used to print "keep it on localhost" and then cheerfully bind
+    # 0.0.0.0 if asked, and a warning is not a control. Every endpoint is
+    # unauthenticated, `POST /api/triage` writes verdicts that feed the precision
+    # metric, and the detail panel returns verbatim session excerpts from proprietary
+    # course exports. So a non-loopback bind without a token does not start - and it
+    # is checked here rather than after the import, because a missing uvicorn was
+    # enough to mask the refusal and return the same exit code for a different reason.
+    import os
+    loopback = {"127.0.0.1", "::1", "localhost"}
+    if args.host not in loopback and not os.environ.get("MIW_AUTH_TOKEN", "").strip():
+        print(f"  Refusing to serve on {args.host} with no MIW_AUTH_TOKEN set.",
+              file=sys.stderr)
+        print("  Every endpoint here is unauthenticated and the detail panel returns\n"
+              "  course content verbatim. Either bind 127.0.0.1, or set a token:\n"
+              "      MIW_AUTH_TOKEN=$(openssl rand -hex 24) python3 main.py serve "
+              "--host 0.0.0.0", file=sys.stderr)
+        return 2
     try:
         import uvicorn
     except ImportError:
         print("uvicorn is not installed: pip install fastapi uvicorn", file=sys.stderr)
         return 2
     print(f"  MIW UI on http://{args.host}:{args.port}   (API docs at /api/docs)")
-    print("  No authentication: it reads and writes your local state. Keep it on "
-          "localhost.")
+    print("  Authentication: " + ("token required (MIW_AUTH_TOKEN is set)"
+                                  if os.environ.get("MIW_AUTH_TOKEN", "").strip()
+                                  else "none — loopback only, which is why this is fine"))
     uvicorn.run("miw.api.app:app", host=args.host, port=args.port,
                 reload=args.reload, log_level="info")
     return 0
