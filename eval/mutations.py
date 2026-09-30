@@ -242,6 +242,12 @@ MUTATIONS: list[tuple[str, str, tuple[str, str], str]] = [
      "pytest:tests/test_provider_parity.py"),
 
     # --- reachable from off this machine means reachable without a token -----
+    ("DEPLOY the read-only footer is wired as a triage form, so no finding opens",
+     "miw/api/static/index.html",
+     ("  wireTriage($('#slide-foot').querySelector('.findingtriage'));",
+      "  wireTriage($('#slide-foot').querySelector('.triage'));\n"
+      "  /* and the note answers to that class too */"),
+     "pytest:tests/test_ui_render.py"),
     ("DEPLOY a hosted deployment with no token serves everyone instead of no one",
      "miw/api/app.py",
      ("    if not token:\n        if _hosted():", "    if not token:\n        if False:"),

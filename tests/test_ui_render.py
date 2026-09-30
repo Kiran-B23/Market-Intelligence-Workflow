@@ -353,7 +353,7 @@ def test_the_panel_is_not_a_section_so_the_generic_rule_does_not_cover_it():
 # empty `alternatives`, a `claims` entry with no quote, a topic gap with no dependency.
 
 
-def _panel_harness(payloads: list) -> str:
+def _panel_harness(payloads: list, read_only: bool = False) -> str:
     js = _script()
     words = re.search(r"const WORDS = \{.*?\n\};", js, re.S).group(0)
     esc = re.search(r"const esc = s =>.*?;\n", js, re.S).group(0)
@@ -365,17 +365,47 @@ def _panel_harness(payloads: list) -> str:
         # Stubs for what the panel touches outside itself. Each records rather than
         # acts, so the assertions below can read what the panel produced.
         "const SLOTS = {};",
+        # `querySelector` answers from the HTML the slot was actually given, rather
+        # than returning null for everything. It has to: `wireTriage` is real below,
+        # and a stub that finds nothing can never exercise the wiring. The bug this
+        # exists for shipped because the read-only footer wore `class="triage"` while
+        # the wiring selected `.triage`, so a sentence was handed to a function that
+        # dereferences `[data-do=toggle]` — and every finding on the deployment opened
+        # as "Could not load this finding".
+        "const stand_in = html => ({",
+        "  dataset: {id: (html.match(/data-id=\"([^\"]*)\"/) || [])[1] || ''},",
+        "  classList: {add(){}, remove(){}, toggle(){}},",
+        # `[data-do=toggle]` in a selector is `data-do=\"toggle\"` in markup.
+        "  querySelector(s) {",
+        "    const attr = s.replace(/^\\[|\\]$/g, '').replace(/=(.*)$/, '=\"$1\"');",
+        "    const cls = s.replace(/^\\./, '');",
+        "    const found = s.startsWith('.')",
+        "      ? new RegExp('class=\"[^\"]*\\\\b' + cls + '\\\\b').test(html)",
+        "      : html.includes(attr);",
+        "    return found ? {onclick: null, textContent: '', value: '',",
+        "      classList: {add(){}, remove(){}, toggle(){}}} : null;",
+        "  },",
+        "  querySelectorAll: () => [],",
+        "});",
         "const el = id => ({",
         "  set innerHTML(v) { SLOTS[id] = (SLOTS[id] || '') + v; },",
         "  get innerHTML() { return SLOTS[id] || ''; },",
-        "  querySelectorAll: () => [], querySelector: () => null,",
+        "  querySelectorAll: () => [],",
+        "  querySelector(sel) {",
+        "    const html = SLOTS[id] || '';",
+        "    const cls = sel.replace(/^\\./, '');",
+        "    return new RegExp('class=\"[^\"]*\\\\b' + cls + '\\\\b').test(html)",
+        "      ? stand_in(html) : null;",
+        "  },",
         "  addEventListener: () => {}, set onclick(v) {},",
         "});",
         "const $ = sel => el(sel);",
-        "const wireCopy = () => {}; const wireTriage = () => {};",
+        "const wireCopy = () => {}; const renderHeader = () => {};",
+        "const markDecided = () => {}; const fetch = () => {};",
+        _function(js, "wireTriage"),
         "const closeDetail = () => {}; const get = async () => ({});",
         "let DETAIL_ID = '', CURRENT_COURSE = '';",
-        "const SUMMARY = {run_date:'2026-01-01'};",
+        f"const SUMMARY = {{run_date:'2026-01-01', read_only:{str(read_only).lower()}}};",
         re.search(r"const NO_EXCERPT = \{.*?\n\};", js, re.S).group(0),
         _function(js, "highlight"),
         _function(js, "idChip"),
@@ -453,3 +483,40 @@ def test_the_decision_is_in_the_panel_and_reachable_without_scrolling():
     assert "also applies to" in foot or "data-id=" in foot
     # In the footer, not at the end of the scrolling body.
     assert 'data-do="accept"' not in slots.get("#slide-body", "")
+
+
+def test_the_panel_opens_on_a_read_only_deployment():
+    """The bug a reviewer found on the deployment, and the reason this harness runs the
+    REAL `wireTriage` rather than a stub.
+
+    In read-only mode the footer is a sentence, not a form. It was rendered with
+    `class="triage"`, and the wiring selected `.triage` — so a div with no
+    `[data-do=toggle]` was handed to a function that dereferences exactly that. The
+    throw was caught by `openDetail`, which reported "Could not load this finding",
+    blaming the fetch for a wiring bug. Every finding on the deployment was unopenable,
+    and every test passed: the panel harness stubbed the function that crashed.
+    """
+    payloads = _payloads(2)
+    out = json.loads(_run(_panel_harness(payloads, read_only=True)))
+    assert out["n"] == len(payloads)
+    foot = out["slots"].get("#slide-foot", "")
+    assert "Read-only" in foot
+    assert "data-do=" not in foot, "no control that cannot work"
+    body = out["slots"].get("#slide-body", "")
+    assert "What needs to change" in body, "the panel still says everything else"
+
+
+def test_the_wiring_selects_the_form_and_not_whatever_shares_its_class():
+    """Belt to the harness's braces, and readable at review time: the class the
+    read-only note carries must not be the class the wiring reaches for."""
+    page = (ROOT / "miw" / "api" / "static" / "index.html").read_text()
+    panel = page[page.index("$('#slide-foot').innerHTML"):]
+    panel = panel[:panel.index("wireTriage(") + 200]
+    selector = re.search(r"wireTriage\(\$\('#slide-foot'\)\.querySelector\('\.(\w+)'\)\)",
+                         panel)
+    assert selector, "could not find the wiring call"
+    wired = selector.group(1)
+    readonly_cls = re.search(r'read_only\s*\?\s*`<div class="(\w+)"', panel)
+    assert readonly_cls, "could not find the read-only footer"
+    assert readonly_cls.group(1) != wired, (
+        f"the read-only note and the triage form both answer to {wired!r}")
